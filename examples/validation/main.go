@@ -1,0 +1,66 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/crgimenes/filo"
+)
+
+// This example shows how Filo can be used for data validation rules.
+// Common use case: form validation, API input validation, business rules.
+
+func main() {
+	eng := filo.NewEngine()
+	filo.RegisterStringBuiltins(eng)
+
+	ctx := context.Background()
+	cfg := filo.EvalConfig{StepLimit: 256, RecursionLimit: 16, Timeout: time.Second}
+
+	// Validation rules written in Filo
+	// These could be stored in a database or config file
+	rules := map[string]string{
+		"email_format":    `(and (> (str-len email) 5) (str-find "@" email))`,
+		"age_valid":       `(and (>= age 18) (<= age 120))`,
+		"password_strong": `(>= (str-len password) 8)`,
+		"username_valid":  `(and (>= (str-len username) 3) (<= (str-len username) 20))`,
+	}
+
+	// Test data to validate
+	testCases := []map[string]filo.Value{
+		{"email": filo.VString("user@example.com"), "age": filo.VNum(25), "password": filo.VString("secret123"), "username": filo.VString("john")},
+		{"email": filo.VString("bad"), "age": filo.VNum(15), "password": filo.VString("123"), "username": filo.VString("x")},
+	}
+
+	for i, data := range testCases {
+		fmt.Printf("=== Test Case %d ===\n", i+1)
+		for ruleName, ruleScript := range rules {
+			result, _, err := eng.RunScript(ctx, ruleScript, data, cfg)
+			if err != nil {
+				fmt.Printf("  %s: ERROR - %v\n", ruleName, err)
+				continue
+			}
+			valid, _ := result.AsBool()
+			status := "✓ PASS"
+			if !valid {
+				status = "✗ FAIL"
+			}
+			fmt.Printf("  %s: %s\n", ruleName, status)
+		}
+		fmt.Println()
+	}
+}
+
+// Output:
+// === Test Case 1 ===
+//   email_format: ✓ PASS
+//   age_valid: ✓ PASS
+//   password_strong: ✓ PASS
+//   username_valid: ✓ PASS
+//
+// === Test Case 2 ===
+//   email_format: ✗ FAIL
+//   age_valid: ✗ FAIL
+//   password_strong: ✗ FAIL
+//   username_valid: ✗ FAIL
