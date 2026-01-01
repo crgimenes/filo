@@ -1,6 +1,6 @@
-# Filo — A Safe, Minimalist Scripting Language for Go Applications
+# Filo language - A Safe, Minimalist Scripting Language for Go Applications
 
-Filo is a **lean**, **secure**, and **deterministic** scripting language designed to be embedded directly into Go applications. It was built for real-world scenarios where end users — including non-programmers — must write small rules, expressions, and validations that influence application behavior **without compromising stability, security, or performance**.
+Filo is a **lean**, **secure**, and **deterministic** scripting language designed to be embedded directly into Go applications. It was built for real-world scenarios where end users - including non-programmers — must write small rules, expressions, and validations that influence application behavior **without compromising stability, security, or performance**.
 
 This README explains **why** the language exists, **which problems it solves**, how it works, and presents **practical examples**.
 
