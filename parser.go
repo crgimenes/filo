@@ -215,12 +215,7 @@ func (l *lexer) errAt(pos int, msg string) error {
 }
 
 func snippetNear(src string, pos int) string {
-	if pos < 0 {
-		pos = 0
-	}
-	if pos > len(src) {
-		pos = len(src)
-	}
+	pos = min(max(pos, 0), len(src))
 	const radius = 20
 	start := max(pos-radius, 0)
 	end := min(pos+radius, len(src))
