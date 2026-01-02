@@ -115,7 +115,7 @@ Step by step, Filo provides:
 - essential operations (`+`, `-`, `*`, `/`, `%`, `pow`);
 - comparisons (`=`, `!=`, `<`, `<=`, `>`, `>=`);
 - boolean logic (`and`, `or`, `not`);
-- lists and higher-order functions (`map`, `fold`, `list`, `length`, `head`, `tail`, `nth`, `append`, `concat`);
+- lists and higher-order functions (`map`, `fold`, `list`, `length`, `head`, `tail`, `nth`, `list-append`, `list-concat`);
 - string operations (`str-fmt`, `str-concat`, `str-join`, `str-split`, `str-find`, `str-trim`, `str-replace`, `str-upper`, `str-lower`, `str-len`, `str-sub`);
 - basic control flow (`if`, `do`);
 - introspection (`type-of`);
@@ -164,11 +164,13 @@ Bytecode may be added in the future, but only when there is a real need.
 | `let` | `(let ((n v) ...) body)` | Defines local variables. Scope is limited to the body. |
 | `letv` | `(letv (n1 n2) (values v1 v2) body)` | Destructures multi-value returns (tuples). |
 | `fn` | `(fn (args) body)` | Creates an anonymous function. |
-| `def` | `(def name expr)` | Defines a global variable or function in the current scope. |
+| `def` | `(def name expr)` | Defines a global variable or function (always in the root/global scope). |
 | `set` | `(set name expr)` | Updates an existing variable in the nearest scope. |
 | `values`| `(values v1 v2 ...)` | Returns multiple values (a tuple). |
 
 ### Core Builtins
+
+Note: `NewEngine()` includes the core math/logic/list/type builtins by default. Some builtin sets are intentionally **opt-in** and must be registered explicitly (see below).
 
 | Category | Function | Description |
 |----------|----------|-------------|
@@ -179,17 +181,24 @@ Bytecode may be added in the future, but only when there is a real need.
 | | `and`, `or`, `not` | Boolean logic. |
 | **Types** | `type-of` | Returns "number", "string", "list", etc. |
 | | `is-empty` | Returns true for "" or empty list. |
-| | `is-nil` | Returns true for nil/empty list (legacy alias). |
+| | `is-nil` | Returns true for an empty list (closest thing to nil in the current runtime). |
 | **Lists** | `list` | Creates a list `(list 1 2 3)`. |
 | | `length` | Returns list length. |
 | | `head`, `tail` | First element / Rest of list. |
 | | `nth` | `(nth list index)` Access element by index (0-based). |
-| | `append` | `(append list item)` Returns new list with item appended. |
-| | `concat` | `(concat l1 l2)` Concatenates two lists. |
+| | `list-append` | `(list-append list item)` Returns new list with item appended. |
+| | `list-concat` | `(list-concat l1 l2 ...)` Concatenates two or more lists. |
 | | `map` | `(map fn list)` Applies function to each element. |
 | | `fold` | `(fold fn init list)` Reduces list with accumulator. |
 
 ### String Builtins
+
+These string builtins are not enabled by default. To use them, register them explicitly:
+
+```go
+eng := filo.NewEngine()
+filo.RegisterStringBuiltins(eng)
+```
 
 | Function | Description |
 |----------|-------------|
@@ -207,6 +216,8 @@ Bytecode may be added in the future, but only when there is a real need.
 
 ### Extension: filomath
 
+Requires explicit registration via `filomath.RegisterMathBuiltins(eng)`.
+
 | Function | Description |
 |----------|-------------|
 | `abs`, `sqrt` | Absolute value, Square root. |
@@ -218,6 +229,8 @@ Bytecode may be added in the future, but only when there is a real need.
 | `pi`, `e` | Constants. |
 
 ### Extension: filorand
+
+Requires explicit registration via `filorand.RegisterRandomBuiltins(eng)`. These functions are intentionally **non-deterministic**.
 
 | Function | Description |
 |----------|-------------|

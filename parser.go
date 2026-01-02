@@ -222,14 +222,8 @@ func snippetNear(src string, pos int) string {
 		pos = len(src)
 	}
 	const radius = 20
-	start := pos - radius
-	if start < 0 {
-		start = 0
-	}
-	end := pos + radius
-	if end > len(src) {
-		end = len(src)
-	}
+	start := max(pos-radius, 0)
+	end := min(pos+radius, len(src))
 	snippet := src[start:end]
 	snippet = strings.ReplaceAll(snippet, "\n", " ")
 	snippet = strings.ReplaceAll(snippet, "\r", " ")
