@@ -254,9 +254,8 @@ func builtinStrSub(ctx context.Context, args []Value) (Value, error) {
 	start = min(max(start, 0), len(runes))
 	if end < 0 {
 		end = len(runes)
-	} else {
-		end = min(end, len(runes))
 	}
+	end = min(end, len(runes))
 	if start > end {
 		return VString(""), nil
 	}

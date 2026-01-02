@@ -202,10 +202,9 @@ func TestNewBuiltins(t *testing.T) {
 			case KString:
 				got = fmt.Sprintf("%q", val.Str)
 			case KBool:
+				got = "#f"
 				if val.Bool {
 					got = "#t"
-				} else {
-					got = "#f"
 				}
 			case KList:
 				// Simplified list representation for this test
@@ -215,12 +214,8 @@ func TestNewBuiltins(t *testing.T) {
 						parts = append(parts, fmt.Sprintf("%g", v.Num))
 					}
 				}
-				if len(parts) > 0 {
-					got = "(list " + strings.Join(parts, " ") + ")"
-				} else {
-					// Handle general list case for (list 1 2) -> "(list 1 2)"
-					got = "(list " + strings.Join(parts, " ") + ")"
-				}
+				// Handle general list case for (list 1 2) -> "(list 1 2)"
+				got = "(list " + strings.Join(parts, " ") + ")"
 			}
 
 			// Rough check for specific list cases

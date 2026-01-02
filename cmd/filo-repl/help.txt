@@ -1,0 +1,75 @@
+# Filo REPL Help
+
+## Overview
+
+Filo is a safe, minimalist Lisp-like scripting language.
+This REPL allows you to interactively evaluate Filo expressions.
+
+## Commands
+
+  .help     Show this help (in pager)
+  .edit     Open $EDITOR to edit input (also: Ctrl+X, E)
+  .clear    Clear current input buffer
+  .quit     Exit REPL (also: .exit, .q, or Ctrl+D)
+
+## Basic Syntax
+
+Filo uses S-expressions (prefix notation):
+
+  (+ 1 2 3)           → 6
+  (* 2 (+ 3 4))       → 14
+  (if (> 10 5) "yes" "no") → "yes"
+
+## Types
+
+  Numbers:   42, 3.14, -10
+  Strings:   "hello world"
+  Booleans:  #t (true), #f (false)
+  Lists:     (list 1 2 3)
+  Functions: (fn (x) (* x x))
+
+## Variables
+
+  (let ((x 10) (y 20)) (+ x y))   Local binding
+  (def square (fn (x) (* x x)))   Global definition
+  (set x 42)                       Assignment
+
+## Core Functions
+
+  Arithmetic:  + - * / % pow
+  Comparison:  = != < <= > >=
+  Logic:       and or not
+  Lists:       list head tail nth length map fold
+  Types:       type-of is-empty is-nil
+
+## Extension Packages
+
+Use --filo-package to load:
+
+  math   sqrt sin cos log abs floor ceil round pi e
+  str    str-upper str-lower str-trim str-split str-join
+  rand   rand-int rand-float uuid-v4
+
+## Keyboard Shortcuts
+
+  Enter       Execute if balanced, continue if not
+  Ctrl+D      Exit (empty line) or force execute
+  Ctrl+X, E   Open external editor
+  Up/Down     Navigate history
+
+## Examples
+
+  Simple math:
+    (+ 1 2 3)
+
+  Define and use function:
+    (def square (fn (x) (* x x)))
+    (square 5)
+
+  List operations:
+    (map (fn (x) (* x 2)) (list 1 2 3))
+
+  Multi-line:
+    (if (> 10 5)
+        "bigger"
+        "smaller")
