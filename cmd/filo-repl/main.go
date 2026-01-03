@@ -265,16 +265,17 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 
 		// Count parentheses
 		open, close := countParens(buffer.String())
+		content := strings.TrimSpace(buffer.String())
 
-		if open == 0 && close == 0 && strings.TrimSpace(buffer.String()) == "" {
+		if content == "" {
 			// Empty input
 			buffer.Reset()
 			t.SetPrompt(promptMain)
 			continue
 		}
 
-		if open > 0 && open == close {
-			// Balanced - execute
+		if open == close {
+			// Balanced (including 0 == 0 for bare values like strings/numbers)
 			newGlobals := executeAndPrint(t, engine, buffer.String(), globals, cfg)
 			if newGlobals != nil {
 				globals = newGlobals
