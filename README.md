@@ -1,8 +1,6 @@
 # Filo language - A Safe, Minimalist Scripting Language for Go Applications
 
-Filo is a **lean**, **secure**, and **deterministic** scripting language designed to be embedded directly into Go applications. It was built for real-world scenarios where end users - including non-programmers — must write small rules, expressions, and validations that influence application behavior **without compromising stability, security, or performance**.
-
-This README explains **why** the language exists, **which problems it solves**, how it works, and presents **practical examples**.
+Filo is a **lean**, **secure**, and **deterministic** scripting language designed to be embedded directly into Go applications. It was created for real-world scenarios where end users, including non-programmers, need to write small rules, expressions, and validations that affect application behavior **without compromising stability, security, or performance**.
 
 ---
 
@@ -37,60 +35,40 @@ a clear need appears:
 
 > **Allow the user to write custom logic without ever putting the server at risk.**
 
-Using Lua was considered, but it has issues:
-
-### Problems when using Lua/gopher-lua
-
-- No granular execution control (`SetHook` does not exist in the library).
-- It is difficult to guarantee:
-  - there are no *infinite loops*,
-  - there is no *excessive CPU consumption*,
-  - there is no *sandbox escape* (filesystem, network, fragile globals).
-- Lua syntax is not ideal for short expressions used as calculated fields.
-- Non-technical users struggle more with procedural syntax.
-
-Therefore, something **simpler, controlled, and safe** was necessary.
-
----
-
 ## Why create the Filo language?
 
 ### 1. **Absolute security**
 
 The Filo runtime is designed with:
 
-- `StepLimit` — prevents infinite loops.
-- `RecursionLimit` — blocks stack explosions.
-- `Timeout` — execution is automatically aborted.
-- `context.Context` — natural integration with Go.
-- `recover()` — no script can cause a server `panic`.
+- `StepLimit` - prevents infinite loops.
+- `RecursionLimit` - blocks stack explosions.
+- `Timeout` - execution is automatically aborted.
+- `context.Context` - natural integration with Go.
+- `recover()` - no script can cause a server `panic`.
 
-### 2. **Determinism**
-
-Scripts must always produce the same results, with no unexpected side effects.
-
-### 3. **Simplicity**
+### 2. **Simplicity**
 
 Filo uses a minimalist Lisp-like syntax:
 
 ```lisp
 (+ 1 2)
-(if (< idade 18) "minor" "adult")
+(if (< age 18) "minor" "adult")
 (map (fn (x) (* x x)) (list 1 2 3))
 ```
 
 Small, easy to teach, easy to understand, and extremely predictable.
 
-### 4. **Smooth Go integration**
+### 3. **Smooth Go integration**
 
 - Builtins written directly in Go.
 - Global environment passed as `map[string]Value`.
 - Safe calls made in the backend.
 - Ideal for validations, RPG rules, and configuration scripts.
 
-### 5. **Extensible**
+### 4. **Extensible**
 
-- Go functions can be registered as Filo commands — from simple sums to database queries.
+- Go functions can be registered as Filo commands - from simple sums to database queries.
 
 ---
 
@@ -139,17 +117,7 @@ No:
 - network access,
 - “dangerous” calls.
 
-All advanced integration happens only through explicitly registered Go functions.
-
-### **4. Interpreter over AST**
-
-For now, Filo:
-
-- compiles to an AST,
-- executes directly,
-- can optionally cache AST or serialized IR.
-
-Bytecode may be added in the future, but only when there is a real need.
+All advanced integration happens only through explicitly registered Go functions. So the programmer has **full control** over what the script can do.
 
 ---
 
@@ -449,66 +417,7 @@ if err != nil {
 
 ---
 
-## Security
-
-Filo was designed to **avoid compromising the server**, even if a user attempts malicious code:
-
-- infinite loops → stopped by the step limit,
-- infinite recursion → stopped by the recursion limit,
-- slow scripts → timeout,
-- attempts to access external resources → impossible,
-- errors never crash the server → `recover()`.
-
-This combination makes Filo **secure by construction**.
-
----
-
-## How it will be used in projects
-
-### RAD system
-
-- calculated fields,
-- validations,
-- transformations,
-- custom behaviors.
-
-### RPG site
-
-- rules,
-- attribute calculations,
-- modifiers,
-- temporary effects,
-- combat automations.
-
-### System configuration
-
-- allow administrators to configure the application using declarative logic.
-
----
-
-## Current state and next steps
-
-### Current state
-
-- specification consolidated,
-- Go integration defined,
-- examples and tests included,
-- `filo` package implemented and used by engine tools.
-
-### Next steps
-
-- keep expanding documentation and reference material,
-- add more safety tests (limits, panic recovery, fuzzing),
-- syntax highlighting for Neovim.
-
----
-
-## Conclusion
-
-Filo exists to solve a real problem:
-
 > **give power to the user without giving up security.**
 
-It is a small, elegant, deterministic language that integrates easily into the Go ecosystem. It lets users write helpful rules without ever putting the server at risk.
+It is a small, elegant, deterministic language that integrates easily into the Go ecosystem. It lets users write helpful rules without putting the server at risk.
 
-Filo is simple enough for anyone to learn, yet powerful enough to express complex rules.
