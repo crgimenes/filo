@@ -56,6 +56,13 @@ func wrapIn(ctx string, err error) error {
 	if err == nil {
 		return nil
 	}
+	// Don't wrap control flow signals - they must propagate unchanged
+	if _, ok := err.(*exitSignal); ok {
+		return err
+	}
+	if _, ok := err.(*returnSignal); ok {
+		return err
+	}
 	return fmt.Errorf("in %s: %w", ctx, err)
 }
 
@@ -91,6 +98,10 @@ func (ev *evaluator) evalList(list *List, env *Env) (Value, error) {
 		case "values":
 			v, err := ev.evalValues(list.Elems[1:], env)
 			return v, wrapIn("values", err)
+		case "exit":
+			return ev.evalExit(list.Elems[1:], env)
+		case "return":
+			return ev.evalReturn(list.Elems[1:], env)
 		}
 		builtin, okBuiltin := ev.builtins[headSym.Name]
 		if okBuiltin {
@@ -318,9 +329,49 @@ func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Valu
 	result, err := ev.evalBody(fn.Body, child)
 	ev.recursion--
 	if err != nil {
+		// Catch returnSignal and extract its value
+		if ret, ok := err.(*returnSignal); ok {
+			return ret.Value, nil
+		}
 		return Value{}, err
 	}
 	return result, nil
+}
+
+// evalExit handles (exit [value]) - terminates script execution
+func (ev *evaluator) evalExit(args []Node, env *Env) (Value, error) {
+	if len(args) > 1 {
+		return Value{}, fmt.Errorf("exit expects 0 or 1 argument")
+	}
+	var val Value
+	if len(args) == 1 {
+		var err error
+		val, err = ev.eval(args[0], env)
+		if err != nil {
+			return Value{}, err
+		}
+	} else {
+		val = VList([]Value{}) // empty list as default
+	}
+	return Value{}, &exitSignal{Value: val}
+}
+
+// evalReturn handles (return [value]) - returns from current function
+func (ev *evaluator) evalReturn(args []Node, env *Env) (Value, error) {
+	if len(args) > 1 {
+		return Value{}, fmt.Errorf("return expects 0 or 1 argument")
+	}
+	var val Value
+	if len(args) == 1 {
+		var err error
+		val, err = ev.eval(args[0], env)
+		if err != nil {
+			return Value{}, err
+		}
+	} else {
+		val = VList([]Value{}) // empty list as default
+	}
+	return Value{}, &returnSignal{Value: val}
 }
 
 func (ev *evaluator) tick() error {

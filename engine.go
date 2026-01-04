@@ -72,7 +72,17 @@ func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]V
 
 	result, err = ev.eval(ast, root)
 	if err != nil {
-		return Value{}, nil, err
+		// Catch exitSignal - script terminated with (exit)
+		if exit, ok := err.(*exitSignal); ok {
+			result = exit.Value
+			err = nil
+		} else if ret, ok := err.(*returnSignal); ok {
+			// Catch returnSignal at top level - acts like exit
+			result = ret.Value
+			err = nil
+		} else {
+			return Value{}, nil, err
+		}
 	}
 
 	newGlobals = make(map[string]Value, len(root.bind))

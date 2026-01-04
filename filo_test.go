@@ -695,6 +695,98 @@ func TestAutoLevelExample(t *testing.T) {
 	}
 }
 
+func TestExitAndReturn(t *testing.T) {
+	eng := NewEngine()
+	cfg := defaultCfg()
+	ctx := context.Background()
+
+	tests := []struct {
+		name   string
+		script string
+		want   string // expected result as string representation
+	}{
+		// exit tests
+		{"exit-no-value", "(exit)", "(list)"},
+		{"exit-with-value", "(exit 42)", "42"},
+		{"exit-with-string", `(exit "done")`, `"done"`},
+		{"exit-in-if-true", "(if #t (exit 1) 2)", "1"},
+		{"exit-in-if-false", "(if #f 1 (exit 2))", "2"},
+		{"exit-in-do", "(do 1 (exit 42) 3)", "42"},
+		{"exit-in-let", "(let ((x 10)) (exit x) 99)", "10"},
+		{"exit-stops-execution", "(do (set a 1) (exit) (set a 2))", "(list)"},
+
+		// return at top level (acts like exit)
+		{"return-toplevel-no-value", "(return)", "(list)"},
+		{"return-toplevel-with-value", "(return 42)", "42"},
+
+		// return inside function
+		{"return-in-fn", "((fn (x) (return x) 99) 42)", "42"},
+		{"return-early-in-fn", "((fn (x) (if (< x 0) (return 0)) x) -5)", "0"},
+		{"return-normal-path", "((fn (x) (if (< x 0) (return 0)) x) 5)", "5"},
+
+		// return in nested closures
+		{"return-in-nested-fn", "(let () (def outer (fn () (let () (return 42) 99))) (outer))", "42"},
+		{"return-in-map", "(let () (def check (fn (x) (if (> x 5) (return x)) 0)) (map check (list 3 7 2)))", "(list 0 7 0)"},
+		{"return-in-fold", "(let () (def f (fn (acc x) (if (> x 10) (return acc) (+ acc x)))) (fold f 0 (list 1 2 3)))", "6"},
+
+		// exit inside function (exits script, not just function)
+		{"exit-in-fn-exits-script", "(let () (def f (fn () (exit 99))) (f) 42)", "99"},
+
+		// nested function returns
+		{"nested-return", `(let ()
+			(def inner (fn (x) (return (* x 2))))
+			(def outer (fn (y) (+ (inner y) 1)))
+			(outer 5))`, "11"},
+
+		// return with expression evaluation
+		{"return-with-expr", "((fn () (return (+ 1 2 3))))", "6"},
+
+		// exit with expression evaluation
+		{"exit-with-expr", "(exit (* 6 7))", "42"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			val, _, err := eng.RunScript(ctx, tc.script, nil, cfg)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			got := formatValue(val)
+			if got != tc.want {
+				t.Fatalf("want %s, got %s", tc.want, got)
+			}
+		})
+	}
+}
+
+// formatValue converts a Value to string for test comparison
+func formatValue(v Value) string {
+	switch v.Kind {
+	case KNumber:
+		return fmt.Sprintf("%g", v.Num)
+	case KString:
+		return fmt.Sprintf("%q", v.Str)
+	case KBool:
+		if v.Bool {
+			return "#t"
+		}
+		return "#f"
+	case KList:
+		if len(v.List) == 0 {
+			return "(list)"
+		}
+		parts := make([]string, len(v.List))
+		for i, elem := range v.List {
+			parts[i] = formatValue(elem)
+		}
+		return "(list " + strings.Join(parts, " ") + ")"
+	default:
+		return v.String()
+	}
+}
+
 func Example_do() {
 	// The 'do' special form evaluates multiple expressions in sequence
 	// and returns the value of the last one.

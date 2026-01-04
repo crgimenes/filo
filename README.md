@@ -135,6 +135,8 @@ All advanced integration happens only through explicitly registered Go functions
 | `def` | `(def name expr)` | Defines a global variable or function (always in the root/global scope). |
 | `set` | `(set name expr)` | Updates an existing variable in the nearest scope. |
 | `values`| `(values v1 v2 ...)` | Returns multiple values (a tuple). |
+| `exit` | `(exit [value])` | Terminates script execution immediately. Returns value or empty list. |
+| `return`| `(return [value])` | Returns from current function. Returns value or empty list. |
 
 ### Core Builtins
 
