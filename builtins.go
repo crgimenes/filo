@@ -10,6 +10,15 @@ type Builtin func(ctx context.Context, args []Value) (Value, error)
 
 type builtinFunc func(ctx context.Context, ev *evaluator, args []Value) (Value, error)
 
+func checkContext(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("execution cancelled: %w", ctx.Err())
+	default:
+		return nil
+	}
+}
+
 func defaultBuiltins() map[string]builtinFunc {
 	bi := map[string]builtinFunc{}
 
@@ -423,6 +432,9 @@ func defaultBuiltins() map[string]builtinFunc {
 		}
 		result := make([]Value, len(list))
 		for i, el := range list {
+			if err := checkContext(ctx); err != nil {
+				return Value{}, err
+			}
 			val, callErr := ev.callFunc(ctx, fn.Fn, []Value{el})
 			if callErr != nil {
 				return Value{}, callErr
@@ -447,6 +459,9 @@ func defaultBuiltins() map[string]builtinFunc {
 		}
 		current := acc
 		for _, el := range list {
+			if err := checkContext(ctx); err != nil {
+				return Value{}, err
+			}
 			val, callErr := ev.callFunc(ctx, fn.Fn, []Value{current, el})
 			if callErr != nil {
 				return Value{}, callErr

@@ -47,23 +47,6 @@ func TestRandomBuiltins(t *testing.T) {
 		}
 	})
 
-	t.Run("rand-seed", func(t *testing.T) {
-		// deterministic test
-		_, _, err := eng.RunScript(ctx, "(rand-seed 12345)", nil, cfg)
-		if err != nil {
-			t.Fatalf("seed failed: %v", err)
-		}
-		val1, _, _ := eng.RunScript(ctx, "(rand-float)", nil, cfg)
-
-		// Reseed same
-		eng.RunScript(ctx, "(rand-seed 12345)", nil, cfg)
-		val2, _, _ := eng.RunScript(ctx, "(rand-float)", nil, cfg)
-
-		if val1.Num != val2.Num {
-			t.Errorf("expected deterministic randomness with seed, got %v != %v", val1.Num, val2.Num)
-		}
-	})
-
 	t.Run("uuid-v4", func(t *testing.T) {
 		val, _, err := eng.RunScript(ctx, "(uuid-v4)", nil, cfg)
 		if err != nil {

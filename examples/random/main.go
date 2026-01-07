@@ -20,10 +20,6 @@ func main() {
 	script := `
 (list (rand-float) (rand-int 100) (uuid-v4))
 `
-	// Seed for partial reproducibility in this run if we wanted,
-	// but here we just show it running.
-	eng.RunScript(ctx, "(rand-seed 1234)", nil, cfg)
-
 	result, _, err := eng.RunScript(ctx, script, nil, cfg)
 	if err != nil {
 		panic(err)

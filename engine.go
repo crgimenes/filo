@@ -16,6 +16,25 @@ type EvalConfig struct {
 	Timeout        time.Duration
 }
 
+const (
+	defaultStepLimit      = 100_000
+	defaultRecursionLimit = 128
+	defaultTimeout        = 30 * time.Second
+)
+
+func (cfg EvalConfig) withDefaults() EvalConfig {
+	if cfg.StepLimit == 0 {
+		cfg.StepLimit = defaultStepLimit
+	}
+	if cfg.RecursionLimit == 0 {
+		cfg.RecursionLimit = defaultRecursionLimit
+	}
+	if cfg.Timeout == 0 {
+		cfg.Timeout = defaultTimeout
+	}
+	return cfg
+}
+
 func NewEngine() *Engine {
 	return &Engine{builtins: defaultBuiltins()}
 }
@@ -60,6 +79,8 @@ func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]V
 	for k, v := range globals {
 		root.Define(k, v)
 	}
+
+	cfg = cfg.withDefaults()
 
 	runCtx := ctx
 	var cancel context.CancelFunc

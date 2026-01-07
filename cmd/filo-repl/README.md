@@ -25,6 +25,7 @@ go build -o filo-repl ./cmd/filo-repl
 ```
 
 You'll see:
+
 ```
 Filo REPL - Type expressions to evaluate. Ctrl+D to exit.
 
@@ -94,7 +95,7 @@ HELLO
 | Package | Description |
 |---------|-------------|
 | `math` | sqrt, sin, cos, log, abs, floor, ceil, round, etc. |
-| `rand` | rand-float, rand-int, rand-seed, uuid-v4 |
+| `rand` | rand-float, rand-int, uuid-v4 |
 | `str` | str-upper, str-lower, str-trim, str-split, str-join, etc. |
 
 ## Exit Codes

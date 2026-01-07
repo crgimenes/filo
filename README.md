@@ -207,7 +207,6 @@ Requires explicit registration via `filorand.RegisterRandomBuiltins(eng)`. These
 |----------|-------------|
 | `rand-float` | Random number [0.0, 1.0). |
 | `rand-int` | `(rand-int n)` Random integer [0, n). |
-| `rand-seed` | `(rand-seed [n])` Reseed RNG. |
 | `uuid-v4` | Generates a standard UUID string. |
 
 ---
