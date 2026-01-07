@@ -25,6 +25,7 @@ import (
 
 	"github.com/crgimenes/filo"
 	"github.com/crgimenes/filo/filomath"
+	"github.com/crgimenes/filo/filoprint"
 	"github.com/crgimenes/filo/filorand"
 	"golang.org/x/term"
 )
@@ -427,8 +428,10 @@ func registerPackage(engine *filo.Engine, pkg string) error {
 		filorand.RegisterRandomBuiltins(engine)
 	case "str":
 		filo.RegisterStringBuiltins(engine)
+	case "print":
+		filoprint.RegisterPrintBuiltins(engine)
 	default:
-		return fmt.Errorf("unknown filo package: %q (available: math, rand, str)", pkg)
+		return fmt.Errorf("unknown filo package: %q (available: math, rand, str, print)", pkg)
 	}
 	return nil
 }

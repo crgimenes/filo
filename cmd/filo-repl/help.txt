@@ -49,6 +49,7 @@ Use --filo-package to load:
   math   sqrt sin cos log abs floor ceil round pi e
   str    str-upper str-lower str-trim str-split str-join
   rand   rand-int rand-float uuid-v4
+  print  print  printf (supports %T for Filo types)
 
 ## Keyboard Shortcuts
 

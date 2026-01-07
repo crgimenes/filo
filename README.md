@@ -108,6 +108,7 @@ Filo can be extended with specialized packages:
 
 - **filomath**: Advanced math functions (`sin`, `cos`, `log`, `to-int`, etc).
 - **filorand**: Non-deterministic functions (`rand-float`, `rand-int`, `uuid-v4`).
+- **filojson**: JSON helpers for marshal/unmarshal (`json-marshal`, `json-unmarshal`, `json-null`).
 
 ### **3. Restricted environment**
 
@@ -422,4 +423,3 @@ if err != nil {
 > **give power to the user without giving up security.**
 
 It is a small, elegant, deterministic language that integrates easily into the Go ecosystem. It lets users write helpful rules without putting the server at risk.
-
