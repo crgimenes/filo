@@ -38,7 +38,7 @@ func builtinStrFmt(ctx context.Context, args []Value) (Value, error) {
 		return Value{}, fmt.Errorf("str-fmt: format must be string: %w", err)
 	}
 
-	fmtArgs := make([]interface{}, len(args)-1)
+	fmtArgs := make([]any, len(args)-1)
 	for i, arg := range args[1:] {
 		switch arg.Kind {
 		case KNumber:

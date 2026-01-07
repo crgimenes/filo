@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type Node interface{}
+type Node any
 
 type NumberLit struct {
 	Value float64
