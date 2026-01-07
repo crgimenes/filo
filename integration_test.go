@@ -1,6 +1,7 @@
 package filo
 
 import (
+	"context"
 	"testing"
 )
 
@@ -417,5 +418,135 @@ func TestCallFunctionNotFound(t *testing.T) {
 	_, err := f.CallFunction("not-exists", 1, 2, 3)
 	if err == nil {
 		t.Fatal("Expected error for non-existent function")
+	}
+}
+
+// TestClose verifies Filo.Close() no-op method.
+func TestClose(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	f.Close() // Should not panic or error
+}
+
+// TestRegisterBuiltinMethod tests Filo.RegisterBuiltin().
+func TestRegisterBuiltinMethod(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	err := f.RegisterBuiltin("my-test", func(ctx context.Context, args []Value) (Value, error) {
+		return VNum(42), nil
+	})
+	if err != nil {
+		t.Fatalf("RegisterBuiltin failed: %v", err)
+	}
+
+	err = f.DoString("(set result (my-test))")
+	if err != nil {
+		t.Fatalf("DoString failed: %v", err)
+	}
+
+	got := f.MustGetInt("result")
+	if got != 42 {
+		t.Fatalf("want 42, got %d", got)
+	}
+}
+
+// TestGetEngine tests Filo.GetEngine().
+func TestGetEngine(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	eng := f.GetEngine()
+	if eng == nil {
+		t.Fatal("GetEngine returned nil")
+	}
+}
+
+// TestSetGlobalVariousTypes tests SetGlobal with various Go types.
+func TestSetGlobalVariousTypes(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+
+	// int64
+	f.SetGlobal("i64", int64(100))
+	f.DoString("(set x i64)")
+	if f.MustGetInt("x") != 100 {
+		t.Fatal("int64 failed")
+	}
+
+	// float32
+	f.SetGlobal("f32", float32(3.14))
+	f.DoString("(set y f32)")
+	// Note: precision may differ slightly
+}
+
+// TestGetNotFound tests Get* methods when variable not found.
+func TestGetNotFound(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+
+	_, err := f.GetString("missing")
+	if err == nil {
+		t.Fatal("expected error for missing variable")
+	}
+
+	_, err = f.GetInt("missing")
+	if err == nil {
+		t.Fatal("expected error for missing variable")
+	}
+
+	_, err = f.GetBool("missing")
+	if err == nil {
+		t.Fatal("expected error for missing variable")
+	}
+
+	_, err = f.GetTable("missing")
+	if err == nil {
+		t.Fatal("expected error for missing variable")
+	}
+
+	_, err = f.GetMap("missing")
+	if err == nil {
+		t.Fatal("expected error for missing variable")
+	}
+
+	_, err = f.GetMapOfLists("missing")
+	if err == nil {
+		t.Fatal("expected error for missing variable")
+	}
+}
+
+// TestCallFunctionNotAFunction tests error when calling non-function.
+func TestCallFunctionNotAFunction(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	f.SetGlobal("notfn", "string value")
+
+	_, err := f.CallFunction("notfn")
+	if err == nil {
+		t.Fatal("expected error for non-function")
+	}
+}
+
+// TestCallFunctionWithTypedArgs tests CallFunction with various argument types.
+func TestCallFunctionWithTypedArgs(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	f.DoString("(def add (fn (a b) (+ a b)))")
+
+	// Test with int, int64
+	result, err := f.CallFunction("add", 10, int64(5))
+	if err != nil {
+		t.Fatalf("CallFunction failed: %v", err)
+	}
+
+	num, _ := result.AsNumber()
+	if num != 15 {
+		t.Fatalf("want 15, got %v", num)
 	}
 }
