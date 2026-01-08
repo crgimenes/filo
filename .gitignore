@@ -88,3 +88,5 @@ config.local.lua
 *.swp
 *.swo
 *~
+
+cmd/filo-repl/filo-repl
