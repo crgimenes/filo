@@ -3,6 +3,7 @@ package filo
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 )
 
@@ -107,8 +108,6 @@ func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]V
 	}
 
 	newGlobals = make(map[string]Value, len(root.bind))
-	for k, v := range root.bind {
-		newGlobals[k] = v
-	}
+	maps.Copy(newGlobals, root.bind)
 	return result, newGlobals, nil
 }
