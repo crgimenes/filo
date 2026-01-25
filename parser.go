@@ -52,8 +52,9 @@ type lexer struct {
 	i   int
 }
 
-func parse(src string) (Node, error) {
-	lx := &lexer{src: src}
+// Parse parses the input string and returns the AST (List of expressions)
+func Parse(input string) (Node, error) {
+	lx := &lexer{src: input}
 	var nodes []Node
 
 	// Read all top-level expressions
@@ -71,7 +72,7 @@ func parse(src string) (Node, error) {
 
 	// If no nodes, return error
 	if len(nodes) == 0 {
-		return nil, &ParseError{Pos: 0, Near: snippetNear(src, 0), Message: "empty script"}
+		return nil, &ParseError{Pos: 0, Near: snippetNear(input, 0), Message: "empty script"}
 	}
 
 	// If single node, return it directly

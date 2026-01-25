@@ -44,16 +44,18 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 
 	var (
-		writeFlag  bool
-		listFlag   bool
-		diffFlag   bool
-		indentSize int
-		showVer    bool
+		writeFlag     bool
+		listFlag      bool
+		diffFlag      bool
+		foldConstFlag bool
+		indentSize    int
+		showVer       bool
 	)
 
 	fs.BoolVar(&writeFlag, "w", false, "write result to (source) file instead of stdout")
 	fs.BoolVar(&listFlag, "l", false, "list files whose formatting differs from filofmt's")
 	fs.BoolVar(&diffFlag, "d", false, "display diffs instead of rewriting files")
+	fs.BoolVar(&foldConstFlag, "fold-const", false, "enable constant folding optimization")
 	fs.IntVar(&indentSize, "indent", 2, "spaces per indent level")
 	fs.BoolVar(&showVer, "version", false, "print version and exit")
 
@@ -80,7 +82,18 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "error reading stdin: %v\n", err)
 			return 1
 		}
-		formatted, err := filo.FormatWithConfig(string(data), cfg)
+		var formatted string
+		if foldConstFlag {
+			ast, parseErr := filo.Parse(string(data))
+			if parseErr != nil {
+				fmt.Fprintf(stderr, "error: %v\n", parseErr)
+				return 1
+			}
+			folded, _ := filo.FoldConstants(ast)
+			formatted, err = filo.FormatAST(folded, cfg)
+		} else {
+			formatted, err = filo.FormatWithConfig(string(data), cfg)
+		}
 		if err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
@@ -92,7 +105,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// Process files
 	exitCode := 0
 	for _, path := range paths {
-		if err := processPath(path, cfg, writeFlag, listFlag, diffFlag, stdout, stderr); err != nil {
+		if err := processPath(path, cfg, writeFlag, listFlag, diffFlag, foldConstFlag, stdout, stderr); err != nil {
 			fmt.Fprintf(stderr, "error: %v\n", err)
 			exitCode = 1
 		}
@@ -101,7 +114,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return exitCode
 }
 
-func processPath(path string, cfg filo.FormatConfig, write, list, diff bool, stdout, stderr io.Writer) error {
+func processPath(path string, cfg filo.FormatConfig, write, list, diff, foldConst bool, stdout, stderr io.Writer) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -118,21 +131,31 @@ func processPath(path string, cfg filo.FormatConfig, write, list, diff bool, std
 			if !strings.HasSuffix(p, ".filo") {
 				return nil
 			}
-			return processFile(p, cfg, write, list, diff, stdout, stderr)
+			return processFile(p, cfg, write, list, diff, foldConst, stdout, stderr)
 		})
 	}
 
-	return processFile(path, cfg, write, list, diff, stdout, stderr)
+	return processFile(path, cfg, write, list, diff, foldConst, stdout, stderr)
 }
 
-func processFile(path string, cfg filo.FormatConfig, write, list, diff bool, stdout, stderr io.Writer) error {
+func processFile(path string, cfg filo.FormatConfig, write, list, diff, foldConst bool, stdout, stderr io.Writer) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 
 	original := string(data)
-	formatted, err := filo.FormatWithConfig(original, cfg)
+	var formatted string
+	if foldConst {
+		ast, parseErr := filo.Parse(original)
+		if parseErr != nil {
+			return fmt.Errorf("%s: %w", path, parseErr)
+		}
+		folded, _ := filo.FoldConstants(ast)
+		formatted, err = filo.FormatAST(folded, cfg)
+	} else {
+		formatted, err = filo.FormatWithConfig(original, cfg)
+	}
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}

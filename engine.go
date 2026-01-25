@@ -71,7 +71,7 @@ func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]V
 		}
 	}()
 
-	ast, err := parse(src)
+	ast, err := Parse(src)
 	if err != nil {
 		return Value{}, nil, err
 	}

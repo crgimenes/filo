@@ -54,12 +54,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		stepLimit      int
 		recursionLimit int
 		timeoutSeconds int
+		foldConst      bool
 	)
 
 	fs.StringVar(&packages, "filo-package", "", "Comma-separated list of extension packages (math, rand, str)")
 	fs.IntVar(&stepLimit, "step-limit", defaultStepLimit, "Maximum evaluation steps")
 	fs.IntVar(&recursionLimit, "recursion-limit", defaultRecursionLimit, "Maximum recursion depth")
 	fs.IntVar(&timeoutSeconds, "timeout", defaultTimeoutSeconds, "Script execution timeout in seconds")
+	fs.BoolVar(&foldConst, "fold-const", false, "Enable interactive constant folding")
 
 	if err := fs.Parse(args); err != nil {
 		return 1
@@ -99,7 +101,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	// Interactive REPL mode
-	return runREPL(engine, stdinFd, stdout, stderr, cfg)
+	return runREPL(engine, stdinFd, stdout, stderr, cfg, foldConst)
 }
 
 func runBatchMode(engine *filo.Engine, stdin io.Reader, stdout, stderr io.Writer, cfg filo.EvalConfig) int {
@@ -126,7 +128,7 @@ func runBatchMode(engine *filo.Engine, stdin io.Reader, stdout, stderr io.Writer
 	return 0
 }
 
-func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg filo.EvalConfig) int {
+func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg filo.EvalConfig, foldConst bool) int {
 	// Set terminal to raw mode
 	oldState, err := term.MakeRaw(stdinFd)
 	if err != nil {
@@ -156,12 +158,47 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 	ctrlXPressed := false
 	exitRequested := false
 
-	// AutoCompleteCallback to handle Ctrl+X, E and ESC
+	// AutoCompleteCallback to handle Ctrl+X, E, ESC, and constant folding
 	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
 		// ESC key (0x1B) - request exit
 		if key == 0x1B {
 			exitRequested = true
 			return "", 0, true
+		}
+
+		// Folding hook
+		if foldConst && key == ')' {
+			balance := 1
+			startIdx := -1
+			// Scan backwards for matching '(' in current line
+			for i := len(line) - 1; i >= 0; i-- {
+				if line[i] == ')' {
+					balance++
+				} else if line[i] == '(' {
+					balance--
+				}
+				if balance == 0 {
+					startIdx = i
+					break
+				}
+			}
+
+			if startIdx != -1 {
+				snippet := line[startIdx:] + ")"
+				ast, err := filo.Parse(snippet)
+				if err == nil {
+					folded, changed := filo.FoldConstants(ast)
+					if changed {
+						replacement, err := filo.FormatAST(folded, filo.FormatConfig{})
+						if err == nil {
+							replacement = strings.TrimSpace(replacement)
+							newLine = line[:startIdx] + replacement
+							newPos = len(newLine)
+							return newLine, newPos, true // consume the ')'
+						}
+					}
+				}
+			}
 		}
 
 		// Ctrl+X is rune 0x18 (ASCII 24)

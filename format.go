@@ -29,6 +29,24 @@ func DefaultFormatConfig() FormatConfig {
 	}
 }
 
+// FormatAST formatting an AST node back to string.
+// This is used when the AST has been modified (e.g. by constant folding)
+// and we can't use the token-based formatter.
+func FormatAST(node Node, cfg FormatConfig) (string, error) {
+	var b strings.Builder
+	if nodes, ok := node.([]Node); ok {
+		for i, n := range nodes {
+			if i > 0 {
+				b.WriteString("\n\n")
+			}
+			formatNode(&b, n, 0, cfg)
+		}
+	} else {
+		formatNode(&b, node, 0, cfg)
+	}
+	return b.String(), nil
+}
+
 // Format formats Filo source code with Lisp-style indentation.
 // It preserves comments and blank lines.
 func Format(src string) (string, error) {

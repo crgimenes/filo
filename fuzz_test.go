@@ -30,7 +30,7 @@ func FuzzParseDoesNotPanic(f *testing.F) {
 				t.Fatalf("parse panicked: %v", r)
 			}
 		}()
-		_, _ = parse(string(data))
+		_, _ = Parse(string(data))
 	})
 }
 
