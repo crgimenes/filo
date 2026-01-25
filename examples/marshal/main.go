@@ -68,6 +68,27 @@ func complexExample() {
 	fmt.Printf("Go struct from pretty: %+v\n", c3)
 }
 
+func optionsExample() {
+	// MarshalWithOptions exposes formatting control (prefix, indent).
+
+	type Config struct {
+		Name string `filo:"name"`
+		Val  int    `filo:"value"`
+	}
+	cfg := Config{Name: "opt-test", Val: 42}
+
+	opts := filo.MarshalOptions{
+		Indent: "  ",
+		Prefix: "> ", // Add a prefix to each line
+	}
+
+	s, err := filo.MarshalWithOptions(cfg, opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(s)
+}
+
 func main() {
 	// Example 1: Marshal Go struct to Filo Value
 	fmt.Println("=== Marshal: Go struct -> Filo Value ===")
@@ -121,4 +142,8 @@ func main() {
 	// Example 4: Complex struct with nested fields
 	fmt.Println("\n=== Complex struct with nested fields ===")
 	complexExample()
+
+	// Example 5: Marshal with Options
+	fmt.Println("\n=== Marshal with Options ===")
+	optionsExample()
 }

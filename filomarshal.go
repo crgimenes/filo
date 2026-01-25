@@ -60,8 +60,6 @@ type MarshalOptions struct {
 	Prefix string
 	// Indent is added per nesting level.
 	Indent string
-	// FoldConstants enables constant folding optimization.
-	FoldConstants bool
 }
 
 // MarshalIndent converts a Go value to an indented Filo string.
@@ -87,45 +85,6 @@ func MarshalWithOptions(v any, opts MarshalOptions) (string, error) {
 	val, err := MarshalToValue(v)
 	if err != nil {
 		return "", err
-	}
-
-	if opts.FoldConstants {
-		// Serialize to AST then optimize
-		code := formatValueCompact(val) // Get compact code
-		ast, err := Parse(code)
-		if err != nil {
-			return "", fmt.Errorf("marshal-fold parse error: %w", err)
-		}
-
-		folded, _ := FoldConstants(ast)
-
-		cfg := FormatConfig{
-			Indent: opts.Indent,
-		}
-		if cfg.Indent == "" {
-			cfg.Indent = "  "
-		}
-		// Note: FormatAST ignores opts.Prefix currently as FormatConfig doesn't have it?
-		// FormatConfig only has Indent, MaxLineWidth.
-		// FormatValueIndent handled prefix manually?
-		// FormatValueIndent calls FormatWithConfig(code, cfg)
-		// Wait, formatValueIndent implementation:
-		// "lines := strings.Split(formatted, "\n") ... prepend prefix".
-		// I should replicate that logic if FoldConstants is used.
-
-		formatted, err := FormatAST(folded, cfg)
-		if err != nil {
-			return "", err
-		}
-
-		if opts.Prefix != "" {
-			lines := strings.Split(formatted, "\n")
-			for i, line := range lines {
-				lines[i] = opts.Prefix + line
-			}
-			return strings.Join(lines, "\n"), nil
-		}
-		return formatted, nil
 	}
 
 	// Default formatting path
