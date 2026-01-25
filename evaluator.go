@@ -343,15 +343,13 @@ func (ev *evaluator) evalExit(args []Node, env *Env) (Value, error) {
 	if len(args) > 1 {
 		return Value{}, fmt.Errorf("exit expects 0 or 1 argument")
 	}
-	var val Value
+	val := VList([]Value{}) // empty list as default
 	if len(args) == 1 {
 		var err error
 		val, err = ev.eval(args[0], env)
 		if err != nil {
 			return Value{}, err
 		}
-	} else {
-		val = VList([]Value{}) // empty list as default
 	}
 	return Value{}, &exitSignal{Value: val}
 }
@@ -361,15 +359,13 @@ func (ev *evaluator) evalReturn(args []Node, env *Env) (Value, error) {
 	if len(args) > 1 {
 		return Value{}, fmt.Errorf("return expects 0 or 1 argument")
 	}
-	var val Value
+	val := VList([]Value{}) // empty list as default
 	if len(args) == 1 {
 		var err error
 		val, err = ev.eval(args[0], env)
 		if err != nil {
 			return Value{}, err
 		}
-	} else {
-		val = VList([]Value{}) // empty list as default
 	}
 	return Value{}, &returnSignal{Value: val}
 }
