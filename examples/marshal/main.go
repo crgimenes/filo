@@ -1,0 +1,111 @@
+// Example marshal demonstrates converting Go structs to Filo values and back.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/crgimenes/filo"
+)
+
+// Config represents application configuration
+type Config struct {
+	Name    string `filo:"name"`
+	Port    int    `filo:"port"`
+	Debug   bool   `filo:"debug"`
+	Retries int    `filo:"retries"`
+}
+
+func complexExample() {
+	type Nested struct {
+		Items []int             `filo:"items"`
+		Data  map[string]string `filo:"data"`
+	}
+	type Complex struct {
+		Name   string  `filo:"name"`
+		Value  float64 `filo:"value"`
+		Active bool    `filo:"active"`
+		Nested Nested  `filo:"nested"`
+	}
+
+	c := Complex{
+		Name:   "test",
+		Value:  123.456,
+		Active: true,
+		Nested: Nested{
+			Items: []int{1, 2, 3, 4, 5},
+			Data:  map[string]string{"key1": "val1", "key2": "val2"},
+		},
+	}
+
+	val, err := filo.Marshal(c)
+	if err != nil {
+		log.Fatalf("Marshal error: %v", err)
+	}
+
+	fmt.Printf("Filo value: %v\n", val)
+
+	var c2 Complex
+	if err := filo.Unmarshal(val, &c2); err != nil {
+		log.Fatalf("Unmarshal error: %v", err)
+	}
+
+	fmt.Printf("Go struct: %+v\n", c2)
+
+}
+
+func main() {
+	// Example 1: Marshal Go struct to Filo Value
+	fmt.Println("=== Marshal: Go struct -> Filo Value ===")
+	cfg := Config{
+		Name:    "my-app",
+		Port:    8080,
+		Debug:   true,
+		Retries: 3,
+	}
+
+	val, err := filo.Marshal(cfg)
+	if err != nil {
+		log.Fatalf("Marshal error: %v", err)
+	}
+	fmt.Printf("Filo value: %v\n\n", val)
+
+	// Example 2: Unmarshal Filo Value back to Go struct
+	fmt.Println("=== Unmarshal: Filo Value -> Go struct ===")
+	var cfg2 Config
+	if err := filo.Unmarshal(val, &cfg2); err != nil {
+		log.Fatalf("Unmarshal error: %v", err)
+	}
+	fmt.Printf("Go struct: %+v\n\n", cfg2)
+
+	// Example 3: Create config in Filo and unmarshal to Go
+	fmt.Println("=== Create config in Filo, with expressions ===")
+	eng := filo.NewEngine()
+
+	// Note: expressions are evaluated by Filo, not by Unmarshal
+	// (list "port" (+ 8000 80)) -> port = 8080 (evaluated)
+	// (list "name" "(+ 1 1)") -> name = "(+ 1 1)" (literal string)
+	script := `
+		(list
+			(list "name" "filo-app")
+			(list "port" (+ 8000 80))
+			(list "debug" #f)
+			(list "retries" (* 2 5)))
+	`
+
+	result, _, err := eng.RunScript(context.Background(), script, nil, filo.EvalConfig{})
+	if err != nil {
+		log.Fatalf("RunScript error: %v", err)
+	}
+
+	var cfg3 Config
+	if err := filo.Unmarshal(result, &cfg3); err != nil {
+		log.Fatalf("Unmarshal error: %v", err)
+	}
+	fmt.Printf("Config from Filo: %+v\n", cfg3)
+
+	// Example 4: Complex struct with nested fields
+	fmt.Println("\n=== Complex struct with nested fields ===")
+	complexExample()
+}

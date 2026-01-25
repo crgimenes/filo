@@ -110,6 +110,59 @@ Filo can be extended with specialized packages:
 - **filorand**: Non-deterministic functions (`rand-float`, `rand-int`, `uuid-v4`).
 - **filojson**: JSON helpers for marshal/unmarshal (`json-marshal`, `json-unmarshal`, `json-null`).
 
+### **Go Marshal/Unmarshal**
+
+Filo provides `Marshal` and `Unmarshal` functions to convert Go values to Filo values and vice versa:
+
+```go
+// Convert Go struct to Filo Value
+type Config struct {
+    Name string `filo:"name"`
+    Port int    `filo:"port"`
+}
+
+cfg := Config{Name: "app", Port: 8080}
+val, err := filo.Marshal(cfg)
+// val = (list (tuple "name" "app") (tuple "port" 8080))
+
+// Convert Filo Value back to Go struct
+var cfg2 Config
+err = filo.Unmarshal(val, &cfg2)
+// cfg2 = {Name: "app", Port: 8080}
+```
+
+**Type mapping:**
+| Go Type | Filo Kind |
+|---------|-----------|
+| `bool` | `KBool` |
+| `int`, `float64`, etc | `KNumber` |
+| `string` | `KString` |
+| `[]T` | `KList` |
+| `struct` | `KList` of `(key, value)` tuples |
+| `map[K]V` | `KList` of `(key, value)` tuples |
+| `nil` | `KTuple` (empty) |
+
+**Note:** Expressions in Filo are evaluated before reaching `Unmarshal`:
+- `(list "port" (+ 8000 80))` → port = 8080 (expression evaluated by Filo)
+- `(list "port" "(+ 8000 80)")` → port = "(+ 8000 80)" (literal string)
+
+**Running fuzz tests:**
+```bash
+# Run a specific fuzz test for 30 seconds
+go test -fuzz=FuzzMarshalUnmarshalString -fuzztime=30s .
+
+# Run fuzz test for ints
+go test -fuzz=FuzzMarshalUnmarshalInt -fuzztime=30s .
+
+# Available fuzz tests:
+# - FuzzMarshalUnmarshalInt
+# - FuzzMarshalUnmarshalFloat
+# - FuzzMarshalUnmarshalString
+# - FuzzMarshalUnmarshalBool
+# - FuzzMarshalUnmarshalBytes
+# - FuzzMarshalSliceInt
+```
+
 ### **3. Restricted environment**
 
 No:
