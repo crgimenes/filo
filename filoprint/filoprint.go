@@ -79,12 +79,12 @@ func formatWithFiloTypes(format string, args []filo.Value) string {
 			spec := format[i+1]
 			if spec == 'T' {
 				// Custom %T: show Filo type
+				tValue := "%!T(MISSING)"
 				if argIndex < len(args) {
-					result.WriteString(filoTypeName(args[argIndex]))
+					tValue = (filoTypeName(args[argIndex]))
 					argIndex++
-				} else {
-					result.WriteString("%!T(MISSING)")
 				}
+				result.WriteString(tValue)
 				i++
 				continue
 			}
