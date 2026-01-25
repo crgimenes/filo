@@ -98,6 +98,9 @@ func (ev *evaluator) evalList(list *List, env *Env) (Value, error) {
 		case "values":
 			v, err := ev.evalValues(list.Elems[1:], env)
 			return v, wrapIn("values", err)
+		case "tuple":
+			v, err := ev.evalValues(list.Elems[1:], env)
+			return v, wrapIn("tuple", err)
 		case "exit":
 			return ev.evalExit(list.Elems[1:], env)
 		case "return":

@@ -27,6 +27,7 @@
 package filo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -48,7 +49,45 @@ import (
 //   - *T -> same as T (nil becomes empty tuple)
 //
 // Functions and channels are not supported and return an error.
-func Marshal(v any) (Value, error) {
+// MarshalIndent converts a Go value to an indented Filo string.
+// The prefix is prepended to each line (including the first),
+// and indent is added per nesting level.
+//
+// This is similar to json.MarshalIndent but produces Filo syntax.
+func MarshalIndent(v any, prefix, indent string) (string, error) {
+	val, err := MarshalToValue(v)
+	if err != nil {
+		return "", err
+	}
+	return FormatValueIndent(val, prefix, indent), nil
+}
+
+// Marshal converts a Go value to a compact Filo string.
+// To modify the formatting, use MarshalIndent.
+func Marshal(v any) (string, error) {
+	val, err := MarshalToValue(v)
+	if err != nil {
+		return "", err
+	}
+	// Use compact formatting
+	return formatValueCompact(val), nil
+}
+
+// MarshalToValue converts a Go value to a Filo Value.
+//
+// Supported types:
+//   - bool -> KBool
+//   - int, int8, int16, int32, int64 -> KNumber
+//   - uint, uint8, uint16, uint32, uint64 -> KNumber
+//   - float32, float64 -> KNumber
+//   - string -> KString
+//   - []T -> KList (elements converted recursively)
+//   - struct -> KList of (field_name, value) tuples
+//   - map[K]V -> KList of (key, value) tuples (sorted by key for determinism)
+//   - *T -> same as T (nil becomes empty tuple)
+//
+// Functions and channels are not supported and return an error.
+func MarshalToValue(v any) (Value, error) {
 	if v == nil {
 		return VTuple(nil), nil
 	}
@@ -200,7 +239,23 @@ func marshalStruct(rv reflect.Value) (Value, error) {
 	return VList(pairs), nil
 }
 
-// Unmarshal converts a Filo Value to a Go value.
+// Unmarshal converts a Filo string to a Go value.
+// It parses the string, evaluates it, and unmarshals the result into target.
+func Unmarshal(data string, target any) error {
+	// Evaluate to get Value
+	// Use a fresh engine instance
+	eng := NewEngine()
+	// We need 'tuple' support which is now in evaluator special forms or alias.
+
+	val, _, err := eng.RunScript(context.Background(), data, nil, EvalConfig{})
+	if err != nil {
+		return err
+	}
+
+	return UnmarshalFromValue(val, target)
+}
+
+// UnmarshalFromValue converts a Filo Value to a Go value.
 // The target must be a non-nil pointer to any Filo-supported type.
 //
 // Type mapping:
@@ -212,7 +267,7 @@ func marshalStruct(rv reflect.Value) (Value, error) {
 //
 // For structs, the list must contain tuples of (string_key, value).
 // Field matching uses the "filo" tag or lowercased field name.
-func Unmarshal(val Value, target any) error {
+func UnmarshalFromValue(val Value, target any) error {
 	rv := reflect.ValueOf(target)
 	if rv.Kind() != reflect.Pointer || rv.IsNil() {
 		return errors.New("unmarshal: target must be a non-nil pointer")

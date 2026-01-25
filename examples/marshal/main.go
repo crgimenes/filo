@@ -46,13 +46,26 @@ func complexExample() {
 
 	fmt.Printf("Filo value: %v\n", val)
 
+	// MarshalIndent for pretty printing
+	prettyVal, err := filo.MarshalIndent(c, "", "  ")
+	if err != nil {
+		log.Fatalf("MarshalIndent error: %v", err)
+	}
+
+	fmt.Printf("Pretty Filo value:\n%v\n", prettyVal)
+
 	var c2 Complex
 	if err := filo.Unmarshal(val, &c2); err != nil {
 		log.Fatalf("Unmarshal error: %v", err)
 	}
 
-	fmt.Printf("Go struct: %+v\n", c2)
+	var c3 Complex
+	if err := filo.Unmarshal(prettyVal, &c3); err != nil {
+		log.Fatalf("Unmarshal error: %v", err)
+	}
 
+	fmt.Printf("Go struct: %+v\n", c2)
+	fmt.Printf("Go struct from pretty: %+v\n", c3)
 }
 
 func main() {
@@ -100,7 +113,7 @@ func main() {
 	}
 
 	var cfg3 Config
-	if err := filo.Unmarshal(result, &cfg3); err != nil {
+	if err := filo.UnmarshalFromValue(result, &cfg3); err != nil {
 		log.Fatalf("Unmarshal error: %v", err)
 	}
 	fmt.Printf("Config from Filo: %+v\n", cfg3)

@@ -23,7 +23,7 @@ func TestMarshalBasicTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			val, err := Marshal(tt.input)
+			val, err := MarshalToValue(tt.input)
 			if err != nil {
 				t.Fatalf("Marshal error: %v", err)
 			}
@@ -39,7 +39,7 @@ func TestMarshalBasicTypes(t *testing.T) {
 
 func TestMarshalSlice(t *testing.T) {
 	input := []int{1, 2, 3}
-	val, err := Marshal(input)
+	val, err := MarshalToValue(input)
 	if err != nil {
 		t.Fatalf("Marshal error: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestMarshalSlice(t *testing.T) {
 
 func TestMarshalMap(t *testing.T) {
 	input := map[string]int{"a": 1, "b": 2}
-	val, err := Marshal(input)
+	val, err := MarshalToValue(input)
 	if err != nil {
 		t.Fatalf("Marshal error: %v", err)
 	}
@@ -84,7 +84,7 @@ type SimpleStruct struct {
 
 func TestMarshalStruct(t *testing.T) {
 	input := SimpleStruct{Name: "Alice", Age: 30, Skip: "ignored", NoTag: "value"}
-	val, err := Marshal(input)
+	val, err := MarshalToValue(input)
 	if err != nil {
 		t.Fatalf("Marshal error: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestUnmarshalBasicTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			target := tt.alloc()
-			if err := Unmarshal(tt.val, target); err != nil {
+			if err := UnmarshalFromValue(tt.val, target); err != nil {
 				t.Fatalf("Unmarshal error: %v", err)
 			}
 			if !tt.check(target) {
@@ -143,7 +143,7 @@ func TestUnmarshalBasicTypes(t *testing.T) {
 func TestUnmarshalSlice(t *testing.T) {
 	val := VList([]Value{VNum(1), VNum(2), VNum(3)})
 	var result []int
-	if err := Unmarshal(val, &result); err != nil {
+	if err := UnmarshalFromValue(val, &result); err != nil {
 		t.Fatalf("Unmarshal error: %v", err)
 	}
 	if len(result) != 3 {
@@ -162,7 +162,7 @@ func TestUnmarshalMap(t *testing.T) {
 		VTuple([]Value{VString("b"), VNum(2)}),
 	})
 	var result map[string]int
-	if err := Unmarshal(val, &result); err != nil {
+	if err := UnmarshalFromValue(val, &result); err != nil {
 		t.Fatalf("Unmarshal error: %v", err)
 	}
 	if result["a"] != 1 || result["b"] != 2 {
@@ -176,7 +176,7 @@ func TestUnmarshalStruct(t *testing.T) {
 		VTuple([]Value{VString("age"), VNum(25)}),
 	})
 	var result SimpleStruct
-	if err := Unmarshal(val, &result); err != nil {
+	if err := UnmarshalFromValue(val, &result); err != nil {
 		t.Fatalf("Unmarshal error: %v", err)
 	}
 	if result.Name != "Bob" {
@@ -211,13 +211,13 @@ func TestRoundtripStability(t *testing.T) {
 
 	// Multiple roundtrips
 	for i := range 5 {
-		val, err := Marshal(original)
+		val, err := MarshalToValue(original)
 		if err != nil {
 			t.Fatalf("roundtrip %d: Marshal error: %v", i, err)
 		}
 
 		var result Complex
-		if err := Unmarshal(val, &result); err != nil {
+		if err := UnmarshalFromValue(val, &result); err != nil {
 			t.Fatalf("roundtrip %d: Unmarshal error: %v", i, err)
 		}
 
@@ -245,24 +245,24 @@ func TestMarshalUnmarshalRoundtrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			val, err := Marshal(tt.input)
+			val, err := MarshalToValue(tt.input)
 			if err != nil {
 				t.Fatalf("Marshal error: %v", err)
 			}
 
 			target := tt.alloc()
-			if err := Unmarshal(val, target); err != nil {
+			if err := UnmarshalFromValue(val, target); err != nil {
 				t.Fatalf("Unmarshal error: %v", err)
 			}
 
 			// Second roundtrip
-			val2, err := Marshal(reflect.ValueOf(target).Elem().Interface())
+			val2, err := MarshalToValue(reflect.ValueOf(target).Elem().Interface())
 			if err != nil {
 				t.Fatalf("Marshal2 error: %v", err)
 			}
 
 			target2 := tt.alloc()
-			if err := Unmarshal(val2, target2); err != nil {
+			if err := UnmarshalFromValue(val2, target2); err != nil {
 				t.Fatalf("Unmarshal2 error: %v", err)
 			}
 
@@ -289,7 +289,7 @@ func TestUnmarshalErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := Unmarshal(tt.val, tt.target)
+			err := UnmarshalFromValue(tt.val, tt.target)
 			if err == nil {
 				t.Error("expected error, got nil")
 			}
@@ -299,13 +299,13 @@ func TestUnmarshalErrors(t *testing.T) {
 
 func TestMarshalErrors(t *testing.T) {
 	ch := make(chan int)
-	_, err := Marshal(ch)
+	_, err := MarshalToValue(ch)
 	if err == nil {
 		t.Error("expected error for channel, got nil")
 	}
 
 	fn := func() {}
-	_, err = Marshal(fn)
+	_, err = MarshalToValue(fn)
 	if err == nil {
 		t.Error("expected error for function, got nil")
 	}
