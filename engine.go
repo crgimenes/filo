@@ -63,6 +63,16 @@ func (e *Engine) MustRegisterBuiltin(name string, fn Builtin) {
 }
 
 func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
+	ast, err := Parse(src)
+	if err != nil {
+		return Value{}, nil, err
+	}
+	return e.ExecuteAST(ctx, ast, globals, cfg)
+}
+
+// ExecuteAST executes a pre-parsed AST with the given globals.
+// This is the core execution method used by both RunScript and Script.Execute.
+func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			result = Value{}
@@ -70,11 +80,6 @@ func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]V
 			err = fmt.Errorf("panic in script: %v", r)
 		}
 	}()
-
-	ast, err := Parse(src)
-	if err != nil {
-		return Value{}, nil, err
-	}
 
 	root := NewEnv()
 	for k, v := range globals {

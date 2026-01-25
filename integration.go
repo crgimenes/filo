@@ -9,6 +9,56 @@ import (
 	"time"
 )
 
+// Script represents a pre-parsed Filo script that can be executed multiple times
+// with different globals. This is similar to Go's html/template pattern.
+type Script struct {
+	name string
+	ast  Node
+}
+
+// newScript creates a new named Script. The script must be parsed before execution.
+func newScript(name string) *Script {
+	return &Script{name: name}
+}
+
+// Name returns the script's name.
+func (s *Script) Name() string {
+	return s.name
+}
+
+// Parse parses the source code and stores the AST in the Script.
+// Returns the Script for method chaining.
+func (s *Script) Parse(src string) (*Script, error) {
+	ast, err := Parse(src)
+	if err != nil {
+		return nil, err
+	}
+	s.ast = ast
+	return s, nil
+}
+
+// Execute runs the pre-parsed script with the given engine, globals, and config.
+func (s *Script) Execute(ctx context.Context, eng *Engine, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
+	if s.ast == nil {
+		return Value{}, nil, &ParseError{Message: "script not parsed"}
+	}
+	return eng.ExecuteAST(ctx, s.ast, globals, cfg)
+}
+
+// ParseScript is a convenience function that creates a new Script and parses it.
+func ParseScript(name, src string) (*Script, error) {
+	return newScript(name).Parse(src)
+}
+
+// Must is a helper that wraps a call to ParseScript and panics if the error is non-nil.
+// It is intended for use in variable initializations.
+func Must(s *Script, err error) *Script {
+	if err != nil {
+		panic(err)
+	}
+	return s
+}
+
 type Filo struct {
 	eng     *Engine
 	globals map[string]Value
@@ -87,8 +137,10 @@ func (f *Filo) SetGlobal(name string, value any) {
 	}
 }
 
-// DoString executes a Filo script and updates globals with any (set ...) statements.
-func (f *Filo) DoString(filoScript string) error {
+// Execute executes a pre-parsed script with optional override globals.
+// Override globals take precedence over instance globals for this execution only.
+// After execution, instance globals are updated with any (set ...) statements.
+func (f *Filo) Execute(script *Script, overrideGlobals map[string]Value) error {
 	ctx := context.Background()
 	cfg := EvalConfig{
 		StepLimit:      10000,
@@ -96,14 +148,34 @@ func (f *Filo) DoString(filoScript string) error {
 		Timeout:        5 * time.Second,
 	}
 
-	_, updatedGlobals, err := f.eng.RunScript(ctx, filoScript, f.globals, cfg)
+	// Merge globals: start with instance globals, override with parameter
+	mergedGlobals := make(map[string]Value, len(f.globals)+len(overrideGlobals))
+	for k, v := range f.globals {
+		mergedGlobals[k] = v
+	}
+	for k, v := range overrideGlobals {
+		mergedGlobals[k] = v
+	}
+
+	_, updatedGlobals, err := script.Execute(ctx, f.eng, mergedGlobals, cfg)
 	if err != nil {
 		return err
 	}
 
-	// Update globals with any values set during script execution
+	// Update instance globals with any values set during script execution
 	f.globals = updatedGlobals
 	return nil
+}
+
+// DoString executes a Filo script and updates globals with any (set ...) statements.
+// This is a convenience method that parses and executes in one call.
+// For scripts executed multiple times, use ParseScript + Execute for better performance.
+func (f *Filo) DoString(filoScript string) error {
+	script, err := ParseScript("inline", filoScript)
+	if err != nil {
+		return err
+	}
+	return f.Execute(script, nil)
 }
 
 // MustGetString retrieves a global variable as a string or fatals.

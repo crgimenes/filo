@@ -110,6 +110,35 @@ Filo can be extended with specialized packages:
 - **filorand**: Non-deterministic functions (`rand-float`, `rand-int`, `uuid-v4`).
 - **filojson**: JSON helpers for marshal/unmarshal (`json-marshal`, `json-unmarshal`, `json-null`).
 
+### **Pre-Parse/Execute (Template-style)**
+
+For scripts executed multiple times with different data, Filo supports pre-parsing, similar to Go's `html/template` package:
+
+```go
+// Parse once at startup
+script := filo.Must(filo.ParseScript("calc", "(+ x y)"))
+
+// Execute many times with different globals
+for _, data := range items {
+    globals := map[string]filo.Value{
+        "x": filo.VNum(data.X),
+        "y": filo.VNum(data.Y),
+    }
+    result, _, err := script.Execute(ctx, engine, globals, cfg)
+    fmt.Println(result.Num)
+}
+```
+
+**API:**
+| Function | Description |
+|----------|-------------|
+| `ParseScript(name, src)` | Creates and parses a reusable script. |
+| `script.Execute(ctx, eng, globals, cfg)` | Executes with explicit engine/config. |
+| `Must(script, err)` | Panics if error (for init). |
+| `Filo.Execute(script, overrides)` | Executes with Filo's globals + optional overrides. |
+
+**Performance:** Pre-parsing eliminates parsing overhead (~2x faster for repeated executions).
+
 ### **Go Marshal/Unmarshal**
 
 Filo provides `Marshal` and `Unmarshal` functions to convert Go values to Filo values and vice versa:

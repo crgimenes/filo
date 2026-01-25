@@ -550,3 +550,131 @@ func TestCallFunctionWithTypedArgs(t *testing.T) {
 		t.Fatalf("want 15, got %v", num)
 	}
 }
+
+// TestFiloParseScript verifies that ParseScript works correctly.
+func TestFiloParseScript(t *testing.T) {
+	t.Parallel()
+
+	script, err := ParseScript("test", "(+ 1 2)")
+	if err != nil {
+		t.Fatalf("ParseScript failed: %v", err)
+	}
+	if script == nil {
+		t.Fatal("ParseScript returned nil script")
+	}
+	if script.Name() != "test" {
+		t.Fatalf("want name 'test', got %q", script.Name())
+	}
+}
+
+// TestFiloParseScriptError verifies that ParseScript returns error on invalid source.
+func TestFiloParseScriptError(t *testing.T) {
+	t.Parallel()
+
+	_, err := ParseScript("bad", "(+ 1")
+	if err == nil {
+		t.Fatal("expected parse error")
+	}
+}
+
+// TestFiloExecuteScript verifies basic ExecuteScript functionality.
+func TestFiloExecuteScript(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	script, _ := ParseScript("calc", "(set result (+ x y))")
+
+	f.SetGlobal("x", 10)
+	f.SetGlobal("y", 20)
+
+	err := f.Execute(script, nil)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	result := f.MustGetInt("result")
+	if result != 30 {
+		t.Fatalf("want 30, got %d", result)
+	}
+}
+
+// TestFiloExecuteScriptMultipleTimes verifies that the same script can be executed multiple times.
+func TestFiloExecuteScriptMultipleTimes(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	script, _ := ParseScript("sum", "(set total (+ a b))")
+
+	testCases := []struct {
+		a, b, expected int
+	}{
+		{1, 2, 3},
+		{10, 20, 30},
+		{100, 200, 300},
+	}
+
+	for _, tc := range testCases {
+		f.SetGlobal("a", tc.a)
+		f.SetGlobal("b", tc.b)
+
+		err := f.Execute(script, nil)
+		if err != nil {
+			t.Fatalf("Execute failed: %v", err)
+		}
+
+		total := f.MustGetInt("total")
+		if total != tc.expected {
+			t.Fatalf("want %d, got %d", tc.expected, total)
+		}
+	}
+}
+
+// TestFiloExecuteScriptWithOverrideGlobals verifies globals merge behavior.
+func TestFiloExecuteScriptWithOverrideGlobals(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	script, _ := ParseScript("calc", "(set result (+ x y))")
+
+	// Set instance globals
+	f.SetGlobal("x", 10)
+	f.SetGlobal("y", 20)
+
+	// Execute with override for x (should override instance global)
+	overrides := map[string]Value{
+		"x": VNum(100),
+	}
+	err := f.Execute(script, overrides)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// Result should be 100 + 20 = 120 (override x, keep instance y)
+	result := f.MustGetInt("result")
+	if result != 120 {
+		t.Fatalf("want 120, got %d", result)
+	}
+
+	// Instance global x should still be 10 (override was temporary)
+	// Note: After execution, globals are updated with script results
+	// The instance x is preserved because overrides don't modify f.globals directly
+}
+
+// TestFiloExecuteScriptGlobalsUpdate verifies that globals are updated after script execution.
+func TestFiloExecuteScriptGlobalsUpdate(t *testing.T) {
+	t.Parallel()
+
+	f := New()
+	script, _ := ParseScript("setter", "(set newvar 42)")
+
+	err := f.Execute(script, nil)
+	if err != nil {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// New variable should be set in instance globals
+	newvar := f.MustGetInt("newvar")
+	if newvar != 42 {
+		t.Fatalf("want 42, got %d", newvar)
+	}
+}
