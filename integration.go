@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"sort"
 	"time"
 )
@@ -150,12 +151,8 @@ func (f *Filo) Execute(script *Script, overrideGlobals map[string]Value) error {
 
 	// Merge globals: start with instance globals, override with parameter
 	mergedGlobals := make(map[string]Value, len(f.globals)+len(overrideGlobals))
-	for k, v := range f.globals {
-		mergedGlobals[k] = v
-	}
-	for k, v := range overrideGlobals {
-		mergedGlobals[k] = v
-	}
+	maps.Copy(mergedGlobals, f.globals)
+	maps.Copy(mergedGlobals, overrideGlobals)
 
 	_, updatedGlobals, err := script.Execute(ctx, f.eng, mergedGlobals, cfg)
 	if err != nil {
