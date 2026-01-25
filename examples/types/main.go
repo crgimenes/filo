@@ -41,9 +41,10 @@ func main() {
 
 	fmt.Println("Types and Checks:")
 	for _, v := range list {
-		if v.Kind == filo.KString {
+		switch v.Kind {
+		case filo.KString:
 			fmt.Printf("- %s\n", v.Str)
-		} else if v.Kind == filo.KBool {
+		case filo.KBool:
 			fmt.Printf("- %v\n", v.Bool)
 		}
 	}
