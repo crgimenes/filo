@@ -283,15 +283,20 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 			}
 			buffer.Reset()
 			t.SetPrompt(promptMain)
-		} else if open > close {
+			continue
+		}
+
+		if open > close {
 			// Unbalanced - continue reading
 			t.SetPrompt(promptCont)
-		} else {
-			// More close than open - error
-			fmt.Fprintln(t, "error: unbalanced parentheses (too many closing)")
-			buffer.Reset()
-			t.SetPrompt(promptMain)
+			continue
 		}
+
+		// More close than open - error
+		fmt.Fprintln(t, "error: unbalanced parentheses (too many closing)")
+		buffer.Reset()
+		t.SetPrompt(promptMain)
+
 	}
 }
 
