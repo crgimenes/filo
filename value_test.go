@@ -47,7 +47,7 @@ func TestDescribeAllTypes(t *testing.T) {
 		{"string", VString("hello"), "string"},
 		{"list", VList(nil), "list"},
 		{"tuple", VTuple(nil), "tuple"},
-		{"func", VFunc(nil), "function"},
+		{"func", VFunc(nil), "func"},
 	}
 
 	for _, tc := range tests {

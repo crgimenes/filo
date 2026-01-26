@@ -106,7 +106,7 @@ func (v Value) describe() string {
 	case KTuple:
 		return "tuple"
 	case KFunc:
-		return "function"
+		return "func"
 	default:
 		return "unknown"
 	}

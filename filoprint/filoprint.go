@@ -165,7 +165,7 @@ func filoTypeName(v filo.Value) string {
 	case filo.KTuple:
 		return "tuple"
 	case filo.KFunc:
-		return "function"
+		return "func"
 	default:
 		return "unknown"
 	}
