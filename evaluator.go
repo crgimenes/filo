@@ -205,8 +205,8 @@ func (ev *evaluator) evalArgs(nodes []Node) ([]Value, error) {
 
 // Logic for callFuncAST (add to end or replace callFunc)
 func (ev *evaluator) callFuncAST(ctx context.Context, fn *Func, argNodes []Node) (Value, error) {
-	if len(argNodes) != len(fn.Params) {
-		return Value{}, fmt.Errorf("function expects %d args, got %d", len(fn.Params), len(argNodes))
+	if len(fn.Params) != len(argNodes) {
+		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(argNodes))
 	}
 	ev.recursion++
 	if ev.cfg.RecursionLimit > 0 && ev.recursion > ev.cfg.RecursionLimit {
@@ -258,7 +258,7 @@ func (ev *evaluator) callFuncAST(ctx context.Context, fn *Func, argNodes []Node)
 // Keep callFunc for Builtins usage (takes []Value)
 func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Value, error) {
 	if len(args) != len(fn.Params) {
-		return Value{}, fmt.Errorf("function expects %d args, got %d", len(fn.Params), len(args))
+		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(args))
 	}
 	ev.recursion++
 	if ev.cfg.RecursionLimit > 0 && ev.recursion > ev.cfg.RecursionLimit {
@@ -311,7 +311,7 @@ func (ev *evaluator) evalIf(args []Node) (Value, error) {
 
 func (ev *evaluator) evalDo(args []Node) (Value, error) {
 	if len(args) == 0 {
-		return Value{}, fmt.Errorf("do requires at least one expression")
+		return Value{}, fmt.Errorf("do expects at least 1 expression")
 	}
 	var result Value
 	for _, arg := range args {
@@ -443,17 +443,17 @@ func (ev *evaluator) evalSet(args []Node) (Value, error) {
 
 func (ev *evaluator) evalFn(args []Node) (Value, error) {
 	if len(args) < 2 {
-		return Value{}, fmt.Errorf("fn expects params and body")
+		return Value{}, fmt.Errorf("fn expects parameters and body")
 	}
 	paramsList, ok := args[0].(*List)
 	if !ok {
-		return Value{}, fmt.Errorf("fn expects param list")
+		return Value{}, fmt.Errorf("fn expects parameter list")
 	}
 	params := make([]string, len(paramsList.Elems))
 	for i, p := range paramsList.Elems {
 		sym, okSym := p.(*Symbol)
 		if !okSym {
-			return Value{}, fmt.Errorf("fn params must be symbols")
+			return Value{}, fmt.Errorf("fn parameters must be symbols")
 		}
 		params[i] = sym.Name
 	}

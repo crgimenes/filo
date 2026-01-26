@@ -352,7 +352,7 @@ func TestLanguageFeatures(t *testing.T) {
 		{
 			name:    "arity mismatch",
 			script:  "((fn (x) x) 1 2)",
-			wantErr: "function expects 1 args, got 2",
+			wantErr: "function expects 1 arguments, got 2",
 		},
 		{
 			name:    "type mismatch +",
