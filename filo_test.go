@@ -820,3 +820,37 @@ func Example_typeOf() {
 	// Output:
 	// Types: number, string
 }
+
+func TestProgramReuse(t *testing.T) {
+	eng := NewEngine()
+	script := `(+ x y)`
+	// Compile once
+	prog, err := eng.Compile(script)
+	if err != nil {
+		t.Fatalf("compile error: %v", err)
+	}
+
+	// Run with different globals
+	cases := []struct {
+		globals map[string]Value
+		want    float64
+	}{
+		{map[string]Value{"x": VNum(1), "y": VNum(2)}, 3},
+		{map[string]Value{"x": VNum(10), "y": VNum(20)}, 30},
+		{map[string]Value{"x": VNum(-5), "y": VNum(5)}, 0},
+	}
+
+	for i, tc := range cases {
+		val, _, err := prog.Execute(context.Background(), tc.globals, EvalConfig{})
+		if err != nil {
+			t.Fatalf("case %d execution error: %v", i, err)
+		}
+		num, err := val.AsNumber()
+		if err != nil {
+			t.Fatalf("case %d expected number: %v", i, err)
+		}
+		if num != tc.want {
+			t.Fatalf("case %d want %v got %v", i, tc.want, num)
+		}
+	}
+}

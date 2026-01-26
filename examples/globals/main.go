@@ -35,4 +35,4 @@ func main() {
 
 // Output:
 // Total attack: 31
-// Globals kept strength=14 bonus=3
+// Globals kept strength=14 and bonus=3

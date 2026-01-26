@@ -102,6 +102,6 @@ func main() {
 // ====================
 // Lead Name  | Score | Grade
 // -----------|-------|------
-// TechCorp   |    95 |   A
+// TechCorp   |    90 |   A
 // SmallMfg   |    19 |   D
 // BigBank    |    95 |   A

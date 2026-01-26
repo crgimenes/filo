@@ -21,7 +21,7 @@ const (
 type Func struct {
 	Params []string
 	Body   []Node
-	Env    *Env
+	Frame  *Frame
 }
 
 type Value struct {

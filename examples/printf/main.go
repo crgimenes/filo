@@ -50,7 +50,7 @@ func main() {
 // Output:
 // Hello, World!
 // Sum: 6
-// List: (1 2 3)
+// List: (list 1 2 3)
 // User: Alice, Age: 25
 // Price: R$ 19.99
 // 42 is a number

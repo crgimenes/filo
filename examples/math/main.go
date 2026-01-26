@@ -36,5 +36,5 @@ func main() {
 }
 
 // Output:
-// Sqrt(17): 4.123106...
+// Sqrt(17): 4.123106
 // Truncated: 4

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/crgimenes/filo"
@@ -27,6 +28,13 @@ func main() {
 		"username_valid":  `(and (>= (str-len username) 3) (<= (str-len username) 20))`,
 	}
 
+	// Deterministic order for output
+	ruleNames := make([]string, 0, len(rules))
+	for k := range rules {
+		ruleNames = append(ruleNames, k)
+	}
+	sort.Strings(ruleNames)
+
 	// Test data to validate
 	testCases := []map[string]filo.Value{
 		{"email": filo.VString("user@example.com"), "age": filo.VNum(25), "password": filo.VString("secret123"), "username": filo.VString("john")},
@@ -35,7 +43,8 @@ func main() {
 
 	for i, data := range testCases {
 		fmt.Printf("=== Test Case %d ===\n", i+1)
-		for ruleName, ruleScript := range rules {
+		for _, ruleName := range ruleNames {
+			ruleScript := rules[ruleName]
 			result, _, err := eng.RunScript(ctx, ruleScript, data, cfg)
 			if err != nil {
 				fmt.Printf("  %s: ERROR - %v\n", ruleName, err)
@@ -54,13 +63,13 @@ func main() {
 
 // Output:
 // === Test Case 1 ===
-//   email_format: ✓ PASS
 //   age_valid: ✓ PASS
+//   email_format: ✓ PASS
 //   password_strong: ✓ PASS
 //   username_valid: ✓ PASS
 //
 // === Test Case 2 ===
-//   email_format: ✗ FAIL
 //   age_valid: ✗ FAIL
+//   email_format: ✗ FAIL
 //   password_strong: ✗ FAIL
 //   username_valid: ✗ FAIL

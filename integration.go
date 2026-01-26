@@ -34,7 +34,11 @@ func (s *Script) Parse(src string) (*Script, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.ast = ast
+	compiled, err := Compile(ast, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("compile error: %w", err)
+	}
+	s.ast = compiled
 	return s, nil
 }
 
