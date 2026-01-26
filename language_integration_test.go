@@ -346,8 +346,8 @@ func TestLanguageFeatures(t *testing.T) {
 		// --- Errors ---
 		{
 			name:    "undefined symbol",
-			script:  "missing-var",
-			wantErr: "undefined symbol: missing-var",
+			script:  `missing-var`,
+			wantErr: "undefined global: missing-var",
 		},
 		{
 			name:    "arity mismatch",

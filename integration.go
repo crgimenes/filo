@@ -13,8 +13,9 @@ import (
 // Script represents a pre-parsed Filo script that can be executed multiple times
 // with different globals. This is similar to Go's html/template pattern.
 type Script struct {
-	name string
-	ast  Node
+	name    string
+	rawAST  Node     // Original AST (unbound)
+	program *Program // Cached bound program (optimized)
 }
 
 // newScript creates a new named Script. The script must be parsed before execution.
@@ -34,20 +35,31 @@ func (s *Script) Parse(src string) (*Script, error) {
 	if err != nil {
 		return nil, err
 	}
-	compiled, err := Compile(ast, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("compile error: %w", err)
-	}
-	s.ast = compiled
+	s.rawAST = ast
+	s.program = nil // Invalidate cache
 	return s, nil
 }
 
 // Execute runs the pre-parsed script with the given engine, globals, and config.
 func (s *Script) Execute(ctx context.Context, eng *Engine, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
-	if s.ast == nil {
+	if s.rawAST == nil {
 		return Value{}, nil, &ParseError{Message: "script not parsed"}
 	}
-	return eng.ExecuteAST(ctx, s.ast, globals, cfg)
+
+	// Lazy Compilation / JIT
+	// If we haven't compiled for this engine yet, do it now.
+	// NOTE: We assume Script is typically used with a single Engine instance.
+	// If switched, we re-compile. This is safe but incurs a one-time cost per engine.
+	if s.program == nil || s.program.eng != eng {
+		prog, err := eng.CompileAST(s.rawAST)
+		if err != nil {
+			return Value{}, nil, fmt.Errorf("jit compile error: %w", err)
+		}
+		s.program = prog
+	}
+
+	// Delegate to optimized program
+	return s.program.Execute(ctx, globals, cfg)
 }
 
 // ParseScript is a convenience function that creates a new Script and parses it.
@@ -172,11 +184,19 @@ func (f *Filo) Execute(script *Script, overrideGlobals map[string]Value) error {
 // This is a convenience method that parses and executes in one call.
 // For scripts executed multiple times, use ParseScript + Execute for better performance.
 func (f *Filo) DoString(filoScript string) error {
-	script, err := ParseScript("inline", filoScript)
+	ctx := context.Background()
+	cfg := EvalConfig{
+		StepLimit:      10000,
+		RecursionLimit: 64,
+		Timeout:        5 * time.Second,
+	}
+
+	_, updatedGlobals, err := f.eng.RunScript(ctx, filoScript, f.globals, cfg)
 	if err != nil {
 		return err
 	}
-	return f.Execute(script, nil)
+	f.globals = updatedGlobals
+	return nil
 }
 
 // MustGetString retrieves a global variable as a string or fatals.

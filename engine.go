@@ -85,6 +85,11 @@ func (e *Engine) Compile(src string) (*Program, error) {
 	if err != nil {
 		return nil, err
 	}
+	return e.CompileAST(ast)
+}
+
+// CompileAST compiles a parsed AST into a reusable Program bound to this Engine.
+func (e *Engine) CompileAST(ast Node) (*Program, error) {
 	compiled, err := Compile(ast, e.builtins, e.symbols)
 	if err != nil {
 		return nil, fmt.Errorf("compile error: %w", err)
