@@ -17,10 +17,9 @@ type GlobalEnv struct {
 }
 
 // NewGlobalEnv creates a new global environment linked to a symbol table.
+// It allocates backing storage based on symbol table size.
 func NewGlobalEnv(symbols *SymbolTable) *GlobalEnv {
 	if symbols == nil {
-		// Fallback or panic? For now, we assume Engine ALWAYS provides one.
-		// Use empty one if nil to prevent crash
 		symbols = NewSymbolTable()
 	}
 	size := symbols.Size()
@@ -28,6 +27,28 @@ func NewGlobalEnv(symbols *SymbolTable) *GlobalEnv {
 		symbols: symbols,
 		values:  make([]Value, size),
 		defined: make([]bool, size),
+	}
+}
+
+// Reset clears the global environment for reuse.
+// It keeps the backing array but resets values and defined status.
+func (g *GlobalEnv) Reset(symbols *SymbolTable) {
+	requiredSize := symbols.Size()
+	g.symbols = symbols
+
+	// Resize if necessary
+	if cap(g.values) < requiredSize {
+		g.values = make([]Value, requiredSize)
+		g.defined = make([]bool, requiredSize)
+	} else {
+		// Slice strictly to required size
+		g.values = g.values[:requiredSize]
+		g.defined = g.defined[:requiredSize]
+		// Zero out memory
+		for i := range g.values {
+			g.values[i] = Value{}
+			g.defined[i] = false
+		}
 	}
 }
 
@@ -79,11 +100,13 @@ func (g *GlobalEnv) ensureSize(size int) {
 
 // ToMap returns a copy of globals (compatibility helper)
 func (g *GlobalEnv) ToMap() map[string]Value {
-	snapshot := g.symbols.Snapshot()
-	m := make(map[string]Value, len(snapshot))
-	for name, id := range snapshot {
-		if id < len(g.values) && g.defined[id] {
-			m[name] = g.values[id]
+	// Optimization: Only iterate defined slots
+	m := make(map[string]Value)
+	for id, defined := range g.defined {
+		if defined && id < len(g.values) {
+			if name, ok := g.symbols.GetName(id); ok {
+				m[name] = g.values[id]
+			}
 		}
 	}
 	return m

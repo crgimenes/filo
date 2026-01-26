@@ -3,12 +3,14 @@ package filo
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
 type Engine struct {
 	builtins map[string]builtinFunc
 	symbols  *SymbolTable
+	envPool  sync.Pool
 }
 
 type EvalConfig struct {
@@ -40,6 +42,12 @@ func NewEngine() *Engine {
 	return &Engine{
 		builtins: defaultBuiltins(),
 		symbols:  NewSymbolTable(),
+		envPool: sync.Pool{
+			New: func() interface{} {
+				// We don't allocate size here because we need SymbolTable size at runtime
+				return &GlobalEnv{}
+			},
+		},
 	}
 }
 
@@ -109,7 +117,16 @@ func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Va
 	}()
 
 	// Initialize Global Environment linked to Engine's SymbolTable
-	root := NewGlobalEnv(e.symbols)
+	// Try to get from pool
+	var root *GlobalEnv
+	if poolVal := e.envPool.Get(); poolVal != nil {
+		root = poolVal.(*GlobalEnv)
+		root.Reset(e.symbols)
+	} else {
+		root = NewGlobalEnv(e.symbols)
+	}
+	defer e.envPool.Put(root)
+
 	for k, v := range globals {
 		root.Define(k, v)
 	}
