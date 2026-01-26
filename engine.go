@@ -3,7 +3,6 @@ package filo
 import (
 	"context"
 	"fmt"
-	"maps"
 	"time"
 )
 
@@ -112,7 +111,6 @@ func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Va
 		}
 	}
 
-	newGlobals = make(map[string]Value, len(root.bind))
-	maps.Copy(newGlobals, root.bind)
+	newGlobals = root.ToMap()
 	return result, newGlobals, nil
 }
