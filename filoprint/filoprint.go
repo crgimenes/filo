@@ -23,7 +23,7 @@ func RegisterPrintBuiltins(eng *filo.Engine) {
 // builtinPrint prints all arguments to stdout.
 // Usage: (print "Hello" name)
 func builtinPrint(ctx context.Context, args []filo.Value) (filo.Value, error) {
-	if len(args) == 0 {
+	if len(args) < 1 {
 		return filo.Value{}, fmt.Errorf("print expects at least 1 argument")
 	}
 
@@ -53,7 +53,7 @@ func builtinPrintf(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	result := formatWithFiloTypes(format, args[1:])
 	fmt.Println(result)
 
-	return filo.VList(nil), nil
+	return filo.VBool(true), nil
 }
 
 // formatWithFiloTypes processes a format string, handling %T for Filo types.

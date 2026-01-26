@@ -43,7 +43,7 @@ func RegisterJSONBuiltins(eng *filo.Engine) {
 
 func builtinJSONNull(_ context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 0 {
-		return filo.Value{}, fmt.Errorf("json-null expects no arguments")
+		return filo.Value{}, fmt.Errorf("json-null expects 0 arguments")
 	}
 	return filo.VTuple(nil), nil
 }

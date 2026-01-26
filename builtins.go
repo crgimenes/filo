@@ -36,7 +36,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["-"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) == 0 {
-			return Value{}, fmt.Errorf("- expects at least one argument")
+			return Value{}, fmt.Errorf("- expects at least 1 argument")
 		}
 		first, err := args[0].AsNumber()
 		if err != nil {
@@ -70,7 +70,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["/"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) == 0 {
-			return Value{}, fmt.Errorf("/ expects at least one argument")
+			return Value{}, fmt.Errorf("/ expects at least 1 argument")
 		}
 		first, err := args[0].AsNumber()
 		if err != nil {
@@ -92,7 +92,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["%"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) != 2 {
-			return Value{}, fmt.Errorf("%% expects two arguments")
+			return Value{}, fmt.Errorf("%% expects 2 arguments")
 		}
 		a, err := args[0].AsNumber()
 		if err != nil {
@@ -110,7 +110,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["pow"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) != 2 {
-			return Value{}, fmt.Errorf("pow expects two arguments")
+			return Value{}, fmt.Errorf("pow expects 2 arguments")
 		}
 		a, err := args[0].AsNumber()
 		if err != nil {
@@ -125,7 +125,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["="] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) < 2 {
-			return Value{}, fmt.Errorf("= expects at least two arguments")
+			return Value{}, fmt.Errorf("= expects at least 2 arguments")
 		}
 		_, err := ensureSameKind(args)
 		if err != nil {
@@ -150,7 +150,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["<"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) < 2 {
-			return Value{}, fmt.Errorf("< expects at least two arguments")
+			return Value{}, fmt.Errorf("< expects at least 2 arguments")
 		}
 		for i := 1; i < len(args); i++ {
 			left, err := args[i-1].AsNumber()
@@ -170,7 +170,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["<="] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) < 2 {
-			return Value{}, fmt.Errorf("<= expects at least two arguments")
+			return Value{}, fmt.Errorf("<= expects at least 2 arguments")
 		}
 		for i := 1; i < len(args); i++ {
 			left, err := args[i-1].AsNumber()
@@ -190,7 +190,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi[">"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) < 2 {
-			return Value{}, fmt.Errorf("> expects at least two arguments")
+			return Value{}, fmt.Errorf("> expects at least 2 arguments")
 		}
 		for i := 1; i < len(args); i++ {
 			left, err := args[i-1].AsNumber()
@@ -210,7 +210,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi[">="] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) < 2 {
-			return Value{}, fmt.Errorf(">= expects at least two arguments")
+			return Value{}, fmt.Errorf(">= expects at least 2 arguments")
 		}
 		for i := 1; i < len(args); i++ {
 			left, err := args[i-1].AsNumber()
@@ -230,7 +230,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["not"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) != 1 {
-			return Value{}, fmt.Errorf("not expects one argument")
+			return Value{}, fmt.Errorf("not expects 1 argument")
 		}
 		v, err := args[0].AsBool()
 		if err != nil {
@@ -357,7 +357,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["length"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) != 1 {
-			return Value{}, fmt.Errorf("length expects one argument")
+			return Value{}, fmt.Errorf("length expects 1 argument")
 		}
 		list, err := args[0].AsList()
 		if err == nil {
@@ -373,7 +373,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["head"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) != 1 {
-			return Value{}, fmt.Errorf("head expects one argument")
+			return Value{}, fmt.Errorf("head expects 1 argument")
 		}
 		list, err := args[0].AsList()
 		if err != nil {
@@ -387,7 +387,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["tail"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) != 1 {
-			return Value{}, fmt.Errorf("tail expects one argument")
+			return Value{}, fmt.Errorf("tail expects 1 argument")
 		}
 		list, err := args[0].AsList()
 		if err != nil {
@@ -401,7 +401,7 @@ func defaultBuiltins() map[string]builtinFunc {
 
 	bi["nth"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
 		if len(args) != 2 {
-			return Value{}, fmt.Errorf("nth expects two arguments")
+			return Value{}, fmt.Errorf("nth expects 2 arguments")
 		}
 		list, err := args[0].AsList()
 		if err != nil {

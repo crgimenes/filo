@@ -239,7 +239,7 @@ func builtinMax(_ context.Context, args []filo.Value) (filo.Value, error) {
 // builtinPi returns the mathematical constant pi.
 func builtinPi(_ context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 0 {
-		return filo.Value{}, fmt.Errorf("pi expects no arguments")
+		return filo.Value{}, fmt.Errorf("pi expects 0 arguments")
 	}
 	return filo.VNum(math.Pi), nil
 }
@@ -247,7 +247,7 @@ func builtinPi(_ context.Context, args []filo.Value) (filo.Value, error) {
 // builtinE returns Euler's number e.
 func builtinE(_ context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 0 {
-		return filo.Value{}, fmt.Errorf("e expects no arguments")
+		return filo.Value{}, fmt.Errorf("e expects 0 arguments")
 	}
 	return filo.VNum(math.E), nil
 }

@@ -9,17 +9,16 @@ import (
 )
 
 func greet(ctx context.Context, args []filo.Value) (filo.Value, error) {
-	switch len(args) {
-	case 1:
-		name, err := args[0].AsString()
-		if err != nil {
-			return filo.Value{}, err
-		}
-
-		return filo.VString("Hello, " + name + "!"), nil
-	default:
-		return filo.Value{}, fmt.Errorf("greet expects one argument")
+	if len(args) != 1 {
+		return filo.Value{}, fmt.Errorf("greet expects 1 argument")
 	}
+
+	name, err := args[0].AsString()
+	if err != nil {
+		return filo.Value{}, err
+	}
+
+	return filo.VString("Hello, " + name + "!"), nil
 }
 
 func main() {
