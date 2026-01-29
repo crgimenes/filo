@@ -43,7 +43,7 @@ func NewEngine() *Engine {
 		builtins: defaultBuiltins(),
 		symbols:  NewSymbolTable(),
 		envPool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				// We don't allocate size here because we need SymbolTable size at runtime
 				return &GlobalEnv{}
 			},
