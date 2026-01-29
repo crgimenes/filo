@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/crgimenes/filo"
+	"github.com/crgimenes/filo/filostrings"
 )
 
 // This example shows how Filo can be used for dynamic configuration.
@@ -13,7 +14,7 @@ import (
 
 func main() {
 	eng := filo.NewEngine()
-	filo.RegisterStringBuiltins(eng)
+	filostrings.RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 256, RecursionLimit: 16, Timeout: time.Second}

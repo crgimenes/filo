@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/crgimenes/filo"
+	"github.com/crgimenes/filo/filostrings"
 )
 
 func main() {
@@ -76,7 +77,7 @@ func namedScriptsExample(ctx context.Context, eng *filo.Engine, cfg filo.EvalCon
 	}
 
 	// Register string builtins for the greet script
-	filo.RegisterStringBuiltins(eng)
+	filostrings.RegisterBuiltins(eng)
 
 	// Use 'greet' script
 	result, _, _ := scripts["greet"].Execute(ctx, eng, map[string]filo.Value{

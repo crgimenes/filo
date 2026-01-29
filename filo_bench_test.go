@@ -18,11 +18,11 @@ func BenchmarkTemplateReuse(b *testing.B) {
 	// - Uses both locals and globals
 	src := `
 	(let ((x in-x) (y in-y))
-		(if (> x y)
-			(str-fmt "Result: %g" (* x 2))
-			(str-fmt "Result: %g" (+ y 10))))
+			(if (> x y)
+			x
+			(+ y 10)))
 	`
-	RegisterStringBuiltins(eng)
+	// RegisterStringBuiltins(eng) // Removed to avoid cycle
 
 	prog, err := eng.Compile(src)
 	if err != nil {

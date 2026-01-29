@@ -10,7 +10,7 @@ import (
 
 func main() {
 	eng := filo.NewEngine()
-	filoprint.RegisterPrintBuiltins(eng)
+	filoprint.RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 1000, RecursionLimit: 32, Timeout: time.Second}

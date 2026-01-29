@@ -14,8 +14,8 @@ import (
 	"github.com/crgimenes/filo"
 )
 
-// RegisterPrintBuiltins adds print functions to the engine.
-func RegisterPrintBuiltins(eng *filo.Engine) {
+// RegisterBuiltins adds print functions to the engine.
+func RegisterBuiltins(eng *filo.Engine) {
 	eng.MustRegisterBuiltin("print", builtinPrint)
 	eng.MustRegisterBuiltin("printf", builtinPrintf)
 }

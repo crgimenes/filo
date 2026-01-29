@@ -50,7 +50,17 @@ func FuzzRunScriptDoesNotPanic(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		eng := NewEngine()
-		RegisterStringBuiltins(eng)
+		// Mock string builtins for fuzzing to avoid import cycle
+		eng.RegisterBuiltin("str-len", func(_ context.Context, args []Value) (Value, error) {
+			if len(args) != 1 {
+				return Value{}, nil
+			}
+			s, _ := args[0].AsString()
+			return VNum(float64(len(s))), nil
+		})
+		eng.RegisterBuiltin("str-sub", func(_ context.Context, args []Value) (Value, error) {
+			return VString("mock"), nil
+		})
 
 		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 		defer cancel()

@@ -1,4 +1,4 @@
-package filo
+package filostrings
 
 import (
 	"context"
@@ -6,12 +6,14 @@ import (
 	"math"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/crgimenes/filo"
 )
 
-// RegisterStringBuiltins adds string manipulation functions to the engine.
+// RegisterBuiltins adds string manipulation functions to the engine.
 // These builtins are pure, deterministic functions that do not access
 // external resources.
-func RegisterStringBuiltins(eng *Engine) {
+func RegisterBuiltins(eng *filo.Engine) {
 	eng.MustRegisterBuiltin("str-join", builtinStrJoin)
 	eng.MustRegisterBuiltin("str-split", builtinStrSplit)
 	eng.MustRegisterBuiltin("str-find", builtinStrFind)
@@ -29,223 +31,223 @@ func RegisterStringBuiltins(eng *Engine) {
 // Usage: (str-fmt format args...) -> string
 // Example: (str-fmt "Hello %s" "World") -> "Hello World"
 // Supports %s, %d, %f, %v, %t.
-func builtinStrFmt(ctx context.Context, args []Value) (Value, error) {
+func builtinStrFmt(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) < 1 {
-		return Value{}, fmt.Errorf("str-fmt expects at least 1 argument (format string)")
+		return filo.Value{}, fmt.Errorf("str-fmt expects at least 1 argument (format string)")
 	}
 	format, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-fmt: format must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-fmt: format must be string: %w", err)
 	}
 
 	fmtArgs := make([]any, len(args)-1)
 	for i, arg := range args[1:] {
 		switch arg.Kind {
-		case KNumber:
+		case filo.KNumber:
 			fmtArgs[i] = arg.Num
-		case KString:
+		case filo.KString:
 			fmtArgs[i] = arg.Str
-		case KBool:
+		case filo.KBool:
 			fmtArgs[i] = arg.Bool
-		case KList:
+		case filo.KList:
 			fmtArgs[i] = arg.List
-		case KTuple:
+		case filo.KTuple:
 			fmtArgs[i] = arg.Tup
 		default:
 			fmtArgs[i] = arg
 		}
 	}
-	return VString(fmt.Sprintf(format, fmtArgs...)), nil
+	return filo.VString(fmt.Sprintf(format, fmtArgs...)), nil
 }
 
 // builtinStrJoin joins a list of strings with a separator.
 // Usage: (str-join separator list) -> string
 // Example: (str-join ", " (list "a" "b" "c")) -> "a, b, c"
-func builtinStrJoin(ctx context.Context, args []Value) (Value, error) {
+func builtinStrJoin(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 2 {
-		return Value{}, fmt.Errorf("str-join expects 2 arguments (separator, list)")
+		return filo.Value{}, fmt.Errorf("str-join expects 2 arguments (separator, list)")
 	}
 	sep, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-join: separator must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-join: separator must be string: %w", err)
 	}
 	list, err := args[1].AsList()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-join: second argument must be list: %w", err)
+		return filo.Value{}, fmt.Errorf("str-join: second argument must be list: %w", err)
 	}
 	parts := make([]string, len(list))
 	for i, v := range list {
 		s, convErr := v.AsString()
 		if convErr != nil {
-			return Value{}, fmt.Errorf("str-join: list element %d must be string: %w", i, convErr)
+			return filo.Value{}, fmt.Errorf("str-join: list element %d must be string: %w", i, convErr)
 		}
 		parts[i] = s
 	}
-	return VString(strings.Join(parts, sep)), nil
+	return filo.VString(strings.Join(parts, sep)), nil
 }
 
 // builtinStrSplit splits a string by a separator into a list.
 // Usage: (str-split separator string) -> list
 // Example: (str-split ", " "a, b, c") -> (list "a" "b" "c")
-func builtinStrSplit(ctx context.Context, args []Value) (Value, error) {
+func builtinStrSplit(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 2 {
-		return Value{}, fmt.Errorf("str-split expects 2 arguments (separator, string)")
+		return filo.Value{}, fmt.Errorf("str-split expects 2 arguments (separator, string)")
 	}
 	sep, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-split: separator must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-split: separator must be string: %w", err)
 	}
 	str, err := args[1].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-split: second argument must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-split: second argument must be string: %w", err)
 	}
 	parts := strings.Split(str, sep)
-	result := make([]Value, len(parts))
+	result := make([]filo.Value, len(parts))
 	for i, p := range parts {
-		result[i] = VString(p)
+		result[i] = filo.VString(p)
 	}
-	return VList(result), nil
+	return filo.VList(result), nil
 }
 
 // builtinStrFind checks if a substring exists in a string.
 // Usage: (str-find substring string) -> bool
 // Example: (str-find "world" "hello world") -> #t
-func builtinStrFind(ctx context.Context, args []Value) (Value, error) {
+func builtinStrFind(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 2 {
-		return Value{}, fmt.Errorf("str-find expects 2 arguments (substring, string)")
+		return filo.Value{}, fmt.Errorf("str-find expects 2 arguments (substring, string)")
 	}
 	substr, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-find: substring must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-find: substring must be string: %w", err)
 	}
 	str, err := args[1].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-find: second argument must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-find: second argument must be string: %w", err)
 	}
-	return VBool(strings.Contains(str, substr)), nil
+	return filo.VBool(strings.Contains(str, substr)), nil
 }
 
 // builtinStrTrim removes leading and trailing whitespace from a string.
 // Usage: (str-trim string) -> string
 // Example: (str-trim "  hello  ") -> "hello"
-func builtinStrTrim(ctx context.Context, args []Value) (Value, error) {
+func builtinStrTrim(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 1 {
-		return Value{}, fmt.Errorf("str-trim expects 1 argument (string)")
+		return filo.Value{}, fmt.Errorf("str-trim expects 1 argument (string)")
 	}
 	str, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-trim: argument must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-trim: argument must be string: %w", err)
 	}
-	return VString(strings.TrimSpace(str)), nil
+	return filo.VString(strings.TrimSpace(str)), nil
 }
 
 // builtinStrReplace replaces all occurrences of old with new in a string.
 // Usage: (str-replace old new string) -> string
 // Example: (str-replace "world" "Filo" "hello world") -> "hello Filo"
-func builtinStrReplace(ctx context.Context, args []Value) (Value, error) {
+func builtinStrReplace(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 3 {
-		return Value{}, fmt.Errorf("str-replace expects 3 arguments (old, new, string)")
+		return filo.Value{}, fmt.Errorf("str-replace expects 3 arguments (old, new, string)")
 	}
 	old, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-replace: old must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-replace: old must be string: %w", err)
 	}
 	newStr, err := args[1].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-replace: new must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-replace: new must be string: %w", err)
 	}
 	str, err := args[2].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-replace: third argument must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-replace: third argument must be string: %w", err)
 	}
-	return VString(strings.ReplaceAll(str, old, newStr)), nil
+	return filo.VString(strings.ReplaceAll(str, old, newStr)), nil
 }
 
 // builtinStrUpper converts a string to uppercase.
 // Usage: (str-upper string) -> string
 // Example: (str-upper "hello") -> "HELLO"
-func builtinStrUpper(ctx context.Context, args []Value) (Value, error) {
+func builtinStrUpper(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 1 {
-		return Value{}, fmt.Errorf("str-upper expects 1 argument (string)")
+		return filo.Value{}, fmt.Errorf("str-upper expects 1 argument (string)")
 	}
 	str, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-upper: argument must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-upper: argument must be string: %w", err)
 	}
-	return VString(strings.ToUpper(str)), nil
+	return filo.VString(strings.ToUpper(str)), nil
 }
 
 // builtinStrLower converts a string to lowercase.
 // Usage: (str-lower string) -> string
 // Example: (str-lower "HELLO") -> "hello"
-func builtinStrLower(ctx context.Context, args []Value) (Value, error) {
+func builtinStrLower(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 1 {
-		return Value{}, fmt.Errorf("str-lower expects 1 argument (string)")
+		return filo.Value{}, fmt.Errorf("str-lower expects 1 argument (string)")
 	}
 	str, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-lower: argument must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-lower: argument must be string: %w", err)
 	}
-	return VString(strings.ToLower(str)), nil
+	return filo.VString(strings.ToLower(str)), nil
 }
 
 // builtinStrConcat concatenates multiple strings.
 // Usage: (str-concat strings...) -> string
 // Example: (str-concat "hello" " " "world") -> "hello world"
-func builtinStrConcat(ctx context.Context, args []Value) (Value, error) {
+func builtinStrConcat(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	var b strings.Builder
 	for i, a := range args {
 		s, err := a.AsString()
 		if err != nil {
-			return Value{}, fmt.Errorf("str-concat: argument %d must be string: %w", i, err)
+			return filo.Value{}, fmt.Errorf("str-concat: argument %d must be string: %w", i, err)
 		}
 		b.WriteString(s)
 	}
-	return VString(b.String()), nil
+	return filo.VString(b.String()), nil
 }
 
 // builtinStrLen returns the length of a string in runes.
 // Usage: (str-len string) -> number
 // Example: (str-len "hello") -> 5
-func builtinStrLen(ctx context.Context, args []Value) (Value, error) {
+func builtinStrLen(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 1 {
-		return Value{}, fmt.Errorf("str-len expects 1 argument (string)")
+		return filo.Value{}, fmt.Errorf("str-len expects 1 argument (string)")
 	}
 	str, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-len: argument must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-len: argument must be string: %w", err)
 	}
-	return VNum(float64(utf8.RuneCountInString(str))), nil
+	return filo.VNum(float64(utf8.RuneCountInString(str))), nil
 }
 
 // builtinStrSub extracts a substring from a string.
 // Usage: (str-sub str start [end]) -> string
 // Indices are 0-based, in runes. End is exclusive. If end is omitted, it slices to the end.
 // Example: (str-sub "hello world" 0 5) -> "hello"
-func builtinStrSub(ctx context.Context, args []Value) (Value, error) {
+func builtinStrSub(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) != 2 && len(args) != 3 {
-		return Value{}, fmt.Errorf("str-sub expects 2 or 3 arguments (string, start, [end])")
+		return filo.Value{}, fmt.Errorf("str-sub expects 2 or 3 arguments (string, start, [end])")
 	}
 	str, err := args[0].AsString()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-sub: first argument must be string: %w", err)
+		return filo.Value{}, fmt.Errorf("str-sub: first argument must be string: %w", err)
 	}
 	startF, err := args[1].AsNumber()
 	if err != nil {
-		return Value{}, fmt.Errorf("str-sub: start must be number: %w", err)
+		return filo.Value{}, fmt.Errorf("str-sub: start must be number: %w", err)
 	}
 	if math.Trunc(startF) != startF {
-		return Value{}, fmt.Errorf("str-sub: start must be an integer")
+		return filo.Value{}, fmt.Errorf("str-sub: start must be an integer")
 	}
 	start := int(startF)
 	end := -1
 	if len(args) == 3 {
 		endF, err := args[2].AsNumber()
 		if err != nil {
-			return Value{}, fmt.Errorf("str-sub: end must be number: %w", err)
+			return filo.Value{}, fmt.Errorf("str-sub: end must be number: %w", err)
 		}
 		if math.Trunc(endF) != endF {
-			return Value{}, fmt.Errorf("str-sub: end must be an integer")
+			return filo.Value{}, fmt.Errorf("str-sub: end must be an integer")
 		}
 		end = int(endF)
 	}
@@ -257,7 +259,7 @@ func builtinStrSub(ctx context.Context, args []Value) (Value, error) {
 	}
 	end = min(end, len(runes))
 	if start > end {
-		return VString(""), nil
+		return filo.VString(""), nil
 	}
-	return VString(string(runes[start:end])), nil
+	return filo.VString(string(runes[start:end])), nil
 }

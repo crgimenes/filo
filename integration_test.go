@@ -2,6 +2,7 @@ package filo
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -362,7 +363,10 @@ func TestCallFunction(t *testing.T) {
 func TestCallFunctionWithStrings(t *testing.T) {
 	f := New()
 	defer f.Close()
-	RegisterStringBuiltins(f.eng)
+	// RegisterStringBuiltins(f.eng)
+	f.eng.RegisterBuiltin("str-concat", func(_ context.Context, args []Value) (Value, error) {
+		return VString(args[0].Str + args[1].Str + args[2].Str), nil
+	})
 
 	// Define a greeting function
 	script := `(def greet (fn (name) (str-concat "Hello, " name "!")))`
@@ -389,7 +393,10 @@ func TestCallFunctionWithStrings(t *testing.T) {
 func TestCallFunctionString(t *testing.T) {
 	f := New()
 	defer f.Close()
-	RegisterStringBuiltins(f.eng)
+	// RegisterStringBuiltins(f.eng)
+	f.eng.RegisterBuiltin("str-upper", func(_ context.Context, args []Value) (Value, error) {
+		return VString(strings.ToUpper(args[0].Str)), nil
+	})
 
 	// Test with non-existent function (should return fallback)
 	result := f.CallFunctionString("not-exists", "fallback", "arg")

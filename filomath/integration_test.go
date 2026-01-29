@@ -19,7 +19,7 @@ func TestMultiplePackagesIntegration(t *testing.T) {
 
 	// Register multiple extension packages on the same engine
 	// Each package adds its builtins to the same builtins map
-	RegisterMathBuiltins(eng)
+	RegisterBuiltins(eng)
 	// In a real scenario, you would also call:
 	// Load multiple extension packages on the same engine
 	// filostrings.RegisterStringBuiltins(eng)
@@ -58,7 +58,7 @@ func TestBuiltinNamespacing(t *testing.T) {
 	t.Parallel()
 
 	eng := filo.NewEngine()
-	RegisterMathBuiltins(eng)
+	RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 1000, RecursionLimit: 32, Timeout: 5 * time.Second}

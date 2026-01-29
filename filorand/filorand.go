@@ -15,13 +15,13 @@ import (
 	"github.com/crgimenes/filo"
 )
 
-// RegisterRandomBuiltins adds random/UUID builtins to a Filo engine.
+// RegisterBuiltins adds random/UUID builtins to a Filo engine.
 //
 // Registered builtins:
 //   - rand-float: Returns a random float in [0.0, 1.0)
 //   - rand-int: Returns a random integer in [0, n)
 //   - uuid-v4: Returns a new random UUID v4 string
-func RegisterRandomBuiltins(eng *filo.Engine) {
+func RegisterBuiltins(eng *filo.Engine) {
 	eng.MustRegisterBuiltin("rand-float", builtinRandFloat)
 	eng.MustRegisterBuiltin("rand-int", builtinRandInt)
 	eng.MustRegisterBuiltin("uuid-v4", builtinUUIDv4)

@@ -111,13 +111,13 @@ func TestFiloTypeName(t *testing.T) {
 	}
 }
 
-func TestRegisterPrintBuiltins(t *testing.T) {
+func TestRegisterBuiltins(t *testing.T) {
 	t.Parallel()
 
 	eng := filo.NewEngine()
 
 	// Should not panic
-	RegisterPrintBuiltins(eng)
+	RegisterBuiltins(eng)
 
 	// Verify builtins are registered by running a simple script
 	globals := map[string]filo.Value{}

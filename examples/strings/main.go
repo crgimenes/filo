@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/crgimenes/filo"
+	"github.com/crgimenes/filo/filostrings"
 )
 
 func main() {
 	eng := filo.NewEngine()
-	filo.RegisterStringBuiltins(eng) // Required for str-fmt, str-upper, etc.
+	filostrings.RegisterBuiltins(eng) // Required for str-fmt, str-upper, etc.
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 64, RecursionLimit: 8, Timeout: time.Second}

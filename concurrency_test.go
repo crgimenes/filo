@@ -11,7 +11,10 @@ import (
 // TestConcurrencySafety stresses the engine with parallel execution, compilation, and dynamic symbol creation.
 func TestConcurrencySafety(t *testing.T) {
 	eng := NewEngine()
-	RegisterStringBuiltins(eng)
+	// Mock string builtin to avoid import cycle
+	eng.RegisterBuiltin("str-fmt", func(_ context.Context, args []Value) (Value, error) {
+		return VString(fmt.Sprintf("val: %g", args[1].Num)), nil
+	})
 
 	// 1. Compile a base program (Program reuse scenario)
 	baseScript := `

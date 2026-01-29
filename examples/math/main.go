@@ -11,7 +11,7 @@ import (
 
 func main() {
 	eng := filo.NewEngine()
-	filomath.RegisterMathBuiltins(eng)
+	filomath.RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 64, RecursionLimit: 8, Timeout: time.Second}

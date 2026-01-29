@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/crgimenes/filo"
+	"github.com/crgimenes/filo/filostrings"
 )
 
 // This example shows how Filo can be used for data transformation pipelines.
@@ -13,7 +14,7 @@ import (
 
 func main() {
 	eng := filo.NewEngine()
-	filo.RegisterStringBuiltins(eng)
+	filostrings.RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 512, RecursionLimit: 32, Timeout: time.Second}

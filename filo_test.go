@@ -168,15 +168,9 @@ func TestNewBuiltins(t *testing.T) {
 		// List Manipulation (append, concat)
 		{"list-append", "(list-append (list 1) 2)", "(list 1 2)", nil},
 		{"list-concat", "(list-concat (list 1) (list 2))", "(list 1 2)", nil},
-
-		// String Formatting (str-fmt)
-		{"str-fmt-s", "(str-fmt \"Hello %s\" \"World\")", "\"Hello World\"", nil},
-		{"str-fmt-d", "(str-fmt \"Count: %g\" 42)", "\"Count: 42\"", nil},
 	}
 
 	eng := NewEngine()
-	// Need format builtins registered for str-fmt test
-	RegisterStringBuiltins(eng)
 
 	for _, tc := range cases {
 		tc := tc
@@ -463,7 +457,7 @@ func TestSecurityLimits(t *testing.T) {
 
 func TestEvaluatorErrorContext(t *testing.T) {
 	eng := NewEngine()
-	RegisterStringBuiltins(eng)
+	// RegisterStringBuiltins(eng) // Removed
 	cfg := defaultCfg()
 	ctx := context.Background()
 

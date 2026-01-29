@@ -7,11 +7,12 @@ import (
 
 	"github.com/crgimenes/filo"
 	"github.com/crgimenes/filo/filojson"
+	"github.com/crgimenes/filo/filostrings"
 )
 
 func main() {
 	eng := filo.NewEngine()
-	filo.RegisterStringBuiltins(eng)
+	filostrings.RegisterBuiltins(eng)
 	filojson.RegisterJSONBuiltins(eng)
 
 	ctx := context.Background()

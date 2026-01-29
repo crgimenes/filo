@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/crgimenes/filo"
+	"github.com/crgimenes/filo/filostrings"
 )
 
 func newEngine() *filo.Engine {
 	eng := filo.NewEngine()
-	filo.RegisterStringBuiltins(eng)
+	filostrings.RegisterBuiltins(eng)
 	RegisterJSONBuiltins(eng)
 	return eng
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/crgimenes/filo"
 )
 
-// RegisterMathBuiltins adds advanced math builtins to a Filo engine.
+// RegisterBuiltins adds advanced math builtins to a Filo engine.
 // This can be called alongside other extension packages.
 //
 // Registered builtins:
@@ -22,7 +22,7 @@ import (
 //   - log, log10: Logarithms
 //   - exp: Exponential (e^x)
 //   - min, max: Multi-argument minimum/maximum
-func RegisterMathBuiltins(eng *filo.Engine) {
+func RegisterBuiltins(eng *filo.Engine) {
 	eng.MustRegisterBuiltin("abs", builtinAbs)
 	eng.MustRegisterBuiltin("sqrt", builtinSqrt)
 	eng.MustRegisterBuiltin("floor", builtinFloor)

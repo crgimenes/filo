@@ -11,7 +11,7 @@ import (
 
 func TestRandomBuiltins(t *testing.T) {
 	eng := filo.NewEngine()
-	RegisterRandomBuiltins(eng)
+	RegisterBuiltins(eng)
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 1000, Timeout: time.Second}
 

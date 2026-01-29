@@ -1,9 +1,11 @@
-package filo
+package filostrings
 
 import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/crgimenes/filo"
 )
 
 func TestStringBuiltins(t *testing.T) {
@@ -216,6 +218,7 @@ func TestStringBuiltins(t *testing.T) {
 			name:   "str-sub middle",
 			script: `(str-sub "hello world" 6 11)`,
 			want:   `"world"`,
+			// want:   `"world"`,
 		},
 		{
 			name:   "str-sub end beyond length",
@@ -251,11 +254,11 @@ func TestStringBuiltins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eng := NewEngine()
-			RegisterStringBuiltins(eng)
+			eng := filo.NewEngine()
+			RegisterBuiltins(eng)
 
 			ctx := context.Background()
-			cfg := EvalConfig{
+			cfg := filo.EvalConfig{
 				StepLimit:      1000,
 				RecursionLimit: 64,
 				Timeout:        time.Second,
@@ -282,11 +285,11 @@ func TestStringBuiltins(t *testing.T) {
 
 func TestStringBuiltinsIntegration(t *testing.T) {
 	// Test combining multiple string builtins
-	eng := NewEngine()
-	RegisterStringBuiltins(eng)
+	eng := filo.NewEngine()
+	RegisterBuiltins(eng)
 
 	ctx := context.Background()
-	cfg := EvalConfig{
+	cfg := filo.EvalConfig{
 		StepLimit:      1000,
 		RecursionLimit: 64,
 		Timeout:        time.Second,

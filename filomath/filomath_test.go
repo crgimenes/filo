@@ -13,7 +13,7 @@ func TestMathBuiltins(t *testing.T) {
 	t.Parallel()
 
 	eng := filo.NewEngine()
-	RegisterMathBuiltins(eng)
+	RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 1000, RecursionLimit: 32, Timeout: 5 * time.Second}
@@ -78,7 +78,7 @@ func TestMathErrors(t *testing.T) {
 	t.Parallel()
 
 	eng := filo.NewEngine()
-	RegisterMathBuiltins(eng)
+	RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 1000, RecursionLimit: 32, Timeout: 5 * time.Second}

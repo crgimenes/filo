@@ -8,6 +8,7 @@ import (
 
 	"github.com/crgimenes/filo"
 	"github.com/crgimenes/filo/filomath"
+	"github.com/crgimenes/filo/filostrings"
 )
 
 func TestLanguageFeatures(t *testing.T) {
@@ -372,8 +373,8 @@ func TestLanguageFeatures(t *testing.T) {
 			eng := filo.NewEngine()
 
 			// Register Extensions
-			filomath.RegisterMathBuiltins(eng)
-			filo.RegisterStringBuiltins(eng)
+			filomath.RegisterBuiltins(eng)
+			filostrings.RegisterBuiltins(eng)
 			// filoprint/random not needed for these pure tests
 
 			ctx := context.Background()

@@ -27,6 +27,7 @@ import (
 	"github.com/crgimenes/filo/filomath"
 	"github.com/crgimenes/filo/filoprint"
 	"github.com/crgimenes/filo/filorand"
+	"github.com/crgimenes/filo/filostrings"
 	"golang.org/x/term"
 )
 
@@ -465,13 +466,13 @@ func countParens(s string) (open, close int) {
 func registerPackage(engine *filo.Engine, pkg string) error {
 	switch pkg {
 	case "math":
-		filomath.RegisterMathBuiltins(engine)
+		filomath.RegisterBuiltins(engine)
 	case "rand":
-		filorand.RegisterRandomBuiltins(engine)
+		filorand.RegisterBuiltins(engine)
 	case "str":
-		filo.RegisterStringBuiltins(engine)
+		filostrings.RegisterBuiltins(engine)
 	case "print":
-		filoprint.RegisterPrintBuiltins(engine)
+		filoprint.RegisterBuiltins(engine)
 	default:
 		return fmt.Errorf("unknown filo package: %q (available: math, rand, str, print)", pkg)
 	}

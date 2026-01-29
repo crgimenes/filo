@@ -7,6 +7,7 @@ import (
 
 	"github.com/crgimenes/filo"
 	"github.com/crgimenes/filo/filomath"
+	"github.com/crgimenes/filo/filostrings"
 )
 
 // This example shows how Filo can be used for scoring and ranking systems.
@@ -14,8 +15,8 @@ import (
 
 func main() {
 	eng := filo.NewEngine()
-	filo.RegisterStringBuiltins(eng)
-	filomath.RegisterMathBuiltins(eng)
+	filostrings.RegisterBuiltins(eng)
+	filomath.RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 512, RecursionLimit: 32, Timeout: time.Second}
