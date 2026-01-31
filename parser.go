@@ -167,14 +167,26 @@ func (l *lexer) readString(startPos int) (Node, error) {
 			}
 			escaped := l.src[l.i]
 			switch escaped {
-			case '"':
+			case '"': // double quote
 				b.WriteByte('"')
-			case 'n':
+			case 'n': // newline (line feed)
 				b.WriteByte('\n')
-			case 't':
+			case 't': // horizontal tab
 				b.WriteByte('\t')
-			case '\\':
+			case 'r': // carriage return
+				b.WriteByte('\r')
+			case '\\': // backslash
 				b.WriteByte('\\')
+			case '0': // null character
+				b.WriteByte('\x00')
+			case 'a': // alert (bell)
+				b.WriteByte('\a')
+			case 'b': // backspace
+				b.WriteByte('\b')
+			case 'f': // form feed
+				b.WriteByte('\f')
+			case 'v': // vertical tab
+				b.WriteByte('\v')
 			default:
 				return nil, l.errAt(l.i, fmt.Sprintf("unsupported escape: \\%c", escaped))
 			}

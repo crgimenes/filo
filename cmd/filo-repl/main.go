@@ -150,7 +150,12 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 	}()
 
 	// Create terminal with VT100 support
-	t := term.NewTerminal(os.Stdin, promptMain)
+	// Wrap stdin with CRLF output converter for raw mode
+	crlfOut := &crlfWriter{os.Stdout}
+	t := term.NewTerminal(&crlfReadWriter{os.Stdin, crlfOut}, promptMain)
+
+	// Configure filoprint to use CRLF output for raw terminal mode
+	filoprint.SetOutput(crlfOut)
 
 	var buffer strings.Builder
 	globals := make(map[string]filo.Value)
@@ -423,6 +428,45 @@ func openEditor(t *term.Terminal, stdinFd int, oldState *term.State, content str
 	}
 
 	return string(data)
+}
+
+// crlfReadWriter wraps an io.ReadWriter and converts \n to \r\n on output.
+// This is necessary because in raw terminal mode, \n only moves the cursor
+// down without returning to column 0. The \r\n sequence properly returns
+// the cursor to the first column.
+
+// crlfWriter wraps an io.Writer and converts \n to \r\n on output.
+type crlfWriter struct {
+	w io.Writer
+}
+
+func (c *crlfWriter) Write(p []byte) (int, error) {
+	// Convert \n to \r\n for proper terminal output in raw mode
+	var out []byte
+	for _, b := range p {
+		if b == '\n' {
+			out = append(out, '\r', '\n')
+			continue
+		}
+		out = append(out, b)
+	}
+	_, err := c.w.Write(out)
+	// Return original length to satisfy io.Writer contract
+	return len(p), err
+}
+
+// crlfReadWriter combines a Reader with a crlfWriter for use with term.Terminal.
+type crlfReadWriter struct {
+	r io.Reader
+	w *crlfWriter
+}
+
+func (c *crlfReadWriter) Read(p []byte) (int, error) {
+	return c.r.Read(p)
+}
+
+func (c *crlfReadWriter) Write(p []byte) (int, error) {
+	return c.w.Write(p)
 }
 
 // countParens counts open and close parentheses, ignoring those inside strings.

@@ -1,26 +1,41 @@
 // Package filoprint provides simple print builtins for Filo scripts.
-// These builtins echo output directly to stdout, useful for REPL debugging.
+// These builtins echo output directly to a configurable writer (default: stdout),
+// useful for REPL debugging.
 //
 // Functions:
-//   - print: Print all arguments
-//   - printf: Print with format string (supports %T for Filo types)
+//   - print: Print all arguments (no trailing newline)
+//   - println: Print all arguments with trailing newline
+//   - printf: Print with format string (supports %T for Filo types, no trailing newline)
 package filoprint
 
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/crgimenes/filo"
 )
 
+// output is the writer where print functions send output.
+// Default is os.Stdout, but can be changed with SetOutput.
+var output io.Writer = os.Stdout
+
+// SetOutput sets the output writer for print functions.
+// This is useful for redirecting output in raw terminal mode.
+func SetOutput(w io.Writer) {
+	output = w
+}
+
 // RegisterBuiltins adds print functions to the engine.
 func RegisterBuiltins(eng *filo.Engine) {
 	eng.MustRegisterBuiltin("print", builtinPrint)
+	eng.MustRegisterBuiltin("println", builtinPrintln)
 	eng.MustRegisterBuiltin("printf", builtinPrintf)
 }
 
-// builtinPrint prints all arguments to stdout.
+// builtinPrint prints all arguments to output without trailing newline.
 // Usage: (print "Hello" name)
 func builtinPrint(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) < 1 {
@@ -31,7 +46,23 @@ func builtinPrint(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	for i, arg := range args {
 		parts[i] = valueToString(arg)
 	}
-	fmt.Println(strings.Join(parts, " "))
+	fmt.Fprint(output, strings.Join(parts, " "))
+
+	return filo.VList(nil), nil
+}
+
+// builtinPrintln prints all arguments to output with trailing newline.
+// Usage: (println "Hello" name)
+func builtinPrintln(ctx context.Context, args []filo.Value) (filo.Value, error) {
+	if len(args) < 1 {
+		return filo.Value{}, fmt.Errorf("println expects at least 1 argument")
+	}
+
+	parts := make([]string, len(args))
+	for i, arg := range args {
+		parts[i] = valueToString(arg)
+	}
+	fmt.Fprintln(output, strings.Join(parts, " "))
 
 	return filo.VList(nil), nil
 }
@@ -51,7 +82,7 @@ func builtinPrintf(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	}
 
 	result := formatWithFiloTypes(format, args[1:])
-	fmt.Println(result)
+	fmt.Fprint(output, result)
 
 	return filo.VBool(true), nil
 }
