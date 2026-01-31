@@ -89,6 +89,37 @@ func optionsExample() {
 	fmt.Println(s)
 }
 
+func mapExample() {
+	// Example with map[string]interface{}
+	data := map[string]any{
+		"username": "admin",
+		"password": "secret",
+		"active":   true,
+		"roles":    []string{"admin", "user"},
+	}
+
+	val, err := filo.Marshal(data)
+	if err != nil {
+		log.Fatalf("Marshal error: %v", err)
+	}
+	fmt.Printf("Filo value: %v\n", val)
+
+	// MarshalIndent for pretty printing
+	prettyVal, err := filo.MarshalIndent(data, "> ", "  ")
+	if err != nil {
+		log.Fatalf("MarshalIndent error: %v", err)
+	}
+
+	fmt.Printf("Pretty Filo value:\n%v\n", prettyVal)
+
+	// Unmarshal back to map
+	var data2 map[string]any
+	if err := filo.Unmarshal(val, &data2); err != nil {
+		log.Fatalf("Unmarshal error: %v", err)
+	}
+	fmt.Printf("Go map: %+v\n", data2)
+}
+
 func main() {
 	// Example 1: Marshal Go struct to Filo Value
 	fmt.Println("=== Marshal: Go struct -> Filo Value ===")
@@ -146,4 +177,8 @@ func main() {
 	// Example 5: Marshal with Options
 	fmt.Println("\n=== Marshal with Options ===")
 	optionsExample()
+
+	// Example 6: Marshal and Unmarshal map[string]interface{}
+	fmt.Println("\n=== Marshal and Unmarshal map[string]interface{} ===")
+	mapExample()
 }

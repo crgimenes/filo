@@ -359,6 +359,14 @@ func unmarshalValue(val Value, rv reflect.Value) error {
 	case reflect.Struct:
 		return unmarshalStruct(val, rv)
 
+	case reflect.Interface:
+		// Convert Filo Value to native Go value and set it
+		goVal, err := valueToGo(val)
+		if err != nil {
+			return err
+		}
+		rv.Set(reflect.ValueOf(goVal))
+
 	default:
 		return fmt.Errorf("unmarshal: unsupported target type %s", rv.Type())
 	}
@@ -422,6 +430,101 @@ func unmarshalMap(val Value, rv reflect.Value) error {
 	}
 	rv.Set(m)
 	return nil
+}
+
+// valueToGo converts a Filo Value to a native Go value.
+// This is used when the target type is interface{}.
+func valueToGo(val Value) (any, error) {
+	switch val.Kind {
+	case KBool:
+		return val.Bool, nil
+	case KNumber:
+		return val.Num, nil
+	case KString:
+		return val.Str, nil
+	case KList:
+		// Check if it looks like a map (list of 2-element tuples/lists with string keys)
+		if isMapLike(val.List) {
+			return listToMap(val.List)
+		}
+		// Otherwise, convert to []any
+		result := make([]any, len(val.List))
+		for i, item := range val.List {
+			v, err := valueToGo(item)
+			if err != nil {
+				return nil, fmt.Errorf("list item %d: %w", i, err)
+			}
+			result[i] = v
+		}
+		return result, nil
+	case KTuple:
+		if len(val.Tup) == 0 {
+			return nil, nil
+		}
+		// Convert tuple to []any
+		result := make([]any, len(val.Tup))
+		for i, item := range val.Tup {
+			v, err := valueToGo(item)
+			if err != nil {
+				return nil, fmt.Errorf("tuple item %d: %w", i, err)
+			}
+			result[i] = v
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("valueToGo: unsupported value kind %v", val.Kind)
+	}
+}
+
+// isMapLike checks if a list looks like a map representation (list of 2-element tuples/lists with string keys)
+func isMapLike(list []Value) bool {
+	for _, item := range list {
+		var elements []Value
+		switch item.Kind {
+		case KTuple:
+			elements = item.Tup
+		case KList:
+			elements = item.List
+		default:
+			return false
+		}
+		if len(elements) != 2 {
+			return false
+		}
+		if elements[0].Kind != KString {
+			return false
+		}
+	}
+	return len(list) > 0
+}
+
+// listToMap converts a list of 2-element tuples/lists with string keys to a map[string]any
+func listToMap(list []Value) (map[string]any, error) {
+	result := make(map[string]any, len(list))
+	for i, item := range list {
+		var elements []Value
+		switch item.Kind {
+		case KTuple:
+			elements = item.Tup
+		case KList:
+			elements = item.List
+		default:
+			return nil, fmt.Errorf("map item %d: expected tuple or list", i)
+		}
+		if len(elements) != 2 {
+			return nil, fmt.Errorf("map item %d: expected 2 elements", i)
+		}
+		key, err := elements[0].AsString()
+		if err != nil {
+			return nil, fmt.Errorf("map item %d key: %w", i, err)
+		}
+		val, err := valueToGo(elements[1])
+		if err != nil {
+			return nil, fmt.Errorf("map item %d value: %w", i, err)
+		}
+		result[key] = val
+	}
+	return result, nil
 }
 
 func unmarshalStruct(val Value, rv reflect.Value) error {
