@@ -17,26 +17,26 @@ func main() {
 
 	script := `
 ;; Simple print examples
-(print "Hello, World!")
-(print "Sum:" (+ 1 2 3))
-(print "List:" (list 1 2 3))
+(println "Hello, World!")
+(println "Sum:" (+ 1 2 3))
+(println "List:" (list 1 2 3))
 
 ;; printf with format specifiers
-(printf "User: %s, Age: %d" "Alice" 25)
-(printf "Price: R$ %.2f" 19.99)
+(printf "User: %s, Age: %d\n" "Alice" 25)
+(printf "Price: R$ %.2f\n" 19.99)
 
 ;; %T shows the Filo type
-(printf "42 is a %T" 42)
-(printf "\"hello\" is a %T" "hello")
-(printf "#t is a %T" #t)
-(printf "(list 1 2) is a %T" (list 1 2))
+(printf "42 is a %T\n" 42)
+(printf "\"hello\" is a %T\n" "hello")
+(printf "#t is a %T\n" #t)
+(printf "(list 1 2) is a %T\n" (list 1 2))
 
 ;; Combining %T with %v
 (let ((x 3.14))
-  (printf "x = %v (type: %T)" x x))
+	(printf "x = %v (type: %T)\n" x x))
 
 ;; Multiple values
-(printf "Types: %T, %T, %T" 42 "text" #f)
+(printf "Types: %T, %T, %T\n" 42 "text" #f)
 
 "done"
 `
