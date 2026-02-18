@@ -117,10 +117,7 @@ func (g *GlobalEnv) ensureSize(size int) {
 
 	// Calculate new capacity if expansion is needed
 	if size > cap(g.values) {
-		newCap := cap(g.values) * 2
-		if newCap < size {
-			newCap = size
-		}
+		newCap := max(cap(g.values)*2, size)
 
 		// Grow values
 		newValues := make([]Value, size, newCap)

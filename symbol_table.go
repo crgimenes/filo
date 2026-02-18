@@ -1,6 +1,7 @@
 package filo
 
 import (
+	"maps"
 	"sync"
 )
 
@@ -70,9 +71,7 @@ func (st *SymbolTable) Snapshot() map[string]int {
 	st.mu.RLock()
 	defer st.mu.RUnlock()
 	snap := make(map[string]int, len(st.symbols))
-	for k, v := range st.symbols {
-		snap[k] = v
-	}
+	maps.Copy(snap, st.symbols)
 	return snap
 }
 

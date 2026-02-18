@@ -431,9 +431,7 @@ func (f *Filo) CallFunction(name string, args ...any) (Value, error) {
 
 	// Set up globals with args
 	callGlobals := make(map[string]Value, len(f.globals)+len(filoArgs))
-	for k, v := range f.globals {
-		callGlobals[k] = v
-	}
+	maps.Copy(callGlobals, f.globals)
 	for i, v := range filoArgs {
 		callGlobals[fmt.Sprintf("arg%d", i)] = v
 	}

@@ -30,13 +30,13 @@ func TestConcurrencySafety(t *testing.T) {
 
 	// Scenario A: Massive Parallel Execution of Pre-Compiled Program
 	// Simulates HTTP handlers executing logic
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 			<-start
 			// Run multiple times per goroutine
-			for j := 0; j < 100; j++ {
+			for j := range 100 {
 				globals := map[string]Value{"in-x": VNum(float64(id*100 + j))}
 				_, _, err := prog.Execute(context.Background(), globals, EvalConfig{})
 				if err != nil {
@@ -49,13 +49,13 @@ func TestConcurrencySafety(t *testing.T) {
 
 	// Scenario B: Concurrent Dynamic Compilation
 	// Simulates lazy loading of new scripts
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 			<-start
 			src := fmt.Sprintf("(+ 1 %d)", id)
-			for j := 0; j < 50; j++ {
+			for range 50 {
 				_, err := eng.Compile(src)
 				if err != nil {
 					panic(fmt.Sprintf("concurrent compile error: %v", err))
@@ -67,13 +67,13 @@ func TestConcurrencySafety(t *testing.T) {
 	// Scenario C: Dynamic Global Definition (Symbol Table Stress)
 	// Scripts that define NEW unique globals at runtime: (set dynamic-var-X 1)
 	// This forces SymbolTable.Resolve() to acquire locks and resize.
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 			<-start
 			// Each iteration defines a totally new global variable
-			for j := 0; j < 50; j++ {
+			for j := range 50 {
 				varName := fmt.Sprintf("dyn-%d-%d", id, j)
 				src := fmt.Sprintf("(set %s %d)", varName, j)
 				_, _, err := eng.RunScript(context.Background(), src, nil, EvalConfig{})
@@ -110,15 +110,13 @@ func TestBuiltinReadRace(t *testing.T) {
 	// No writes, just concurrent reads via Compile
 
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			_, err := eng.Compile("(+ 1 1)")
 			if err != nil {
 				panic(err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

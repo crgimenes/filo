@@ -25,7 +25,7 @@ func BenchmarkMapAllocations(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// Simulate map loop
-			for j := 0; j < 1000; j++ {
+			for j := range 1000 {
 				arg := VNum(float64(j))
 				// Allocates slice
 				args := []Value{arg}
@@ -42,7 +42,7 @@ func BenchmarkMapAllocations(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			// Pre-allocate buffer
 			buffer := make([]Value, 1)
-			for j := 0; j < 1000; j++ {
+			for j := range 1000 {
 				arg := VNum(float64(j))
 				buffer[0] = arg
 

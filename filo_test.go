@@ -124,7 +124,6 @@ func TestArithmetic(t *testing.T) {
 		{"mul", "(* 2 3 4)", 24},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			val, _ := run(t, tc.script, nil, cfg)
 			got, err := val.AsNumber()
@@ -173,7 +172,6 @@ func TestNewBuiltins(t *testing.T) {
 	eng := NewEngine()
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			val, _, err := eng.RunScript(context.Background(), tc.script, nil, cfg)
 
@@ -740,7 +738,6 @@ func TestExitAndReturn(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			val, _, err := eng.RunScript(ctx, tc.script, nil, cfg)
 			if err != nil {

@@ -91,11 +91,11 @@ func parseExpectedOutput(t *testing.T, path string) (string, bool) {
 			}
 		} else {
 			// Inside output block, read contiguous comments
-			if strings.HasPrefix(trimmed, "//") {
+			if after, ok := strings.CutPrefix(trimmed, "//"); ok {
 				// Preserve indentation by removing only the first space (comment marker)
-				content := strings.TrimPrefix(trimmed, "//")
-				if strings.HasPrefix(content, " ") {
-					content = strings.TrimPrefix(content, " ")
+				content := after
+				if after, ok := strings.CutPrefix(content, " "); ok {
+					content = after
 				}
 
 				if expected.Len() > 0 {

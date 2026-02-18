@@ -57,7 +57,7 @@ func BenchmarkTemplateReuse(b *testing.B) {
 func BenchmarkGlobalEnvAlloc(b *testing.B) {
 	eng := NewEngine()
 	// Pre-fill symbol table to simulate a larger application
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		eng.symbols.Resolve(fmt.Sprintf("var-%d", i))
 	}
 
