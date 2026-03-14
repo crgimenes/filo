@@ -150,15 +150,15 @@ func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Va
 	// Eval with single argument (state needed is inside ev)
 	result, err = ev.eval(ast)
 	if err != nil {
-		// Catch exitSignal - script terminated with (exit)
-		if exit, ok := err.(*exitSignal); ok {
-			result = exit.Value
+		switch sig := err.(type) {
+		case *exitSignal:
+			result = sig.Value
 			err = nil
-		} else if ret, ok := err.(*returnSignal); ok {
+		case *returnSignal:
 			// Catch returnSignal at top level - acts like exit
-			result = ret.Value
+			result = sig.Value
 			err = nil
-		} else {
+		default:
 			return Value{}, nil, err
 		}
 	}

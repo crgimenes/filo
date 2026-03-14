@@ -94,22 +94,19 @@ func foldIf(list *List) (Node, bool) {
 	cond := list.Elems[1]
 
 	// Check if cond is a boolean literal
-	if boolLit, ok := cond.(*BoolLit); ok {
-		if boolLit.Value {
-			// Return 'then' branch
-			return list.Elems[2], true
-		} else {
-			// Return 'else' branch
-			if len(list.Elems) == 4 {
-				return list.Elems[3], true
-			}
-			// No else branch -> void/nil?
-			// Filo runtime returns empty list for missing else.
-			// We should return empty list literal.
-			// Currently empty list is modeled as empty *List.
-			return &List{Elems: nil}, true
-		}
+	boolLit, ok := cond.(*BoolLit)
+	if !ok {
+		return list, false
 	}
+	if boolLit.Value {
+		return list.Elems[2], true
+	}
+	// Condition is #f — return 'else' branch if present.
+	if len(list.Elems) == 4 {
+		return list.Elems[3], true
+	}
+	// No else branch — Filo runtime returns empty list.
+	return &List{Elems: nil}, true
 	return list, false
 }
 
