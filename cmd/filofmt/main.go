@@ -203,7 +203,7 @@ func printSimpleDiff(w io.Writer, original, formatted string) {
 	// Simple line-by-line diff
 	maxLines := max(len(fmtLines), len(origLines))
 
-	for i := 0; i < maxLines; i++ {
+	for i := range maxLines {
 		var origLine, fmtLine string
 		if i < len(origLines) {
 			origLine = origLines[i]
