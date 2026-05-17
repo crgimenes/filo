@@ -188,7 +188,7 @@ func processFile(path string, cfg filo.FormatConfig, write, list, diff, foldCons
 
 	if write {
 		// Write back to file
-		return os.WriteFile(path, []byte(formatted), 0644)
+		return os.WriteFile(path, []byte(formatted), 0600)
 	}
 
 	// Default: print to stdout
