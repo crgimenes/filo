@@ -1,55 +1,45 @@
-# Filo language - A Safe, Minimalist Scripting Language for Go Applications
+# Filo
 
-Filo is a **lean**, **secure**, and **deterministic** scripting language designed to be embedded directly into Go applications. It was created for real-world scenarios where end users, including non-programmers, need to write small rules, expressions, and validations that affect application behavior **without compromising stability, security, or performance**.
+Filo is a small scripting language I built to be embedded in Go applications. It's a Lisp with minimal syntax, deterministic execution, and explicit limits on every dimension that could break a host server.
 
----
+I made it for a problem that comes up every time I try to give end users scripting power: the obvious paths are either too weak to be useful or too powerful to be safe. Filo is the third option -- small enough that an ordinary user can write short rules (validations, expressions, field logic) and closed enough that nothing can go down because of it.
 
 ## Name and pronunciation
 
-The name **Filo** comes from the Italian word *filo* (“thread”).
+The name **Filo** comes from the Italian word *filo* ("thread").
 
-It is pronounced like Italian **filo**:
+It's pronounced like Italian **filo**:
 
 - IPA: `/ˈfiː.lo/`
-- Rough English approximation: **“FEE-lo”**
+- Rough English approximation: **"FEE-lo"**
 
-Examples in Italian:
+It is **not** "Filó", "FYE-lo" (`/ˈfaɪ.loʊ/`), or "fee-LOH" (`/fiːˈloʊ/`). Just **"FEE-lo"**.
 
-- *Un filo di lana.* – “A thread of wool.”
-- *Tirare un filo dal maglione.* – “To pull a thread from the sweater.”
-- *C’è un filo che pende dalla manica.* – “There is a thread hanging from the sleeve.”
+## Why I built it
 
-Please note: it is **not** pronounced like “Filó” or “FYE-lo” (`/ˈfaɪ.loʊ/`) or “fee-LOH” (`/fiːˈloʊ/`), but simply **“FEE-lo”**.
+Three concrete cases that needed something like Filo:
 
----
+- a RAD-style generic application builder where end users write logic into fields;
+- an RPG platform with rules customizable per game and per character;
+- regular applications configurable by administrators without redeploys.
 
-## Motivation
+In all three the requirement is the same: let the user write logic, and never let that logic put the server at risk.
 
-When building complex systems such as:
+## How it stays safe
 
-- a RAD-style generic application builder,
-- an RPG platform with customizable rules,
-- applications configurable by users or administrators,
+The runtime ships with explicit constraints from day one:
 
-a clear need appears:
+- `StepLimit` -- bounds the number of evaluation steps.
+- `RecursionLimit` -- bounds the call stack.
+- `Timeout` -- execution gets cancelled.
+- `context.Context` -- natural integration with Go cancellation.
+- `recover()` around the executor -- no script can cause a `panic` on the host.
 
-> **Allow the user to write custom logic without ever putting the server at risk.**
+There is no file access, no network access, no syscall, no "dangerous" calls of any kind. The only things scripts can touch are the Go functions the host explicitly registers as builtins.
 
-## Why create the Filo language?
+## Syntax
 
-### 1. **Absolute security**
-
-The Filo runtime is designed with:
-
-- `StepLimit` - prevents infinite loops.
-- `RecursionLimit` - blocks stack explosions.
-- `Timeout` - execution is automatically aborted.
-- `context.Context` - natural integration with Go.
-- `recover()` - no script can cause a server `panic`.
-
-### 2. **Simplicity**
-
-Filo uses a minimalist Lisp-like syntax:
+Lisp, minimal:
 
 ```lisp
 (+ 1 2)
@@ -57,62 +47,109 @@ Filo uses a minimalist Lisp-like syntax:
 (map (fn (x) (* x x)) (list 1 2 3))
 ```
 
-Small, easy to teach, easy to understand, and extremely predictable.
+I picked Lisp because it's the cheapest syntax to implement and the most predictable for someone who has never programmed. There's nowhere to hide logic in syntactic ornament.
 
-### 3. **Smooth Go integration**
+## Go integration shape
 
-- Builtins written directly in Go.
-- Global environment passed as `map[string]Value`.
-- Safe calls made in the backend.
-- Ideal for validations, RPG rules, and configuration scripts.
+- Builtins are written in Go.
+- The global environment is a `map[string]Value`.
+- Scripts run inside whatever sandbox the host configures.
+- The host stays in control: only what you register is callable.
 
-### 4. **Extensible**
+## Language reference
 
-- Go functions can be registered as Filo commands - from simple sums to database queries.
+### Special forms
 
----
+| Name | Syntax | Description |
+|------|--------|-------------|
+| `if` | `(if cond then [else])` | Conditional. Returns `list()` (empty/nil) if `else` is missing and `cond` is false. |
+| `do` | `(do expr1 expr2 ...)` | Evaluates expressions in order, returns the last result. |
+| `let` | `(let ((n v) ...) body)` | Local variables scoped to the body. |
+| `letv` | `(letv (n1 n2) (values v1 v2) body)` | Destructures multi-value returns (tuples). |
+| `fn` | `(fn (args) body)` | Anonymous function. |
+| `def` | `(def name expr)` | Global variable or function (always in the root scope). |
+| `set` | `(set name expr)` | Updates an existing variable in the nearest scope. |
+| `values` | `(values v1 v2 ...)` | Returns multiple values (a tuple). |
+| `exit` | `(exit [value])` | Terminates execution immediately. |
+| `return` | `(return [value])` | Returns from the current function. |
 
-## Design and Philosophy
+### Core builtins
 
-Filo's philosophy is summarized in four principles:
+Note: `NewEngine()` includes the core math/logic/list/type builtins by default. Some sets are intentionally **opt-in** and must be registered explicitly.
 
-### **1. Short, declarative scripts**
+| Category | Function | Description |
+|----------|----------|-------------|
+| **Math** | `+`, `-`, `*`, `/`, `%` | Basic arithmetic. |
+| | `pow` | `(pow x y)` |
+| **Logic** | `=`, `!=` | Equality. |
+| | `<`, `<=`, `>`, `>=` | Numeric comparison. |
+| | `and`, `or`, `not` | Boolean logic. |
+| **Types** | `type-of` | Returns "number", "string", "list", etc. |
+| | `is-empty` | True for `""` or empty list. |
+| | `is-nil` | True for an empty list (closest thing to nil in the current runtime). |
+| **Lists** | `list` | Creates a list `(list 1 2 3)`. |
+| | `length` | List length. |
+| | `head`, `tail` | First element / rest of list. |
+| | `nth` | `(nth list index)` 0-based access. |
+| | `list-append` | `(list-append list item)` Returns new list with item appended. |
+| | `list-concat` | `(list-concat l1 l2 ...)` |
+| | `map` | `(map fn list)` |
+| | `fold` | `(fold fn init list)` |
 
-Users should write:
+### String builtins
 
-- mathematical expressions,
-- validations,
-- small business rules.
+Not enabled by default. To use them:
 
-No modules, long loops, or complex structures.
+```go
+eng := filo.NewEngine()
+filo.RegisterStringBuiltins(eng)
+```
 
-### **2. Small, powerful, testable language**
+| Function | Description |
+|----------|-------------|
+| `str-fmt` | `(str-fmt format args...)` Safe `fmt.Sprintf`. |
+| `str-concat` | Concatenates arguments. |
+| `str-join` | `(str-join sep list)` |
+| `str-split` | `(str-split sep str)` |
+| `str-len` | String length (runes). |
+| `str-sub` | `(str-sub str start [end])` |
+| `str-find` | `(str-find sub str)` |
+| `str-replace` | `(str-replace old new str)` |
+| `str-trim` | Trims whitespace. |
+| `str-upper` | Uppercase. |
+| `str-lower` | Lowercase. |
 
-Step by step, Filo provides:
+### Extension: filomath
 
-- essential operations (`+`, `-`, `*`, `/`, `%`, `pow`);
-- comparisons (`=`, `!=`, `<`, `<=`, `>`, `>=`);
-- boolean logic (`and`, `or`, `not`);
-- lists and higher-order functions (`map`, `fold`, `list`, `length`, `head`, `tail`, `nth`, `list-append`, `list-concat`);
-- string operations (`str-fmt`, `str-concat`, `str-join`, `str-split`, `str-find`, `str-trim`, `str-replace`, `str-upper`, `str-lower`, `str-len`, `str-sub`);
-- basic control flow (`if`, `do`);
-- introspection (`type-of`);
-- validation (`is-empty`, `is-nil`);
-- local scope (`let`, `letv`);
-- multiple returns (`values`);
-- functions (`fn`, `def`) with recursion limits.
+Requires explicit registration: `filomath.RegisterMathBuiltins(eng)`.
 
-### **Extension Packages**
+| Function | Description |
+|----------|-------------|
+| `abs`, `sqrt` | Absolute value, square root. |
+| `floor`, `ceil`, `round` | Rounding. |
+| `to-int` | `(to-int n)` Truncates float to int. |
+| `sin`, `cos`, `tan` | Trig (radians). |
+| `log`, `log10`, `exp` | Logarithms / exponential. |
+| `math-min`, `math-max` | Min / max of arguments. |
+| `pi`, `e` | Constants. |
 
-Filo can be extended with specialized packages:
+### Extension: filorand
 
-- **filomath**: Advanced math functions (`sin`, `cos`, `log`, `to-int`, etc).
-- **filorand**: Non-deterministic functions (`rand-float`, `rand-int`, `uuid-v4`).
-- **filojson**: JSON helpers for marshal/unmarshal (`json-marshal`, `json-unmarshal`, `json-null`).
+Requires explicit registration: `filorand.RegisterRandomBuiltins(eng)`. These are intentionally **non-deterministic**.
 
-### **Pre-Parse/Execute (Template-style)**
+| Function | Description |
+|----------|-------------|
+| `rand-float` | Random number `[0.0, 1.0)`. |
+| `rand-int` | `(rand-int n)` Random integer `[0, n)`. |
+| `uuid-v4` | Generates a UUID string. |
 
-For scripts executed multiple times with different data, Filo supports pre-parsing, similar to Go's `html/template` package:
+### Extension: filojson
+
+JSON helpers for marshal/unmarshal: `json-marshal`, `json-unmarshal`, `json-null`.
+
+## Pre-parse / execute (template style)
+
+For scripts run many times against different data, Filo supports pre-parsing, similar to Go's `html/template`:
 
 ```go
 // Parse once at startup
@@ -120,16 +157,17 @@ script := filo.Must(filo.ParseScript("calc", "(+ x y)"))
 
 // Execute many times with different globals
 for _, data := range items {
-    globals := map[string]filo.Value{
-        "x": filo.VNum(data.X),
-        "y": filo.VNum(data.Y),
-    }
-    result, _, err := script.Execute(ctx, engine, globals, cfg)
-    fmt.Println(result.Num)
+	globals := map[string]filo.Value{
+		"x": filo.VNum(data.X),
+		"y": filo.VNum(data.Y),
+	}
+	result, _, err := script.Execute(ctx, engine, globals, cfg)
+	fmt.Println(result.Num)
 }
 ```
 
-**API:**
+API:
+
 | Function | Description |
 |----------|-------------|
 | `ParseScript(name, src)` | Creates and parses a reusable script. |
@@ -137,30 +175,29 @@ for _, data := range items {
 | `Must(script, err)` | Panics if error (for init). |
 | `Filo.Execute(script, overrides)` | Executes with Filo's globals + optional overrides. |
 
-**Performance:** Pre-parsing eliminates parsing overhead (~2x faster for repeated executions).
+Pre-parsing eliminates parsing overhead. Roughly 2x faster for repeated executions.
 
-### **Go Marshal/Unmarshal**
+## Marshal / Unmarshal
 
-Filo provides `Marshal` and `Unmarshal` functions to convert Go values to Filo values and vice versa:
+Convert Go values to Filo values and back:
 
 ```go
-// Convert Go struct to Filo Value
 type Config struct {
-    Name string `filo:"name"`
-    Port int    `filo:"port"`
+	Name string `filo:"name"`
+	Port int    `filo:"port"`
 }
 
 cfg := Config{Name: "app", Port: 8080}
 val, err := filo.Marshal(cfg)
 // val = (list (tuple "name" "app") (tuple "port" 8080))
 
-// Convert Filo Value back to Go struct
 var cfg2 Config
 err = filo.Unmarshal(val, &cfg2)
 // cfg2 = {Name: "app", Port: 8080}
 ```
 
-**Type mapping:**
+Type mapping:
+
 | Go Type | Filo Kind |
 |---------|-----------|
 | `bool` | `KBool` |
@@ -171,19 +208,18 @@ err = filo.Unmarshal(val, &cfg2)
 | `map[K]V` | `KList` of `(key, value)` tuples |
 | `nil` | `KTuple` (empty) |
 
-**Note:** Expressions in Filo are evaluated before reaching `Unmarshal`:
-- `(list "port" (+ 8000 80))` → port = 8080 (expression evaluated by Filo)
-- `(list "port" "(+ 8000 80)")` → port = "(+ 8000 80)" (literal string)
+Expressions are evaluated **before** reaching `Unmarshal`:
 
-**Running fuzz tests:**
+- `(list "port" (+ 8000 80))` → `port = 8080`
+- `(list "port" "(+ 8000 80)")` → `port = "(+ 8000 80)"` (literal string)
+
+Fuzz tests:
+
 ```bash
-# Run a specific fuzz test for 30 seconds
+# A single fuzz target for 30 seconds
 go test -fuzz=FuzzMarshalUnmarshalString -fuzztime=30s .
 
-# Run fuzz test for ints
-go test -fuzz=FuzzMarshalUnmarshalInt -fuzztime=30s .
-
-# Available fuzz tests:
+# Available targets:
 # - FuzzMarshalUnmarshalInt
 # - FuzzMarshalUnmarshalFloat
 # - FuzzMarshalUnmarshalString
@@ -192,108 +228,7 @@ go test -fuzz=FuzzMarshalUnmarshalInt -fuzztime=30s .
 # - FuzzMarshalSliceInt
 ```
 
-### **3. Restricted environment**
-
-No:
-
-- file access,
-- network access,
-- “dangerous” calls.
-
-All advanced integration happens only through explicitly registered Go functions. So the programmer has **full control** over what the script can do.
-
----
-
-## Language Reference
-
-### Special Forms
-
-| Name | Syntax | Description |
-|------|--------|-------------|
-| `if` | `(if cond then [else])` | Conditional execution. Returns `list()` (empty/nil) if else is missing and cond is false. |
-| `do` | `(do expr1 expr2 ...)` | Evaluates expressions in order, returns the last result. |
-| `let` | `(let ((n v) ...) body)` | Defines local variables. Scope is limited to the body. |
-| `letv` | `(letv (n1 n2) (values v1 v2) body)` | Destructures multi-value returns (tuples). |
-| `fn` | `(fn (args) body)` | Creates an anonymous function. |
-| `def` | `(def name expr)` | Defines a global variable or function (always in the root/global scope). |
-| `set` | `(set name expr)` | Updates an existing variable in the nearest scope. |
-| `values`| `(values v1 v2 ...)` | Returns multiple values (a tuple). |
-| `exit` | `(exit [value])` | Terminates script execution immediately. Returns value or empty list. |
-| `return`| `(return [value])` | Returns from current function. Returns value or empty list. |
-
-### Core Builtins
-
-Note: `NewEngine()` includes the core math/logic/list/type builtins by default. Some builtin sets are intentionally **opt-in** and must be registered explicitly (see below).
-
-| Category | Function | Description |
-|----------|----------|-------------|
-| **Math** | `+`, `-`, `*`, `/`, `%` | Basic arithmetic. |
-| | `pow` | `(pow x y)` Power function. |
-| **Logic** | `=`, `!=` | Equality checks. |
-| | `<`, `<=`, `>`, `>=` | Numeric comparison. |
-| | `and`, `or`, `not` | Boolean logic. |
-| **Types** | `type-of` | Returns "number", "string", "list", etc. |
-| | `is-empty` | Returns true for "" or empty list. |
-| | `is-nil` | Returns true for an empty list (closest thing to nil in the current runtime). |
-| **Lists** | `list` | Creates a list `(list 1 2 3)`. |
-| | `length` | Returns list length. |
-| | `head`, `tail` | First element / Rest of list. |
-| | `nth` | `(nth list index)` Access element by index (0-based). |
-| | `list-append` | `(list-append list item)` Returns new list with item appended. |
-| | `list-concat` | `(list-concat l1 l2 ...)` Concatenates two or more lists. |
-| | `map` | `(map fn list)` Applies function to each element. |
-| | `fold` | `(fold fn init list)` Reduces list with accumulator. |
-
-### String Builtins
-
-These string builtins are not enabled by default. To use them, register them explicitly:
-
-```go
-eng := filo.NewEngine()
-filo.RegisterStringBuiltins(eng)
-```
-
-| Function | Description |
-|----------|-------------|
-| `str-fmt` | `(str-fmt format args...)` Safe implementation of `fmt.Sprintf`. |
-| `str-concat` | Concatenates arguments into a string. |
-| `str-join` | `(str-join sep list)` Joins list elements with separator. |
-| `str-split` | `(str-split sep str)` Splits string into list. |
-| `str-len` | Returns string length (runes). |
-| `str-sub` | `(str-sub str start [end])` Substring operations. |
-| `str-find` | `(str-find sub str)` Validation/Search. |
-| `str-replace`| `(str-replace old new str)` Replaces occurrences. |
-| `str-trim` | Trims whitespace. |
-| `str-upper` | Converts to uppercase. |
-| `str-lower` | Converts to lowercase. |
-
-### Extension: filomath
-
-Requires explicit registration via `filomath.RegisterMathBuiltins(eng)`.
-
-| Function | Description |
-|----------|-------------|
-| `abs`, `sqrt` | Absolute value, Square root. |
-| `floor`, `ceil`, `round`| Rounding operations. |
-| `to-int` | `(to-int n)` Truncates float to integer. |
-| `sin`, `cos`, `tan` | Trigonometric functions (radians). |
-| `log`, `log10`, `exp` | Logarithmic functions. |
-| `math-min`, `math-max` | Min/Max of arguments. |
-| `pi`, `e` | Constants. |
-
-### Extension: filorand
-
-Requires explicit registration via `filorand.RegisterRandomBuiltins(eng)`. These functions are intentionally **non-deterministic**.
-
-| Function | Description |
-|----------|-------------|
-| `rand-float` | Random number [0.0, 1.0). |
-| `rand-int` | `(rand-int n)` Random integer [0, n). |
-| `uuid-v4` | Generates a standard UUID string. |
-
----
-
-## Practical examples
+## Examples
 
 ### 1. Calculated field
 
@@ -346,37 +281,35 @@ Requires explicit registration via `filorand.RegisterRandomBuiltins(eng)`. These
   (auto-level-progress 1200 thresholds))
 ```
 
-This script returns `(tuple 3 1500)`, meaning the character is at level three and needs 1,500 XP to reach the next tier.
+Returns `(tuple 3 1500)` -- character is at level three and needs 1,500 XP to reach the next tier.
 
----
+## Integrating with Go
 
-## Integration example with Go
+### Register a builtin
 
-### Register a simple builtin
-
-The following helper sums two numbers provided as positional parameters `a` and `b`.
+`add-two` sums two numbers passed positionally:
 
 ```go
 func addTwo(ctx context.Context, args []filo.Value) (filo.Value, error) {
-    if len(args) != 2 {
-        return filo.Value{}, errors.New("expected two numbers")
-    }
+	if len(args) != 2 {
+		return filo.Value{}, errors.New("expected two numbers")
+	}
 
-    a, err := args[0].AsNumber()
-    if err != nil {
-        return filo.Value{}, err
-    }
+	a, err := args[0].AsNumber()
+	if err != nil {
+		return filo.Value{}, err
+	}
 
-    b, err := args[1].AsNumber()
-    if err != nil {
-        return filo.Value{}, err
-    }
+	b, err := args[1].AsNumber()
+	if err != nil {
+		return filo.Value{}, err
+	}
 
-    return filo.VNum(a + b), nil
+	return filo.VNum(a + b), nil
 }
 
 func registerMathBuiltins(eng *filo.Engine) {
-    eng.MustRegisterBuiltin("add-two", addTwo)
+	eng.MustRegisterBuiltin("add-two", addTwo)
 }
 
 eng := filo.NewEngine()
@@ -384,37 +317,37 @@ registerMathBuiltins(eng)
 
 res, _, err := eng.RunScript(ctx, "(add-two 10 32)", nil, cfg)
 if err != nil {
-    return err
+	return err
 }
 // res = 42
 ```
 
 ### Register a string formatter
 
-`full-name` expects two string parameters: `first` and `last`. It trims blanks and returns a single string value.
+`full-name` takes two strings, trims, joins:
 
 ```go
 func fullName(ctx context.Context, args []filo.Value) (filo.Value, error) {
-    if len(args) != 2 {
-        return filo.Value{}, errors.New("expected first and last name")
-    }
+	if len(args) != 2 {
+		return filo.Value{}, errors.New("expected first and last name")
+	}
 
-    first, err := args[0].AsString()
-    if err != nil {
-        return filo.Value{}, err
-    }
+	first, err := args[0].AsString()
+	if err != nil {
+		return filo.Value{}, err
+	}
 
-    last, err := args[1].AsString()
-    if err != nil {
-        return filo.Value{}, err
-    }
+	last, err := args[1].AsString()
+	if err != nil {
+		return filo.Value{}, err
+	}
 
-    combined := strings.TrimSpace(first + " " + last)
-    return filo.VString(combined), nil
+	combined := strings.TrimSpace(first + " " + last)
+	return filo.VString(combined), nil
 }
 
 func registerStringBuiltins(eng *filo.Engine) {
-    eng.MustRegisterBuiltin("full-name", fullName)
+	eng.MustRegisterBuiltin("full-name", fullName)
 }
 
 eng := filo.NewEngine()
@@ -422,56 +355,56 @@ registerStringBuiltins(eng)
 
 res, _, err := eng.RunScript(ctx, "(full-name \"Ada\" \"Lovelace\")", nil, cfg)
 if err != nil {
-    return err
+	return err
 }
 // res = "Ada Lovelace"
 ```
 
-### Register a custom aggregator
+### Register an aggregator
 
-This builtin receives a list of numbers `xs` and returns a tuple with the minimum and maximum values.
+`min-max` takes a list of numbers and returns a tuple `(min max)`:
 
 ```go
 func minMax(ctx context.Context, args []filo.Value) (filo.Value, error) {
-    if len(args) != 1 {
-        return filo.Value{}, errors.New("expected one list")
-    }
+	if len(args) != 1 {
+		return filo.Value{}, errors.New("expected one list")
+	}
 
-    list, err := args[0].AsList()
-    if err != nil {
-        return filo.Value{}, err
-    }
+	list, err := args[0].AsList()
+	if err != nil {
+		return filo.Value{}, err
+	}
 
-    if len(list) == 0 {
-        return filo.Value{}, errors.New("list cannot be empty")
-    }
+	if len(list) == 0 {
+		return filo.Value{}, errors.New("list cannot be empty")
+	}
 
-    minVal, err := list[0].AsNumber()
-    if err != nil {
-        return filo.Value{}, err
-    }
+	minVal, err := list[0].AsNumber()
+	if err != nil {
+		return filo.Value{}, err
+	}
 
-    maxVal := minVal
-    for i := 1; i < len(list); i++ {
-        current, convErr := list[i].AsNumber()
-        if convErr != nil {
-            return filo.Value{}, convErr
-        }
+	maxVal := minVal
+	for i := 1; i < len(list); i++ {
+		current, convErr := list[i].AsNumber()
+		if convErr != nil {
+			return filo.Value{}, convErr
+		}
 
-        if current < minVal {
-            minVal = current
-        }
+		if current < minVal {
+			minVal = current
+		}
 
-        if current > maxVal {
-            maxVal = current
-        }
-    }
+		if current > maxVal {
+			maxVal = current
+		}
+	}
 
-    return filo.VList([]filo.Value{filo.VNum(minVal), filo.VNum(maxVal)}), nil
+	return filo.VList([]filo.Value{filo.VNum(minVal), filo.VNum(maxVal)}), nil
 }
 
 func registerAggregatorBuiltins(eng *filo.Engine) {
-    eng.MustRegisterBuiltin("min-max", minMax)
+	eng.MustRegisterBuiltin("min-max", minMax)
 }
 
 eng := filo.NewEngine()
@@ -479,28 +412,22 @@ registerAggregatorBuiltins(eng)
 
 res, _, err := eng.RunScript(ctx, "(min-max (list 4 7 1 9))", nil, cfg)
 if err != nil {
-    return err
+	return err
 }
 // res = (list 1 9)
 ```
 
-### Example with globals
+### Passing globals
 
 ```go
 globals := map[string]filo.Value{
-    "field:a": filo.VNum(10),
-    "field:b": filo.VNum(5),
+	"field:a": filo.VNum(10),
+	"field:b": filo.VNum(5),
 }
 
 res, _, err := eng.RunScript(ctx, "(+ field:a field:b)", globals, cfg)
 if err != nil {
-    return err
+	return err
 }
 // res = 15
 ```
-
----
-
-> **give power to the user without giving up security.**
-
-It is a small, elegant, deterministic language that integrates easily into the Go ecosystem. It lets users write helpful rules without putting the server at risk.
