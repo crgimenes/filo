@@ -91,3 +91,4 @@ config.local.lua
 
 cmd/filo-repl/filo-repl
 cmd/filofmt/filofmt
+/filo
