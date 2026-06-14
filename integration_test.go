@@ -66,6 +66,75 @@ func TestSetGlobalBool(t *testing.T) {
 	}
 }
 
+func TestGetNumber(t *testing.T) {
+	f := New()
+	defer f.Close()
+
+	if err := f.DoString("(set speed 2.5)"); err != nil {
+		t.Fatalf("DoString error: %v", err)
+	}
+
+	speed, err := f.GetNumber("speed")
+	if err != nil {
+		t.Fatalf("GetNumber error: %v", err)
+	}
+	if speed != 2.5 {
+		t.Fatalf("expected speed = 2.5, got %v", speed)
+	}
+
+	if i := f.MustGetInt("speed"); i != 2 {
+		t.Fatalf("expected GetInt to truncate to 2, got %d", i)
+	}
+}
+
+func TestMustGetNumber(t *testing.T) {
+	f := New()
+	defer f.Close()
+
+	f.SetGlobal("scale", 1.5)
+	if scale := f.MustGetNumber("scale"); scale != 1.5 {
+		t.Fatalf("expected scale = 1.5, got %v", scale)
+	}
+
+	if err := f.DoString("(set whole 3)"); err != nil {
+		t.Fatalf("DoString error: %v", err)
+	}
+	if whole := f.MustGetNumber("whole"); whole != 3.0 {
+		t.Fatalf("expected whole = 3.0, got %v", whole)
+	}
+}
+
+func TestGetFloatCompatibilityAliases(t *testing.T) {
+	f := New()
+	defer f.Close()
+
+	f.SetGlobal("scale", 1.5)
+
+	scale, err := f.GetFloat("scale")
+	if err != nil {
+		t.Fatalf("GetFloat error: %v", err)
+	}
+	if scale != 1.5 {
+		t.Fatalf("expected scale = 1.5, got %v", scale)
+	}
+	if scale := f.MustGetFloat("scale"); scale != 1.5 {
+		t.Fatalf("expected scale = 1.5, got %v", scale)
+	}
+}
+
+func TestGetNumberTypeMismatch(t *testing.T) {
+	f := New()
+	defer f.Close()
+
+	f.SetGlobal("name", "neko")
+	if _, err := f.GetNumber("name"); err == nil {
+		t.Fatal("expected error converting string to number")
+	}
+	if _, err := f.GetFloat("name"); err == nil || !strings.Contains(err.Error(), `converting "name" to float`) {
+		t.Fatalf("GetFloat compatibility error = %v", err)
+	}
+}
+
 // TestSetGlobalTable verifies that a []string is correctly set as a Filo list global.
 func TestSetGlobalTable(t *testing.T) {
 	f := New()
@@ -478,15 +547,26 @@ func TestSetGlobalVariousTypes(t *testing.T) {
 
 	// int64
 	f.SetGlobal("i64", int64(100))
-	f.DoString("(set x i64)")
+	if err := f.DoString("(set x i64)"); err != nil {
+		t.Fatalf("set int64 global: %v", err)
+	}
 	if f.MustGetInt("x") != 100 {
 		t.Fatal("int64 failed")
 	}
 
 	// float32
 	f.SetGlobal("f32", float32(3.14))
-	f.DoString("(set y f32)")
-	// Note: precision may differ slightly
+	if err := f.DoString("(set y f32)"); err != nil {
+		t.Fatalf("set float32 global: %v", err)
+	}
+	got, err := f.GetNumber("y")
+	if err != nil {
+		t.Fatalf("GetNumber float32 global: %v", err)
+	}
+	want := float64(float32(3.14))
+	if got != want {
+		t.Fatalf("float32 global = %v, want %v", got, want)
+	}
 }
 
 // TestGetNotFound tests Get* methods when variable not found.
@@ -501,6 +581,16 @@ func TestGetNotFound(t *testing.T) {
 	}
 
 	_, err = f.GetInt("missing")
+	if err == nil {
+		t.Fatal("expected error for missing variable")
+	}
+
+	_, err = f.GetNumber("missing")
+	if err == nil {
+		t.Fatal("expected error for missing variable")
+	}
+
+	_, err = f.GetFloat("missing")
 	if err == nil {
 		t.Fatal("expected error for missing variable")
 	}
@@ -544,17 +634,34 @@ func TestCallFunctionWithTypedArgs(t *testing.T) {
 	t.Parallel()
 
 	f := New()
-	f.DoString("(def add (fn (a b) (+ a b)))")
+	if err := f.DoString("(def add (fn (a b) (+ a b)))"); err != nil {
+		t.Fatalf("define add: %v", err)
+	}
 
-	// Test with int, int64
 	result, err := f.CallFunction("add", 10, int64(5))
 	if err != nil {
 		t.Fatalf("CallFunction failed: %v", err)
 	}
 
-	num, _ := result.AsNumber()
+	num, err := result.AsNumber()
+	if err != nil {
+		t.Fatalf("integer result is not a number: %v", err)
+	}
 	if num != 15 {
 		t.Fatalf("want 15, got %v", num)
+	}
+
+	result, err = f.CallFunction("add", float32(1.5), float64(2.25))
+	if err != nil {
+		t.Fatalf("CallFunction with floats failed: %v", err)
+	}
+
+	num, err = result.AsNumber()
+	if err != nil {
+		t.Fatalf("float result is not a number: %v", err)
+	}
+	if num != 3.75 {
+		t.Fatalf("want 3.75, got %v", num)
 	}
 }
 

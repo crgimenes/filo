@@ -48,6 +48,12 @@ func TestFoldConstants(t *testing.T) {
 			changed:  true,
 		},
 		{
+			name:     "if constant false without else",
+			input:    "(if #f 1)",
+			expected: "()",
+			changed:  true,
+		},
+		{
 			name:     "if constant true nested",
 			input:    "(if #t (+ 1 2) 0)",
 			expected: "3",

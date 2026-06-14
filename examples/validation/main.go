@@ -22,6 +22,7 @@ func main() {
 
 	// Validation rules written in Filo
 	// These could be stored in a database or config file
+	// #nosec G101 -- these are validation rule names and contain no credentials.
 	rules := map[string]string{
 		"email_format":    `(and (> (str-len email) 5) (str-find "@" email))`,
 		"age_valid":       `(and (>= age 18) (<= age 120))`,

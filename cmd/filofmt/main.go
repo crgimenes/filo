@@ -139,6 +139,7 @@ func processPath(path string, cfg filo.FormatConfig, write, list, diff, foldCons
 }
 
 func processFile(path string, cfg filo.FormatConfig, write, list, diff, foldConst bool, stdout, stderr io.Writer) error {
+	// #nosec G304 -- filofmt intentionally reads paths selected by the user.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -187,7 +188,7 @@ func processFile(path string, cfg filo.FormatConfig, write, list, diff, foldCons
 	}
 
 	if write {
-		// Write back to file
+		// #nosec G703 -- filofmt intentionally rewrites paths selected by the user.
 		return os.WriteFile(path, []byte(formatted), 0600)
 	}
 

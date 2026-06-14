@@ -199,7 +199,7 @@ func (f *Filo) DoString(filoScript string) error {
 	return nil
 }
 
-// MustGetString retrieves a global variable as a string or fatals.
+// MustGetString retrieves a global variable as a string or panics.
 func (f *Filo) MustGetString(vGlobal string) string {
 	return must(f.GetString(vGlobal))
 }
@@ -216,7 +216,7 @@ func (f *Filo) GetString(vGlobal string) (string, error) {
 	return s, nil
 }
 
-// MustGetInt retrieves a global variable as an int or fatals.
+// MustGetInt retrieves a global variable as an int or panics.
 func (f *Filo) MustGetInt(vGlobal string) int {
 	return must(f.GetInt(vGlobal))
 }
@@ -233,7 +233,43 @@ func (f *Filo) GetInt(vGlobal string) (int, error) {
 	return int(n), nil
 }
 
-// MustGetBool retrieves a global variable as a bool or fatals.
+// MustGetNumber retrieves a global variable as a float64 or panics.
+func (f *Filo) MustGetNumber(vGlobal string) float64 {
+	return must(f.GetNumber(vGlobal))
+}
+
+// GetNumber retrieves a global Filo number as a float64.
+func (f *Filo) GetNumber(vGlobal string) (float64, error) {
+	return f.getNumber(vGlobal, "number")
+}
+
+func (f *Filo) getNumber(vGlobal, targetType string) (float64, error) {
+	v, ok := f.globals[vGlobal]
+	if !ok {
+		return 0, fmt.Errorf("global variable %q not found", vGlobal)
+	}
+	n, err := v.AsNumber()
+	if err != nil {
+		return 0, fmt.Errorf("error converting %q to %s: %w", vGlobal, targetType, err)
+	}
+	return n, nil
+}
+
+// MustGetFloat retrieves a global variable as a float64 or panics.
+//
+// Deprecated: use MustGetNumber.
+func (f *Filo) MustGetFloat(vGlobal string) float64 {
+	return must(f.GetFloat(vGlobal))
+}
+
+// GetFloat retrieves a global Filo number as a float64.
+//
+// Deprecated: use GetNumber.
+func (f *Filo) GetFloat(vGlobal string) (float64, error) {
+	return f.getNumber(vGlobal, "float")
+}
+
+// MustGetBool retrieves a global variable as a bool or panics.
 func (f *Filo) MustGetBool(vGlobal string) bool {
 	return must(f.GetBool(vGlobal))
 }
@@ -250,7 +286,7 @@ func (f *Filo) GetBool(vGlobal string) (bool, error) {
 	return b, nil
 }
 
-// MustGetTable retrieves a global variable as a []string or fatals.
+// MustGetTable retrieves a global variable as a []string or panics.
 func (f *Filo) MustGetTable(vGlobal string) []string {
 	return must(f.GetTable(vGlobal))
 }
@@ -275,7 +311,7 @@ func (f *Filo) GetTable(vGlobal string) ([]string, error) {
 	return ret, nil
 }
 
-// MustGetMap retrieves a global variable as a map[string]string or fatals.
+// MustGetMap retrieves a global variable as a map[string]string or panics.
 func (f *Filo) MustGetMap(vGlobal string) map[string]string {
 	return must(f.GetMap(vGlobal))
 }
@@ -332,7 +368,7 @@ func (f *Filo) SetGlobalMapOfLists(name string, m map[string][]string) {
 	f.globals[name] = VList(pairs)
 }
 
-// MustGetMapOfLists retrieves a global variable as a map[string][]string or fatals.
+// MustGetMapOfLists retrieves a global variable as a map[string][]string or panics.
 // Expects the structure: (list (list "key" (list "val1" "val2")) ...)
 func (f *Filo) MustGetMapOfLists(vGlobal string) map[string][]string {
 	return must(f.GetMapOfLists(vGlobal))
@@ -407,6 +443,8 @@ func (f *Filo) CallFunction(name string, args ...any) (Value, error) {
 		case int:
 			filoArgs[i] = VNum(float64(v))
 		case int64:
+			filoArgs[i] = VNum(float64(v))
+		case float32:
 			filoArgs[i] = VNum(float64(v))
 		case float64:
 			filoArgs[i] = VNum(v)

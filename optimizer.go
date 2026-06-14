@@ -107,7 +107,6 @@ func foldIf(list *List) (Node, bool) {
 	}
 	// No else branch — Filo runtime returns empty list.
 	return &List{Elems: nil}, true
-	return list, false
 }
 
 var pureFunctions = map[string]bool{

@@ -94,15 +94,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		Timeout:        time.Duration(timeoutSeconds) * time.Second,
 	}
 
-	// Check if stdin is a terminal
-	stdinFd := int(os.Stdin.Fd())
+	stdinFd, err := terminalFileDescriptor(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
 	if !term.IsTerminal(stdinFd) {
-		// Batch mode
 		return runBatchMode(engine, stdin, stdout, stderr, cfg)
 	}
 
-	// Interactive REPL mode
 	return runREPL(engine, stdinFd, stdout, stderr, cfg, foldConst)
+}
+
+func terminalFileDescriptor(file *os.File) (int, error) {
+	fd := file.Fd()
+	if fd > uintptr(^uint(0)>>1) {
+		return 0, fmt.Errorf("file descriptor %d exceeds int range", fd)
+	}
+	// #nosec G115 -- the architecture-sized bound above makes this conversion safe.
+	return int(fd), nil
 }
 
 func runBatchMode(engine *filo.Engine, stdin io.Reader, stdout, stderr io.Writer, cfg filo.EvalConfig) int {
@@ -137,15 +147,19 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 		return 1
 	}
 
-	// Ensure terminal is restored on exit
-	defer term.Restore(stdinFd, oldState)
+	defer func() {
+		if err := term.Restore(stdinFd, oldState); err != nil {
+			fmt.Fprintf(stderr, "error: failed to restore terminal: %v\n", err)
+		}
+	}()
 
-	// Handle signals to restore terminal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigChan
-		term.Restore(stdinFd, oldState)
+		if err := term.Restore(stdinFd, oldState); err != nil {
+			fmt.Fprintf(stderr, "error: failed to restore terminal: %v\n", err)
+		}
 		os.Exit(0)
 	}()
 
@@ -223,7 +237,11 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 				}
 				fullContent += line
 
-				editedContent := openEditor(t, stdinFd, oldState, fullContent)
+				editedContent, err := openEditor(stdinFd, oldState, fullContent)
+				if err != nil {
+					fmt.Fprintf(t, "error: %v\n", err)
+					return line, pos, true
+				}
 				buffer.Reset()
 
 				// If edited content has multiple lines, put all but last in buffer
@@ -284,14 +302,20 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 				fmt.Fprintln(t, "Bye!")
 				return 0
 			case ".h", ".help":
-				showHelp(t, stdinFd, oldState)
+				if err := showHelp(stdinFd, oldState); err != nil {
+					fmt.Fprintf(t, "error: %v\n", err)
+				}
 				continue
 			case ".c", ".clear":
 				buffer.Reset()
 				t.SetPrompt(promptMain)
 				continue
 			case ".e", ".edit":
-				content := openEditor(t, stdinFd, oldState, buffer.String())
+				content, err := openEditor(stdinFd, oldState, buffer.String())
+				if err != nil {
+					fmt.Fprintf(t, "error: %v\n", err)
+					continue
+				}
 				buffer.Reset()
 				buffer.WriteString(content)
 				if content != "" {
@@ -354,7 +378,7 @@ func executeAndPrint(t *term.Terminal, engine *filo.Engine, script string, globa
 	return newGlobals
 }
 
-func showHelp(t *term.Terminal, stdinFd int, oldState *term.State) {
+func showHelp(stdinFd int, oldState *term.State) error {
 	pager := os.Getenv("PAGER")
 	if pager == "" {
 		pager = "less"
@@ -363,30 +387,40 @@ func showHelp(t *term.Terminal, stdinFd int, oldState *term.State) {
 	// Create temp file with help content
 	tmpFile, err := os.CreateTemp("", "filo-help-*.txt")
 	if err != nil {
-		fmt.Fprintf(t, "error: failed to create temp file: %v\n", err)
-		return
+		return fmt.Errorf("create help file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
 
-	tmpFile.WriteString(helpContent)
-	tmpFile.Close()
+	if _, err := tmpFile.WriteString(helpContent); err != nil {
+		return fmt.Errorf("write help file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("close help file: %w", err)
+	}
 
-	// Restore terminal for pager
-	term.Restore(stdinFd, oldState)
+	if err := term.Restore(stdinFd, oldState); err != nil {
+		return fmt.Errorf("restore terminal for pager: %w", err)
+	}
 
-	// Run pager
+	// #nosec G204,G702 -- PAGER intentionally selects the executable without invoking a shell.
 	cmd := exec.Command(pager, tmpPath)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Run()
+	runErr := cmd.Run()
 
-	// Set raw mode again
-	term.MakeRaw(stdinFd)
+	_, rawErr := term.MakeRaw(stdinFd)
+	if runErr != nil {
+		return fmt.Errorf("run pager: %w", runErr)
+	}
+	if rawErr != nil {
+		return fmt.Errorf("restore raw terminal mode: %w", rawErr)
+	}
+	return nil
 }
 
-func openEditor(t *term.Terminal, stdinFd int, oldState *term.State, content string) string {
+func openEditor(stdinFd int, oldState *term.State, content string) (string, error) {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
 		editor = "vi"
@@ -395,39 +429,45 @@ func openEditor(t *term.Terminal, stdinFd int, oldState *term.State, content str
 	// Create temp file
 	tmpFile, err := os.CreateTemp("", "filo-repl-*.filo")
 	if err != nil {
-		fmt.Fprintf(t, "error: failed to create temp file: %v\n", err)
-		return content
+		return content, fmt.Errorf("create editor file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
 
-	// Write current content
 	if content != "" {
-		tmpFile.WriteString(content)
+		if _, err := tmpFile.WriteString(content); err != nil {
+			return content, fmt.Errorf("write editor file: %w", err)
+		}
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		return content, fmt.Errorf("close editor file: %w", err)
+	}
 
-	// Restore terminal for editor
-	term.Restore(stdinFd, oldState)
+	if err := term.Restore(stdinFd, oldState); err != nil {
+		return content, fmt.Errorf("restore terminal for editor: %w", err)
+	}
 
-	// Run editor
+	// #nosec G204,G702 -- EDITOR intentionally selects the executable without invoking a shell.
 	cmd := exec.Command(editor, tmpPath)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Run()
-
-	// Set raw mode again
-	term.MakeRaw(stdinFd)
-
-	// Read back content
-	data, err := os.ReadFile(tmpPath)
-	if err != nil {
-		fmt.Fprintf(t, "error: failed to read edited file: %v\n", err)
-		return content
+	runErr := cmd.Run()
+	_, rawErr := term.MakeRaw(stdinFd)
+	if runErr != nil {
+		return content, fmt.Errorf("run editor: %w", runErr)
+	}
+	if rawErr != nil {
+		return content, fmt.Errorf("restore raw terminal mode: %w", rawErr)
 	}
 
-	return string(data)
+	// #nosec G304 -- tmpPath was created by os.CreateTemp in this function.
+	data, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return content, fmt.Errorf("read editor file: %w", err)
+	}
+
+	return string(data), nil
 }
 
 // crlfReadWriter wraps an io.ReadWriter and converts \n to \r\n on output.
