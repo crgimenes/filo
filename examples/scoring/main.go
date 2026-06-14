@@ -86,13 +86,21 @@ func main() {
 	for i, globals := range leads {
 		result, _, err := eng.RunScript(ctx, scoringScript, globals, cfg)
 		if err != nil {
-			fmt.Printf("Error scoring %s: %v\n", leadNames[i], err)
-			continue
+			panic(fmt.Errorf("score %s: %w", leadNames[i], err))
 		}
 
-		tuple, _ := result.AsTuple()
-		score, _ := tuple[0].AsNumber()
-		grade, _ := tuple[1].AsString()
+		tuple, err := result.AsTuple()
+		if err != nil {
+			panic(err)
+		}
+		score, err := tuple[0].AsNumber()
+		if err != nil {
+			panic(err)
+		}
+		grade, err := tuple[1].AsString()
+		if err != nil {
+			panic(err)
+		}
 
 		fmt.Printf("%-10s | %5.0f |   %s\n", leadNames[i], score, grade)
 	}

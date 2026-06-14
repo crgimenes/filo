@@ -3,11 +3,13 @@ package filo
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestExamples(t *testing.T) {
@@ -37,20 +39,26 @@ func TestExamples(t *testing.T) {
 func verifyExample(t *testing.T, sourcePath string) {
 	// 1. Parse expected output from source
 	expectedOutput, hasOutput := parseExpectedOutput(t, sourcePath)
-	if !hasOutput {
-		t.Skipf("no // Output: comment found in %s", sourcePath)
-	}
 
 	// 2. Run the example
-	// Assumption: running from module root so 'go run examples/foo/main.go' works.
-	cmd := exec.Command("go", "run", sourcePath)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "go", "run", "-trimpath", sourcePath)
+	cmd.Env = append(os.Environ(), "GOWORK=off")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
+	if ctx.Err() != nil {
+		t.Fatalf("execution timed out: %v", ctx.Err())
+	}
 	if err != nil {
 		t.Fatalf("execution failed: %v\nStderr: %s", err, stderr.String())
+	}
+	if !hasOutput {
+		return
 	}
 
 	// 3. Compare output

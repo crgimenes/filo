@@ -33,7 +33,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	js, _ := j.AsString()
+	js, err := j.AsString()
+	if err != nil {
+		panic(err)
+	}
 	fmt.Println("JSON:", js)
 
 	// Unmarshal back and inspect the structure (list of pairs)

@@ -84,18 +84,29 @@ func main() {
 
 		result, _, err := eng.RunScript(ctx, filterScript, globals, cfg)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			continue
+			panic(err)
 		}
 
-		resultList, _ := result.AsList()
+		resultList, err := result.AsList()
+		if err != nil {
+			panic(err)
+		}
 		if len(resultList) == 0 {
 			fmt.Println("  No items match")
 		}
 		for _, item := range resultList {
-			rec, _ := item.AsList()
-			name, _ := rec[0].AsString()
-			price, _ := rec[1].AsNumber()
+			rec, err := item.AsList()
+			if err != nil {
+				panic(err)
+			}
+			name, err := rec[0].AsString()
+			if err != nil {
+				panic(err)
+			}
+			price, err := rec[1].AsNumber()
+			if err != nil {
+				panic(err)
+			}
 			fmt.Printf("  - %s ($%.0f)\n", name, price)
 		}
 		fmt.Println()

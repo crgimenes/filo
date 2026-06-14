@@ -62,20 +62,34 @@ func main() {
 	}
 
 	for _, globals := range environments {
-		envName, _ := globals["env"].AsString()
-		tierName, _ := globals["tier"].AsString()
+		envName, err := globals["env"].AsString()
+		if err != nil {
+			panic(err)
+		}
+		tierName, err := globals["tier"].AsString()
+		if err != nil {
+			panic(err)
+		}
 		fmt.Printf("=== Environment: %s, Tier: %s ===\n", envName, tierName)
 
 		result, _, err := eng.RunScript(ctx, configScript, globals, cfg)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			continue
+			panic(err)
 		}
 
-		configList, _ := result.AsList()
+		configList, err := result.AsList()
+		if err != nil {
+			panic(err)
+		}
 		for _, item := range configList {
-			pair, _ := item.AsList()
-			key, _ := pair[0].AsString()
+			pair, err := item.AsList()
+			if err != nil {
+				panic(err)
+			}
+			key, err := pair[0].AsString()
+			if err != nil {
+				panic(err)
+			}
 			fmt.Printf("  %s = %s\n", key, pair[1].String())
 		}
 		fmt.Println()

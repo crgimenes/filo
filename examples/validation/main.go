@@ -49,10 +49,12 @@ func main() {
 			ruleScript := rules[ruleName]
 			result, _, err := eng.RunScript(ctx, ruleScript, data, cfg)
 			if err != nil {
-				fmt.Printf("  %s: ERROR - %v\n", ruleName, err)
-				continue
+				panic(fmt.Errorf("evaluate %s: %w", ruleName, err))
 			}
-			valid, _ := result.AsBool()
+			valid, err := result.AsBool()
+			if err != nil {
+				panic(fmt.Errorf("convert %s result: %w", ruleName, err))
+			}
 			status := "✓ PASS"
 			if !valid {
 				status = "✗ FAIL"

@@ -27,9 +27,18 @@ func main() {
 		panic(err)
 	}
 
-	list, _ := result.AsList()
-	floatVal, _ := list[0].AsNumber()
-	intVal, _ := list[1].AsNumber() // to-int returns a number (float64) holding an integer
+	list, err := result.AsList()
+	if err != nil {
+		panic(err)
+	}
+	floatVal, err := list[0].AsNumber()
+	if err != nil {
+		panic(err)
+	}
+	intVal, err := list[1].AsNumber()
+	if err != nil {
+		panic(err)
+	}
 
 	fmt.Printf("Sqrt(17): %f\n", floatVal)
 	fmt.Printf("Truncated: %.0f\n", intVal)

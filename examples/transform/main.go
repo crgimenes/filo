@@ -49,21 +49,38 @@ func main() {
 
 	result, _, err := eng.RunScript(ctx, transformScript, globals, cfg)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
+		panic(err)
 	}
 
 	fmt.Println("Transformed Records:")
 	fmt.Println("Name       | Age | Salary   | Category")
 	fmt.Println("-----------|-----|----------|--------")
 
-	resultList, _ := result.AsList()
+	resultList, err := result.AsList()
+	if err != nil {
+		panic(err)
+	}
 	for _, record := range resultList {
-		rec, _ := record.AsList()
-		name, _ := rec[0].AsString()
-		age, _ := rec[1].AsNumber()
-		salary, _ := rec[2].AsNumber()
-		category, _ := rec[3].AsString()
+		rec, err := record.AsList()
+		if err != nil {
+			panic(err)
+		}
+		name, err := rec[0].AsString()
+		if err != nil {
+			panic(err)
+		}
+		age, err := rec[1].AsNumber()
+		if err != nil {
+			panic(err)
+		}
+		salary, err := rec[2].AsNumber()
+		if err != nil {
+			panic(err)
+		}
+		category, err := rec[3].AsString()
+		if err != nil {
+			panic(err)
+		}
 		fmt.Printf("%-10s | %3.0f | %8.0f | %s\n", name, age, salary, category)
 	}
 }

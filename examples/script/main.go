@@ -56,7 +56,11 @@ func simpleExample(ctx context.Context, eng *filo.Engine, cfg filo.EvalConfig) {
 			log.Fatal(err)
 		}
 
-		fmt.Printf("x²+y² for (%v,%v) = %v\n", tc.x, tc.y, result.Num)
+		number, err := result.AsNumber()
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("x²+y² for (%v,%v) = %v\n", tc.x, tc.y, number)
 	}
 }
 
@@ -80,26 +84,47 @@ func namedScriptsExample(ctx context.Context, eng *filo.Engine, cfg filo.EvalCon
 	filostrings.RegisterBuiltins(eng)
 
 	// Use 'greet' script
-	result, _, _ := scripts["greet"].Execute(ctx, eng, map[string]filo.Value{
+	result, _, err := scripts["greet"].Execute(ctx, eng, map[string]filo.Value{
 		"name":   filo.VString("Alice"),
 		"formal": filo.VBool(true),
 	}, cfg)
-	fmt.Println("Greeting:", result.Str)
+	if err != nil {
+		log.Fatal(err)
+	}
+	greeting, err := result.AsString()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Greeting:", greeting)
 
 	// Use 'sum' script
-	result, _, _ = scripts["sum"].Execute(ctx, eng, map[string]filo.Value{
+	result, _, err = scripts["sum"].Execute(ctx, eng, map[string]filo.Value{
 		"a": filo.VNum(10),
 		"b": filo.VNum(20),
 		"c": filo.VNum(30),
 	}, cfg)
-	fmt.Println("Sum:", result.Num)
+	if err != nil {
+		log.Fatal(err)
+	}
+	sum, err := result.AsNumber()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Sum:", sum)
 
 	// Use 'discount' script
-	result, _, _ = scripts["discount"].Execute(ctx, eng, map[string]filo.Value{
+	result, _, err = scripts["discount"].Execute(ctx, eng, map[string]filo.Value{
 		"price": filo.VNum(100),
 		"qty":   filo.VNum(15),
 	}, cfg)
-	fmt.Println("Discounted price:", result.Num)
+	if err != nil {
+		log.Fatal(err)
+	}
+	discountedPrice, err := result.AsNumber()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Discounted price:", discountedPrice)
 }
 
 func performanceExample(ctx context.Context, eng *filo.Engine, cfg filo.EvalConfig) {
@@ -113,7 +138,9 @@ func performanceExample(ctx context.Context, eng *filo.Engine, cfg filo.EvalConf
 	// Measure RunScript (parse + execute each time)
 	start := time.Now()
 	for range iterations {
-		_, _, _ = eng.RunScript(ctx, script, globals, cfg)
+		if _, _, err := eng.RunScript(ctx, script, globals, cfg); err != nil {
+			log.Fatal(err)
+		}
 	}
 	runScriptDuration := time.Since(start)
 
@@ -121,7 +148,9 @@ func performanceExample(ctx context.Context, eng *filo.Engine, cfg filo.EvalConf
 	parsedScript := filo.Must(filo.ParseScript("perf", script))
 	start = time.Now()
 	for range iterations {
-		_, _, _ = parsedScript.Execute(ctx, eng, globals, cfg)
+		if _, _, err := parsedScript.Execute(ctx, eng, globals, cfg); err != nil {
+			log.Fatal(err)
+		}
 	}
 	preParsedDuration := time.Since(start)
 
