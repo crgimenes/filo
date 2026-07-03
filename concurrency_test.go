@@ -12,9 +12,12 @@ import (
 func TestConcurrencySafety(t *testing.T) {
 	eng := NewEngine()
 	// Mock string builtin to avoid import cycle
-	eng.RegisterBuiltin("str-fmt", func(_ context.Context, args []Value) (Value, error) {
+	err := eng.RegisterBuiltin("str-fmt", func(_ context.Context, args []Value) (Value, error) {
 		return VString(fmt.Sprintf("val: %g", args[1].Num)), nil
 	})
+	if err != nil {
+		t.Fatalf("register str-fmt: %v", err)
+	}
 
 	// 1. Compile a base program (Program reuse scenario)
 	baseScript := `

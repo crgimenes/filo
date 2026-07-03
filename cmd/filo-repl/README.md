@@ -7,8 +7,8 @@ Interactive REPL (Read-Evaluate-Print Loop) for the Filo language.
 - **Interactive mode**: Line editing, command history, multi-line input
 - **Batch mode**: Pipe-friendly execution when stdin is not a TTY
 - **Multi-line expressions**: Automatically continues reading until parentheses are balanced
-- **Editor integration**: `:edit` opens `$EDITOR` to edit complex expressions
-- **Extension packages**: Load math, rand, or string builtins
+- **Editor integration**: `.edit` (or `.e`) opens `$EDITOR` to edit complex expressions
+- **Extension packages**: Load math, rand, string, or print builtins
 
 ## Building
 
@@ -85,10 +85,11 @@ HELLO
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--filo-package` | (none) | Comma-separated: `math`, `rand`, `str` |
+| `--filo-package` | (none) | Comma-separated: `math`, `rand`, `str`, `print` |
 | `--step-limit` | 100000 | Maximum evaluation steps |
 | `--recursion-limit` | 128 | Maximum recursion depth |
 | `--timeout` | 30 | Timeout in seconds |
+| `--fold-const` | false | Fold constant expressions as you type |
 
 ## Extension Packages
 
@@ -97,6 +98,7 @@ HELLO
 | `math` | sqrt, sin, cos, log, abs, floor, ceil, round, etc. |
 | `rand` | rand-float, rand-int, uuid-v4 |
 | `str` | str-upper, str-lower, str-trim, str-split, str-join, etc. |
+| `print` | print, println, printf |
 
 ## Exit Codes
 

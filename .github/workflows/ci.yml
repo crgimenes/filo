@@ -1,0 +1,55 @@
+name: test
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build ./...
+      - run: go vet ./...
+      - name: Test
+        run: go test -count=1 -timeout 120s ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+      - name: Lint
+        run: $(go env GOPATH)/bin/golangci-lint run ./...
+
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # A short smoke fuzz on the two most exposed surfaces (parser and marshal
+      # round-trip). Not an exhaustive run — just enough to catch a regression
+      # that a seed corpus wouldn't. Each target is bounded so the job can't hang.
+      - name: Fuzz parser
+        run: go test -run '^$' -fuzz '^FuzzParseDoesNotPanic$' -fuzztime 30s .
+      - name: Fuzz run-script
+        run: go test -run '^$' -fuzz '^FuzzRunScriptDoesNotPanic$' -fuzztime 30s .
+      - name: Fuzz marshal round-trip
+        run: go test -run '^$' -fuzz '^FuzzMarshalUnmarshalString$' -fuzztime 30s .

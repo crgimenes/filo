@@ -432,7 +432,8 @@ func defaultBuiltins() map[string]builtinFunc {
 		}
 		result := make([]Value, len(list))
 		for i, el := range list {
-			if err := checkContext(ctx); err != nil {
+			err := checkContext(ctx)
+			if err != nil {
 				return Value{}, err
 			}
 			val, callErr := ev.callFunc(ctx, fn.Fn, []Value{el})
@@ -459,7 +460,8 @@ func defaultBuiltins() map[string]builtinFunc {
 		}
 		current := acc
 		for _, el := range list {
-			if err := checkContext(ctx); err != nil {
+			err := checkContext(ctx)
+			if err != nil {
 				return Value{}, err
 			}
 			val, callErr := ev.callFunc(ctx, fn.Fn, []Value{current, el})

@@ -90,10 +90,12 @@ func wrapIn(ctx string, err error) error {
 	if err == nil {
 		return nil
 	}
-	if _, ok := err.(*exitSignal); ok {
+	_, ok := err.(*exitSignal)
+	if ok {
 		return err
 	}
-	if _, ok := err.(*returnSignal); ok {
+	_, ok = err.(*returnSignal)
+	if ok {
 		return err
 	}
 	return fmt.Errorf("in %s: %w", ctx, err)
@@ -104,7 +106,8 @@ func (ev *evaluator) evalList(list *List) (Value, error) {
 		return Value{}, fmt.Errorf("empty list expression")
 	}
 
-	if rb, ok := list.Elems[0].(*ResolvedBuiltin); ok {
+	rb, ok := list.Elems[0].(*ResolvedBuiltin)
+	if ok {
 		args, err := ev.evalArgs(list.Elems[1:])
 		if err != nil {
 			return Value{}, fmt.Errorf("while evaluating arguments for %q: %w", rb.Name, err)
@@ -247,7 +250,8 @@ func (ev *evaluator) callFuncAST(ctx context.Context, fn *Func, argNodes []Node)
 	ev.recursion--
 
 	if err != nil {
-		if ret, ok := err.(*returnSignal); ok {
+		ret, ok := err.(*returnSignal)
+		if ok {
 			return ret.Value, nil
 		}
 		return Value{}, err
@@ -280,7 +284,8 @@ func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Valu
 	ev.recursion--
 
 	if err != nil {
-		if ret, ok := err.(*returnSignal); ok {
+		ret, ok := err.(*returnSignal)
+		if ok {
 			return ret.Value, nil
 		}
 		return Value{}, err
@@ -399,9 +404,14 @@ func (ev *evaluator) evalLetv(args []Node) (Value, error) {
 		return Value{}, fmt.Errorf("letv arity mismatch")
 	}
 
-	// Create Frame
+	// Copy the tuple's elements into the frame. The slice must NOT be shared with
+	// the source tuple: a later (set var ...) writes into the frame's slots, and
+	// aliasing would mutate the original tuple in place (corrupting a value that
+	// is still reachable from another binding or the Go host).
+	slots := make([]Value, len(elements))
+	copy(slots, elements)
 	newFrame := &Frame{
-		slots:  elements, // Reuse the tuple slice as frame! Optimization!
+		slots:  slots,
 		parent: ev.frame,
 	}
 

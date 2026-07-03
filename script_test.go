@@ -120,7 +120,8 @@ func TestMust(t *testing.T) {
 
 func TestMustPanic(t *testing.T) {
 	defer func() {
-		if r := recover(); r == nil {
+		r := recover()
+		if r == nil {
 			t.Fatal("expected Must to panic on error")
 		}
 	}()

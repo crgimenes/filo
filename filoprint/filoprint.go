@@ -46,7 +46,7 @@ func builtinPrint(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	for i, arg := range args {
 		parts[i] = valueToString(arg)
 	}
-	fmt.Fprint(output, strings.Join(parts, " "))
+	_, _ = fmt.Fprint(output, strings.Join(parts, " ")) // like fmt.Print, output errors are not surfaced
 
 	return filo.VList(nil), nil
 }
@@ -62,7 +62,7 @@ func builtinPrintln(ctx context.Context, args []filo.Value) (filo.Value, error) 
 	for i, arg := range args {
 		parts[i] = valueToString(arg)
 	}
-	fmt.Fprintln(output, strings.Join(parts, " "))
+	_, _ = fmt.Fprintln(output, strings.Join(parts, " "))
 
 	return filo.VList(nil), nil
 }
@@ -82,7 +82,7 @@ func builtinPrintf(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	}
 
 	result := formatWithFiloTypes(format, args[1:])
-	fmt.Fprint(output, result)
+	_, _ = fmt.Fprint(output, result)
 
 	return filo.VBool(true), nil
 }
@@ -128,7 +128,7 @@ func formatWithFiloTypes(format string, args []filo.Value) string {
 			if j < len(format) {
 				specFull := format[i : j+1]
 				if argIndex < len(args) {
-					result.WriteString(fmt.Sprintf(specFull, valueToGo(args[argIndex])))
+					fmt.Fprintf(&result, specFull, valueToGo(args[argIndex]))
 					argIndex++
 				} else {
 					result.WriteString(specFull)

@@ -26,7 +26,8 @@ func FuzzParseDoesNotPanic(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		defer func() {
-			if r := recover(); r != nil {
+			r := recover()
+			if r != nil {
 				t.Fatalf("parse panicked: %v", r)
 			}
 		}()
@@ -51,16 +52,22 @@ func FuzzRunScriptDoesNotPanic(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		eng := NewEngine()
 		// Mock string builtins for fuzzing to avoid import cycle
-		eng.RegisterBuiltin("str-len", func(_ context.Context, args []Value) (Value, error) {
+		err := eng.RegisterBuiltin("str-len", func(_ context.Context, args []Value) (Value, error) {
 			if len(args) != 1 {
 				return Value{}, nil
 			}
 			s, _ := args[0].AsString()
 			return VNum(float64(len(s))), nil
 		})
-		eng.RegisterBuiltin("str-sub", func(_ context.Context, args []Value) (Value, error) {
+		if err != nil {
+			t.Fatalf("register str-len: %v", err)
+		}
+		err = eng.RegisterBuiltin("str-sub", func(_ context.Context, args []Value) (Value, error) {
 			return VString("mock"), nil
 		})
+		if err != nil {
+			t.Fatalf("register str-sub: %v", err)
+		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 		defer cancel()
@@ -68,7 +75,8 @@ func FuzzRunScriptDoesNotPanic(f *testing.F) {
 		cfg := EvalConfig{StepLimit: 200, RecursionLimit: 20, Timeout: 0}
 
 		defer func() {
-			if r := recover(); r != nil {
+			r := recover()
+			if r != nil {
 				t.Fatalf("RunScript panicked: %v", r)
 			}
 		}()

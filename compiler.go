@@ -35,7 +35,8 @@ func (s *Scope) define(name string) int {
 func (s *Scope) resolve(name string) (depth int, index int, found bool) {
 	depth = 0
 	for cur := s; cur != nil; cur = cur.parent {
-		if idx, ok := cur.vars[name]; ok {
+		idx, ok := cur.vars[name]
+		if ok {
 			return depth, idx, true
 		}
 		depth++
@@ -77,7 +78,8 @@ func (c *compiler) walk(node Node) (Node, error) {
 		}
 		// Not in local scope. Check builtins.
 		if c.builtins != nil {
-			if fn, ok := c.builtins[n.Name]; ok {
+			fn, ok := c.builtins[n.Name]
+			if ok {
 				return &ResolvedBuiltin{
 					Name: n.Name,
 					fn:   fn,

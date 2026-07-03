@@ -22,7 +22,6 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -59,12 +58,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.IntVar(&indentSize, "indent", 2, "spaces per indent level")
 	fs.BoolVar(&showVer, "version", false, "print version and exit")
 
-	if err := fs.Parse(args); err != nil {
+	err := fs.Parse(args)
+	if err != nil {
 		return 1
 	}
 
 	if showVer {
-		fmt.Fprintf(stdout, "filofmt version %s\n", version)
+		_, _ = fmt.Fprintf(stdout, "filofmt version %s\n", version)
 		return 0
 	}
 
@@ -79,14 +79,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(paths) == 0 {
 		data, err := io.ReadAll(stdin)
 		if err != nil {
-			fmt.Fprintf(stderr, "error reading stdin: %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "error reading stdin: %v\n", err)
 			return 1
 		}
 		var formatted string
 		if foldConstFlag {
 			ast, parseErr := filo.Parse(string(data))
 			if parseErr != nil {
-				fmt.Fprintf(stderr, "error: %v\n", parseErr)
+				_, _ = fmt.Fprintf(stderr, "error: %v\n", parseErr)
 				return 1
 			}
 			folded, _ := filo.FoldConstants(ast)
@@ -95,18 +95,22 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			formatted, err = filo.FormatWithConfig(string(data), cfg)
 		}
 		if err != nil {
-			fmt.Fprintf(stderr, "error: %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
-		fmt.Fprintln(stdout, formatted)
+		_, err = fmt.Fprintln(stdout, formatted)
+		if err != nil {
+			return 1
+		}
 		return 0
 	}
 
 	// Process files
 	exitCode := 0
 	for _, path := range paths {
-		if err := processPath(path, cfg, writeFlag, listFlag, diffFlag, foldConstFlag, stdout, stderr); err != nil {
-			fmt.Fprintf(stderr, "error: %v\n", err)
+		err := processPath(path, cfg, writeFlag, listFlag, diffFlag, foldConstFlag, stdout, stderr)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 			exitCode = 1
 		}
 	}
@@ -169,20 +173,21 @@ func processFile(path string, cfg filo.FormatConfig, write, list, diff, foldCons
 	if original == formatted {
 		// Already formatted
 		if !write && !list && !diff {
-			fmt.Fprint(stdout, formatted)
+			_, err = fmt.Fprint(stdout, formatted)
+			return err
 		}
 		return nil
 	}
 
 	if list {
-		fmt.Fprintln(stdout, path)
-		return nil
+		_, err = fmt.Fprintln(stdout, path)
+		return err
 	}
 
 	if diff {
 		// Simple diff: show before/after
-		fmt.Fprintf(stdout, "--- %s (original)\n", path)
-		fmt.Fprintf(stdout, "+++ %s (formatted)\n", path)
+		_, _ = fmt.Fprintf(stdout, "--- %s (original)\n", path)
+		_, _ = fmt.Fprintf(stdout, "+++ %s (formatted)\n", path)
 		printSimpleDiff(stdout, original, formatted)
 		return nil
 	}
@@ -193,8 +198,8 @@ func processFile(path string, cfg filo.FormatConfig, write, list, diff, foldCons
 	}
 
 	// Default: print to stdout
-	fmt.Fprint(stdout, formatted)
-	return nil
+	_, err = fmt.Fprint(stdout, formatted)
+	return err
 }
 
 func printSimpleDiff(w io.Writer, original, formatted string) {
@@ -215,14 +220,11 @@ func printSimpleDiff(w io.Writer, original, formatted string) {
 
 		if origLine != fmtLine {
 			if origLine != "" {
-				fmt.Fprintf(w, "-%s\n", origLine)
+				_, _ = fmt.Fprintf(w, "-%s\n", origLine)
 			}
 			if fmtLine != "" {
-				fmt.Fprintf(w, "+%s\n", fmtLine)
+				_, _ = fmt.Fprintf(w, "+%s\n", fmtLine)
 			}
 		}
 	}
 }
-
-// Ensure bytes imported (for future use)
-var _ = bytes.Buffer{}

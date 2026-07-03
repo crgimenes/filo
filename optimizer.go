@@ -105,8 +105,11 @@ func foldIf(list *List) (Node, bool) {
 	if len(list.Elems) == 4 {
 		return list.Elems[3], true
 	}
-	// No else branch — Filo runtime returns empty list.
-	return &List{Elems: nil}, true
+	// No else branch: the interpreter's (if #f X) yields an empty list VALUE, so
+	// fold to a (list) call, not a bare &List{} node — an empty list node is a
+	// runtime error ("empty list expression"), which would make the optimized
+	// form (and filofmt -fold-const output) diverge from the interpreter.
+	return &List{Elems: []Node{&Symbol{Name: "list"}}}, true
 }
 
 var pureFunctions = map[string]bool{

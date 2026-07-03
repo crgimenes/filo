@@ -57,7 +57,8 @@ func builtinJSONMarshal(_ context.Context, args []filo.Value) (filo.Value, error
 		return filo.Value{}, fmt.Errorf("json-marshal: %w", err)
 	}
 	// JSON numbers cannot represent NaN/Inf; ensure we don't emit them.
-	if err := validateNoNaNInf(goVal); err != nil {
+	err = validateNoNaNInf(goVal)
+	if err != nil {
 		return filo.Value{}, fmt.Errorf("json-marshal: %w", err)
 	}
 	b, err := json.Marshal(goVal)
@@ -76,7 +77,8 @@ func builtinJSONUnmarshal(_ context.Context, args []filo.Value) (filo.Value, err
 		return filo.Value{}, fmt.Errorf("json-unmarshal: argument must be string: %w", err)
 	}
 	var v any
-	if err := json.Unmarshal([]byte(s), &v); err != nil {
+	err = json.Unmarshal([]byte(s), &v)
+	if err != nil {
 		return filo.Value{}, fmt.Errorf("json-unmarshal: %w", err)
 	}
 	fv, err := fromGoToFilo(v)
@@ -185,14 +187,16 @@ func validateNoNaNInf(v any) error {
 		return nil
 	case []any:
 		for i := range x {
-			if err := validateNoNaNInf(x[i]); err != nil {
+			err := validateNoNaNInf(x[i])
+			if err != nil {
 				return err
 			}
 		}
 		return nil
 	case map[string]any:
 		for k := range x {
-			if err := validateNoNaNInf(x[k]); err != nil {
+			err := validateNoNaNInf(x[k])
+			if err != nil {
 				return err
 			}
 		}

@@ -150,7 +150,8 @@ func (g *GlobalEnv) ToMap() map[string]Value {
 	m := make(map[string]Value)
 	for id, defined := range g.defined {
 		if defined && id < len(g.values) {
-			if name, ok := g.symbols.GetName(id); ok {
+			name, ok := g.symbols.GetName(id)
+			if ok {
 				m[name] = g.values[id]
 			}
 		}

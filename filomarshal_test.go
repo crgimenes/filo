@@ -130,7 +130,8 @@ func TestUnmarshalBasicTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			target := tt.alloc()
-			if err := UnmarshalFromValue(tt.val, target); err != nil {
+			err := UnmarshalFromValue(tt.val, target)
+			if err != nil {
 				t.Fatalf("Unmarshal error: %v", err)
 			}
 			if !tt.check(target) {
@@ -143,7 +144,8 @@ func TestUnmarshalBasicTypes(t *testing.T) {
 func TestUnmarshalSlice(t *testing.T) {
 	val := VList([]Value{VNum(1), VNum(2), VNum(3)})
 	var result []int
-	if err := UnmarshalFromValue(val, &result); err != nil {
+	err := UnmarshalFromValue(val, &result)
+	if err != nil {
 		t.Fatalf("Unmarshal error: %v", err)
 	}
 	if len(result) != 3 {
@@ -162,7 +164,8 @@ func TestUnmarshalMap(t *testing.T) {
 		VTuple([]Value{VString("b"), VNum(2)}),
 	})
 	var result map[string]int
-	if err := UnmarshalFromValue(val, &result); err != nil {
+	err := UnmarshalFromValue(val, &result)
+	if err != nil {
 		t.Fatalf("Unmarshal error: %v", err)
 	}
 	if result["a"] != 1 || result["b"] != 2 {
@@ -176,7 +179,8 @@ func TestUnmarshalStruct(t *testing.T) {
 		VTuple([]Value{VString("age"), VNum(25)}),
 	})
 	var result SimpleStruct
-	if err := UnmarshalFromValue(val, &result); err != nil {
+	err := UnmarshalFromValue(val, &result)
+	if err != nil {
 		t.Fatalf("Unmarshal error: %v", err)
 	}
 	if result.Name != "Bob" {
@@ -217,7 +221,8 @@ func TestRoundtripStability(t *testing.T) {
 		}
 
 		var result Complex
-		if err := UnmarshalFromValue(val, &result); err != nil {
+		err = UnmarshalFromValue(val, &result)
+		if err != nil {
 			t.Fatalf("roundtrip %d: Unmarshal error: %v", i, err)
 		}
 
@@ -251,7 +256,8 @@ func TestMarshalUnmarshalRoundtrip(t *testing.T) {
 			}
 
 			target := tt.alloc()
-			if err := UnmarshalFromValue(val, target); err != nil {
+			err = UnmarshalFromValue(val, target)
+			if err != nil {
 				t.Fatalf("Unmarshal error: %v", err)
 			}
 
@@ -262,7 +268,8 @@ func TestMarshalUnmarshalRoundtrip(t *testing.T) {
 			}
 
 			target2 := tt.alloc()
-			if err := UnmarshalFromValue(val2, target2); err != nil {
+			err = UnmarshalFromValue(val2, target2)
+			if err != nil {
 				t.Fatalf("Unmarshal2 error: %v", err)
 			}
 

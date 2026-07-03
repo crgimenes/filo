@@ -1,5 +1,4 @@
-// Package filo provides Marshal and Unmarshal functions for converting between
-// Go values and Filo Value types.
+// Marshal and Unmarshal convert between Go values and Filo Value types.
 //
 // Marshal converts any Go value supported by Filo (bool, numbers, string, slices,
 // structs, maps) into a Filo Value.
@@ -33,6 +32,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // Marshal converts a Go value to a Filo Value.
@@ -144,7 +144,14 @@ func marshalValue(rv reflect.Value) (Value, error) {
 		return VNum(rv.Float()), nil
 
 	case reflect.String:
-		return VString(rv.String()), nil
+		s := rv.String()
+		// Filo strings are UTF-8 text. Reject invalid UTF-8 loudly instead of
+		// letting it round-trip lossily through the Unicode replacement character
+		// (U+FFFD), which would silently corrupt the host's data.
+		if !utf8.ValidString(s) {
+			return Value{}, fmt.Errorf("marshal: string is not valid UTF-8")
+		}
+		return VString(s), nil
 
 	case reflect.Slice, reflect.Array:
 		return marshalSlice(rv)
@@ -381,7 +388,8 @@ func unmarshalSlice(val Value, rv reflect.Value) error {
 
 	slice := reflect.MakeSlice(rv.Type(), len(list), len(list))
 	for i, item := range list {
-		if err := unmarshalValue(item, slice.Index(i)); err != nil {
+		err := unmarshalValue(item, slice.Index(i))
+		if err != nil {
 			return fmt.Errorf("unmarshal slice index %d: %w", i, err)
 		}
 	}
@@ -417,12 +425,14 @@ func unmarshalMap(val Value, rv reflect.Value) error {
 		}
 
 		keyRv := reflect.New(keyType).Elem()
-		if err := unmarshalValue(tup[0], keyRv); err != nil {
+		err := unmarshalValue(tup[0], keyRv)
+		if err != nil {
 			return fmt.Errorf("unmarshal map key %d: %w", i, err)
 		}
 
 		valRv := reflect.New(valType).Elem()
-		if err := unmarshalValue(tup[1], valRv); err != nil {
+		err = unmarshalValue(tup[1], valRv)
+		if err != nil {
 			return fmt.Errorf("unmarshal map value %d: %w", i, err)
 		}
 
@@ -578,7 +588,8 @@ func unmarshalStruct(val Value, rv reflect.Value) error {
 			continue
 		}
 
-		if err := unmarshalValue(tup[1], rv.Field(fieldIdx)); err != nil {
+		err := unmarshalValue(tup[1], rv.Field(fieldIdx))
+		if err != nil {
 			return fmt.Errorf("unmarshal struct field %s: %w", key, err)
 		}
 	}

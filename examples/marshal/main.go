@@ -55,12 +55,14 @@ func complexExample() {
 	fmt.Printf("Pretty Filo value:\n%v\n", prettyVal)
 
 	var c2 Complex
-	if err := filo.Unmarshal(val, &c2); err != nil {
+	err = filo.Unmarshal(val, &c2)
+	if err != nil {
 		log.Fatalf("Unmarshal error: %v", err)
 	}
 
 	var c3 Complex
-	if err := filo.Unmarshal(prettyVal, &c3); err != nil {
+	err = filo.Unmarshal(prettyVal, &c3)
+	if err != nil {
 		log.Fatalf("Unmarshal error: %v", err)
 	}
 
@@ -114,7 +116,8 @@ func mapExample() {
 
 	// Unmarshal back to map
 	var data2 map[string]any
-	if err := filo.Unmarshal(val, &data2); err != nil {
+	err = filo.Unmarshal(val, &data2)
+	if err != nil {
 		log.Fatalf("Unmarshal error: %v", err)
 	}
 	fmt.Printf("Go map: %+v\n", data2)
@@ -139,7 +142,8 @@ func main() {
 	// Example 2: Unmarshal Filo Value back to Go struct
 	fmt.Println("=== Unmarshal: Filo Value -> Go struct ===")
 	var cfg2 Config
-	if err := filo.Unmarshal(val, &cfg2); err != nil {
+	err = filo.Unmarshal(val, &cfg2)
+	if err != nil {
 		log.Fatalf("Unmarshal error: %v", err)
 	}
 	fmt.Printf("Go struct: %+v\n\n", cfg2)
@@ -165,7 +169,8 @@ func main() {
 	}
 
 	var cfg3 Config
-	if err := filo.UnmarshalFromValue(result, &cfg3); err != nil {
+	err = filo.UnmarshalFromValue(result, &cfg3)
+	if err != nil {
 		log.Fatalf("Unmarshal error: %v", err)
 	}
 	fmt.Printf("Config from Filo: %+v\n", cfg3)

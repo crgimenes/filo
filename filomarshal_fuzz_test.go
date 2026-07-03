@@ -2,6 +2,7 @@ package filo
 
 import (
 	"testing"
+	"unicode/utf8"
 )
 
 // FuzzMarshalUnmarshalInt tests roundtrip stability for integers
@@ -20,7 +21,8 @@ func FuzzMarshalUnmarshalInt(f *testing.F) {
 		}
 
 		var result int
-		if err := Unmarshal(val, &result); err != nil {
+		err = Unmarshal(val, &result)
+		if err != nil {
 			t.Fatalf("Unmarshal error: %v", err)
 		}
 
@@ -46,7 +48,8 @@ func FuzzMarshalUnmarshalFloat(f *testing.F) {
 		}
 
 		var result float64
-		if err := Unmarshal(val, &result); err != nil {
+		err = Unmarshal(val, &result)
+		if err != nil {
 			t.Fatalf("Unmarshal error: %v", err)
 		}
 
@@ -68,11 +71,17 @@ func FuzzMarshalUnmarshalString(f *testing.F) {
 	f.Fuzz(func(t *testing.T, s string) {
 		val, err := Marshal(s)
 		if err != nil {
-			t.Fatalf("Marshal error: %v", err)
+			// Filo strings are UTF-8 text: Marshal rejects non-UTF-8 input rather
+			// than corrupting it. That is the only allowed error here.
+			if utf8.ValidString(s) {
+				t.Fatalf("Marshal error on valid UTF-8 %q: %v", s, err)
+			}
+			return
 		}
 
 		var result string
-		if err := Unmarshal(val, &result); err != nil {
+		err = Unmarshal(val, &result)
+		if err != nil {
 			t.Fatalf("Unmarshal error: %v", err)
 		}
 
@@ -94,7 +103,8 @@ func FuzzMarshalUnmarshalBool(f *testing.F) {
 		}
 
 		var result bool
-		if err := Unmarshal(val, &result); err != nil {
+		err = Unmarshal(val, &result)
+		if err != nil {
 			t.Fatalf("Unmarshal error: %v", err)
 		}
 
@@ -115,11 +125,17 @@ func FuzzMarshalUnmarshalBytes(f *testing.F) {
 		s := string(data)
 		val, err := Marshal(s)
 		if err != nil {
-			t.Fatalf("Marshal error: %v", err)
+			// Bytes cast to a string can be invalid UTF-8; Filo strings are text,
+			// so Marshal rejecting that is the contract, not a failure.
+			if utf8.ValidString(s) {
+				t.Fatalf("Marshal error on valid UTF-8: %v", err)
+			}
+			return
 		}
 
 		var result string
-		if err := Unmarshal(val, &result); err != nil {
+		err = Unmarshal(val, &result)
+		if err != nil {
 			t.Fatalf("Unmarshal error: %v", err)
 		}
 
@@ -144,7 +160,8 @@ func FuzzMarshalSliceInt(f *testing.F) {
 		}
 
 		var result []int
-		if err := Unmarshal(val, &result); err != nil {
+		err = Unmarshal(val, &result)
+		if err != nil {
 			t.Fatalf("Unmarshal error: %v", err)
 		}
 

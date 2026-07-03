@@ -13,7 +13,8 @@ func TestDoString(t *testing.T) {
 	defer f.Close()
 
 	// Execute Filo script setting global variable 'x' to 42.
-	if err := f.DoString("(set x 42)"); err != nil {
+	err := f.DoString("(set x 42)")
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -70,7 +71,8 @@ func TestGetNumber(t *testing.T) {
 	f := New()
 	defer f.Close()
 
-	if err := f.DoString("(set speed 2.5)"); err != nil {
+	err := f.DoString("(set speed 2.5)")
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -82,7 +84,8 @@ func TestGetNumber(t *testing.T) {
 		t.Fatalf("expected speed = 2.5, got %v", speed)
 	}
 
-	if i := f.MustGetInt("speed"); i != 2 {
+	i := f.MustGetInt("speed")
+	if i != 2 {
 		t.Fatalf("expected GetInt to truncate to 2, got %d", i)
 	}
 }
@@ -92,14 +95,17 @@ func TestMustGetNumber(t *testing.T) {
 	defer f.Close()
 
 	f.SetGlobal("scale", 1.5)
-	if scale := f.MustGetNumber("scale"); scale != 1.5 {
+	scale := f.MustGetNumber("scale")
+	if scale != 1.5 {
 		t.Fatalf("expected scale = 1.5, got %v", scale)
 	}
 
-	if err := f.DoString("(set whole 3)"); err != nil {
+	err := f.DoString("(set whole 3)")
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
-	if whole := f.MustGetNumber("whole"); whole != 3.0 {
+	whole := f.MustGetNumber("whole")
+	if whole != 3.0 {
 		t.Fatalf("expected whole = 3.0, got %v", whole)
 	}
 }
@@ -117,7 +123,8 @@ func TestGetFloatCompatibilityAliases(t *testing.T) {
 	if scale != 1.5 {
 		t.Fatalf("expected scale = 1.5, got %v", scale)
 	}
-	if scale := f.MustGetFloat("scale"); scale != 1.5 {
+	scale = f.MustGetFloat("scale")
+	if scale != 1.5 {
 		t.Fatalf("expected scale = 1.5, got %v", scale)
 	}
 }
@@ -127,10 +134,12 @@ func TestGetNumberTypeMismatch(t *testing.T) {
 	defer f.Close()
 
 	f.SetGlobal("name", "neko")
-	if _, err := f.GetNumber("name"); err == nil {
+	_, err := f.GetNumber("name")
+	if err == nil {
 		t.Fatal("expected error converting string to number")
 	}
-	if _, err := f.GetFloat("name"); err == nil || !strings.Contains(err.Error(), `converting "name" to float`) {
+	_, err = f.GetFloat("name")
+	if err == nil || !strings.Contains(err.Error(), `converting "name" to float`) {
 		t.Fatalf("GetFloat compatibility error = %v", err)
 	}
 }
@@ -214,13 +223,16 @@ func TestSetGlobalMapDeterministicOrder(t *testing.T) {
 		return k
 	}
 
-	if got := getKey(0); got != "a" {
+	got := getKey(0)
+	if got != "a" {
 		t.Fatalf("expected first key to be %q, got %q", "a", got)
 	}
-	if got := getKey(1); got != "b" {
+	got = getKey(1)
+	if got != "b" {
 		t.Fatalf("expected second key to be %q, got %q", "b", got)
 	}
-	if got := getKey(2); got != "c" {
+	got = getKey(2)
+	if got != "c" {
 		t.Fatalf("expected third key to be %q, got %q", "c", got)
 	}
 }
@@ -234,7 +246,8 @@ func TestScriptWithGlobals(t *testing.T) {
 	f.SetGlobal("multiplier", 5)
 
 	script := "(set result (* base multiplier))"
-	if err := f.DoString(script); err != nil {
+	err := f.DoString(script)
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -254,7 +267,8 @@ func TestScriptWithConditional(t *testing.T) {
 	script := `(if (= env "prod")
 		(set port 443)
 		(set port 8080))`
-	if err := f.DoString(script); err != nil {
+	err := f.DoString(script)
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -273,7 +287,8 @@ func TestMultipleStatements(t *testing.T) {
 		(set host "localhost")
 		(set port 3210)
 		(set enabled #t))`
-	if err := f.DoString(script); err != nil {
+	err := f.DoString(script)
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -363,13 +378,16 @@ func TestSetGlobalMapOfListsDeterministicOrder(t *testing.T) {
 		return k
 	}
 
-	if got := getKey(0); got != "a" {
+	got := getKey(0)
+	if got != "a" {
 		t.Fatalf("expected first key to be %q, got %q", "a", got)
 	}
-	if got := getKey(1); got != "b" {
+	got = getKey(1)
+	if got != "b" {
 		t.Fatalf("expected second key to be %q, got %q", "b", got)
 	}
-	if got := getKey(2); got != "c" {
+	got = getKey(2)
+	if got != "c" {
 		t.Fatalf("expected third key to be %q, got %q", "c", got)
 	}
 }
@@ -386,7 +404,8 @@ func TestHasFunction(t *testing.T) {
 
 	// Define a function via script
 	script := `(def my-func (fn (x) (* x 2)))`
-	if err := f.DoString(script); err != nil {
+	err := f.DoString(script)
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -409,7 +428,8 @@ func TestCallFunction(t *testing.T) {
 
 	// Define a function
 	script := `(def double (fn (x) (* x 2)))`
-	if err := f.DoString(script); err != nil {
+	err := f.DoString(script)
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -433,13 +453,17 @@ func TestCallFunctionWithStrings(t *testing.T) {
 	f := New()
 	defer f.Close()
 	// RegisterStringBuiltins(f.eng)
-	f.eng.RegisterBuiltin("str-concat", func(_ context.Context, args []Value) (Value, error) {
+	err := f.eng.RegisterBuiltin("str-concat", func(_ context.Context, args []Value) (Value, error) {
 		return VString(args[0].Str + args[1].Str + args[2].Str), nil
 	})
+	if err != nil {
+		t.Fatalf("register str-concat: %v", err)
+	}
 
 	// Define a greeting function
 	script := `(def greet (fn (name) (str-concat "Hello, " name "!")))`
-	if err := f.DoString(script); err != nil {
+	err = f.DoString(script)
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -463,9 +487,12 @@ func TestCallFunctionString(t *testing.T) {
 	f := New()
 	defer f.Close()
 	// RegisterStringBuiltins(f.eng)
-	f.eng.RegisterBuiltin("str-upper", func(_ context.Context, args []Value) (Value, error) {
+	err := f.eng.RegisterBuiltin("str-upper", func(_ context.Context, args []Value) (Value, error) {
 		return VString(strings.ToUpper(args[0].Str)), nil
 	})
+	if err != nil {
+		t.Fatalf("register str-upper: %v", err)
+	}
 
 	// Test with non-existent function (should return fallback)
 	result := f.CallFunctionString("not-exists", "fallback", "arg")
@@ -475,7 +502,8 @@ func TestCallFunctionString(t *testing.T) {
 
 	// Define a function
 	script := `(def process (fn (text) (str-upper text)))`
-	if err := f.DoString(script); err != nil {
+	err = f.DoString(script)
+	if err != nil {
 		t.Fatalf("DoString error: %v", err)
 	}
 
@@ -547,7 +575,8 @@ func TestSetGlobalVariousTypes(t *testing.T) {
 
 	// int64
 	f.SetGlobal("i64", int64(100))
-	if err := f.DoString("(set x i64)"); err != nil {
+	err := f.DoString("(set x i64)")
+	if err != nil {
 		t.Fatalf("set int64 global: %v", err)
 	}
 	if f.MustGetInt("x") != 100 {
@@ -556,7 +585,8 @@ func TestSetGlobalVariousTypes(t *testing.T) {
 
 	// float32
 	f.SetGlobal("f32", float32(3.14))
-	if err := f.DoString("(set y f32)"); err != nil {
+	err = f.DoString("(set y f32)")
+	if err != nil {
 		t.Fatalf("set float32 global: %v", err)
 	}
 	got, err := f.GetNumber("y")
@@ -634,7 +664,8 @@ func TestCallFunctionWithTypedArgs(t *testing.T) {
 	t.Parallel()
 
 	f := New()
-	if err := f.DoString("(def add (fn (a b) (+ a b)))"); err != nil {
+	err := f.DoString("(def add (fn (a b) (+ a b)))")
+	if err != nil {
 		t.Fatalf("define add: %v", err)
 	}
 

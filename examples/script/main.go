@@ -138,7 +138,8 @@ func performanceExample(ctx context.Context, eng *filo.Engine, cfg filo.EvalConf
 	// Measure RunScript (parse + execute each time)
 	start := time.Now()
 	for range iterations {
-		if _, _, err := eng.RunScript(ctx, script, globals, cfg); err != nil {
+		_, _, err := eng.RunScript(ctx, script, globals, cfg)
+		if err != nil {
 			log.Fatal(err)
 		}
 	}
@@ -148,7 +149,8 @@ func performanceExample(ctx context.Context, eng *filo.Engine, cfg filo.EvalConf
 	parsedScript := filo.Must(filo.ParseScript("perf", script))
 	start = time.Now()
 	for range iterations {
-		if _, _, err := parsedScript.Execute(ctx, eng, globals, cfg); err != nil {
+		_, _, err := parsedScript.Execute(ctx, eng, globals, cfg)
+		if err != nil {
 			log.Fatal(err)
 		}
 	}

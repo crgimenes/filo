@@ -48,9 +48,11 @@ func TestFoldConstants(t *testing.T) {
 			changed:  true,
 		},
 		{
-			name:     "if constant false without else",
+			name: "if constant false without else",
+			// Folds to (list), which evaluates to an empty list value — the same as
+			// the interpreter's (if #f X). A bare () node would be a runtime error.
 			input:    "(if #f 1)",
-			expected: "()",
+			expected: "(list)",
 			changed:  true,
 		},
 		{

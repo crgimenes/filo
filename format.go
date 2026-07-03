@@ -1,4 +1,4 @@
-// Package filo provides Lisp-style formatting for Filo code.
+// Lisp-style formatting for Filo code.
 //
 // The formatting follows common Lisp conventions for readability:
 //   - Short expressions stay on one line: (+ 1 2)
@@ -34,7 +34,8 @@ func DefaultFormatConfig() FormatConfig {
 // and we can't use the token-based formatter.
 func FormatAST(node Node, cfg FormatConfig) (string, error) {
 	var b strings.Builder
-	if nodes, ok := node.([]Node); ok {
+	nodes, ok := node.([]Node)
+	if ok {
 		for i, n := range nodes {
 			if i > 0 {
 				b.WriteString("\n\n")
@@ -222,7 +223,6 @@ func formatTokens(tokens []token, cfg FormatConfig) string {
 			// Before every ( break line (except at start)
 			if !atLineStart {
 				b.WriteString("\n")
-				atLineStart = true
 			}
 			writeIndent()
 			b.WriteString("(")
@@ -408,7 +408,8 @@ func formatList(b *strings.Builder, items []Node, depth int, cfg FormatConfig) {
 	}
 
 	// Check for special forms
-	if sym, ok := items[0].(*Symbol); ok {
+	sym, ok := items[0].(*Symbol)
+	if ok {
 		switch sym.Name {
 		case "let", "letv":
 			formatLetForm(b, items, depth, cfg)
@@ -457,7 +458,8 @@ func formatLetForm(b *strings.Builder, items []Node, depth int, cfg FormatConfig
 
 	if len(items) >= 2 {
 		// Format bindings
-		if bindings, ok := items[1].(*List); ok {
+		bindings, ok := items[1].(*List)
+		if ok {
 			compact := compactNode(bindings.Elems)
 			if len(compact) <= 40 {
 				b.WriteString(compact)

@@ -64,7 +64,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.IntVar(&timeoutSeconds, "timeout", defaultTimeoutSeconds, "Script execution timeout in seconds")
 	fs.BoolVar(&foldConst, "fold-const", false, "Enable interactive constant folding")
 
-	if err := fs.Parse(args); err != nil {
+	err := fs.Parse(args)
+	if err != nil {
 		return 1
 	}
 
@@ -82,8 +83,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// Create engine and register packages
 	engine := filo.NewEngine()
 	for _, pkg := range requestedPackages {
-		if err := registerPackage(engine, pkg); err != nil {
-			fmt.Fprintf(stderr, "error: %v\n", err)
+		err := registerPackage(engine, pkg)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
 	}
@@ -96,7 +98,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	stdinFd, err := terminalFileDescriptor(os.Stdin)
 	if err != nil {
-		fmt.Fprintf(stderr, "error: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
 	}
 	if !term.IsTerminal(stdinFd) {
@@ -118,24 +120,24 @@ func terminalFileDescriptor(file *os.File) (int, error) {
 func runBatchMode(engine *filo.Engine, stdin io.Reader, stdout, stderr io.Writer, cfg filo.EvalConfig) int {
 	data, err := io.ReadAll(stdin)
 	if err != nil {
-		fmt.Fprintf(stderr, "error: failed to read script: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: failed to read script: %v\n", err)
 		return 1
 	}
 
 	script := string(data)
 	if strings.TrimSpace(script) == "" {
-		fmt.Fprintln(stderr, "error: empty script")
+		_, _ = fmt.Fprintln(stderr, "error: empty script")
 		return 1
 	}
 
 	ctx := context.Background()
 	result, _, err := engine.RunScript(ctx, script, nil, cfg)
 	if err != nil {
-		fmt.Fprintf(stderr, "error: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
 	}
 
-	fmt.Fprintln(stdout, formatResult(result))
+	_, _ = fmt.Fprintln(stdout, formatResult(result))
 	return 0
 }
 
@@ -143,13 +145,14 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 	// Set terminal to raw mode
 	oldState, err := term.MakeRaw(stdinFd)
 	if err != nil {
-		fmt.Fprintf(stderr, "error: failed to set raw mode: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "error: failed to set raw mode: %v\n", err)
 		return 1
 	}
 
 	defer func() {
-		if err := term.Restore(stdinFd, oldState); err != nil {
-			fmt.Fprintf(stderr, "error: failed to restore terminal: %v\n", err)
+		err := term.Restore(stdinFd, oldState)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "error: failed to restore terminal: %v\n", err)
 		}
 	}()
 
@@ -157,8 +160,9 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-sigChan
-		if err := term.Restore(stdinFd, oldState); err != nil {
-			fmt.Fprintf(stderr, "error: failed to restore terminal: %v\n", err)
+		err := term.Restore(stdinFd, oldState)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "error: failed to restore terminal: %v\n", err)
 		}
 		os.Exit(0)
 	}()
@@ -192,9 +196,10 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 			startIdx := -1
 			// Scan backwards for matching '(' in current line
 			for i := len(line) - 1; i >= 0; i-- {
-				if line[i] == ')' {
+				switch line[i] {
+				case ')':
 					balance++
-				} else if line[i] == '(' {
+				case '(':
 					balance--
 				}
 				if balance == 0 {
@@ -239,7 +244,7 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 
 				editedContent, err := openEditor(stdinFd, oldState, fullContent)
 				if err != nil {
-					fmt.Fprintf(t, "error: %v\n", err)
+					_, _ = fmt.Fprintf(t, "error: %v\n", err)
 					return line, pos, true
 				}
 				buffer.Reset()
@@ -263,24 +268,24 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 	}
 
 	// Print welcome message
-	fmt.Fprintln(t, "Filo REPL - Type expressions to evaluate. Ctrl+D to exit.")
-	fmt.Fprintln(t, "Use Ctrl+X,E to open $EDITOR or type .help for commands.")
-	fmt.Fprintln(t, ".exit to exit.")
-	fmt.Fprintln(t, "")
+	_, _ = fmt.Fprintln(t, "Filo REPL - Type expressions to evaluate. Ctrl+D to exit.")
+	_, _ = fmt.Fprintln(t, "Use Ctrl+X,E to open $EDITOR or type .help for commands.")
+	_, _ = fmt.Fprintln(t, ".exit to exit.")
+	_, _ = fmt.Fprintln(t, "")
 
 	for {
 		line, err := t.ReadLine()
 
 		// Check if ESC was pressed
 		if exitRequested {
-			fmt.Fprintln(t, "\nBye!")
+			_, _ = fmt.Fprintln(t, "\nBye!")
 			return 0
 		}
 
 		if err == io.EOF {
 			// Ctrl+D on empty line - exit
 			if buffer.Len() == 0 {
-				fmt.Fprintln(t, "\nBye!")
+				_, _ = fmt.Fprintln(t, "\nBye!")
 				return 0
 			}
 			// Ctrl+D with content - force execute
@@ -290,7 +295,7 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 			continue
 		}
 		if err != nil {
-			fmt.Fprintf(t, "error: %v\n", err)
+			_, _ = fmt.Fprintf(t, "error: %v\n", err)
 			return 1
 		}
 
@@ -299,11 +304,12 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 		if buffer.Len() == 0 {
 			switch trimmed {
 			case ".q", ".quit", ".exit":
-				fmt.Fprintln(t, "Bye!")
+				_, _ = fmt.Fprintln(t, "Bye!")
 				return 0
 			case ".h", ".help":
-				if err := showHelp(stdinFd, oldState); err != nil {
-					fmt.Fprintf(t, "error: %v\n", err)
+				err := showHelp(stdinFd, oldState)
+				if err != nil {
+					_, _ = fmt.Fprintf(t, "error: %v\n", err)
 				}
 				continue
 			case ".c", ".clear":
@@ -313,7 +319,7 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 			case ".e", ".edit":
 				content, err := openEditor(stdinFd, oldState, buffer.String())
 				if err != nil {
-					fmt.Fprintf(t, "error: %v\n", err)
+					_, _ = fmt.Fprintf(t, "error: %v\n", err)
 					continue
 				}
 				buffer.Reset()
@@ -360,7 +366,7 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 		}
 
 		// More close than open - error
-		fmt.Fprintln(t, "error: unbalanced parentheses (too many closing)")
+		_, _ = fmt.Fprintln(t, "error: unbalanced parentheses (too many closing)")
 		buffer.Reset()
 		t.SetPrompt(promptMain)
 
@@ -371,10 +377,10 @@ func executeAndPrint(t *term.Terminal, engine *filo.Engine, script string, globa
 	ctx := context.Background()
 	result, newGlobals, err := engine.RunScript(ctx, script, globals, cfg)
 	if err != nil {
-		fmt.Fprintf(t, "error: %v\n", err)
+		_, _ = fmt.Fprintf(t, "error: %v\n", err)
 		return nil
 	}
-	fmt.Fprintln(t, formatResult(result))
+	_, _ = fmt.Fprintln(t, formatResult(result))
 	return newGlobals
 }
 
@@ -390,16 +396,19 @@ func showHelp(stdinFd int, oldState *term.State) error {
 		return fmt.Errorf("create help file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
-	if _, err := tmpFile.WriteString(helpContent); err != nil {
+	_, err = tmpFile.WriteString(helpContent)
+	if err != nil {
 		return fmt.Errorf("write help file: %w", err)
 	}
-	if err := tmpFile.Close(); err != nil {
+	err = tmpFile.Close()
+	if err != nil {
 		return fmt.Errorf("close help file: %w", err)
 	}
 
-	if err := term.Restore(stdinFd, oldState); err != nil {
+	err = term.Restore(stdinFd, oldState)
+	if err != nil {
 		return fmt.Errorf("restore terminal for pager: %w", err)
 	}
 
@@ -432,18 +441,21 @@ func openEditor(stdinFd int, oldState *term.State, content string) (string, erro
 		return content, fmt.Errorf("create editor file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	if content != "" {
-		if _, err := tmpFile.WriteString(content); err != nil {
+		_, err := tmpFile.WriteString(content)
+		if err != nil {
 			return content, fmt.Errorf("write editor file: %w", err)
 		}
 	}
-	if err := tmpFile.Close(); err != nil {
+	err = tmpFile.Close()
+	if err != nil {
 		return content, fmt.Errorf("close editor file: %w", err)
 	}
 
-	if err := term.Restore(stdinFd, oldState); err != nil {
+	err = term.Restore(stdinFd, oldState)
+	if err != nil {
 		return content, fmt.Errorf("restore terminal for editor: %w", err)
 	}
 

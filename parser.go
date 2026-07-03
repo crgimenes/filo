@@ -57,13 +57,27 @@ func (e *ParseError) Error() string {
 	return fmt.Sprintf("parse error at position %d: %s", e.Pos, e.Message)
 }
 
+// maxParseDepth bounds nested list nesting so a pathological input (e.g. a
+// stream of "(") cannot exhaust the goroutine stack. A Go stack overflow is a
+// fatal error that recover() cannot catch, so this limit is the only thing that
+// keeps an untrusted script from taking the host process down — the parser runs
+// before the evaluator's StepLimit/RecursionLimit/Timeout and recover() can
+// apply. The bound is far deeper than any hand-written config and still leaves
+// ample real stack headroom.
+const maxParseDepth = 4096
+
 type lexer struct {
-	src string
-	i   int
+	src   string
+	i     int
+	depth int
 }
 
-// Parse parses the input string and returns the AST (List of expressions)
+// Parse parses the input string and returns the AST (List of expressions).
 func Parse(input string) (Node, error) {
+	// Strip a leading UTF-8 BOM: an editor or shell may prepend one, and it must
+	// not become part of the first token.
+	input = strings.TrimPrefix(input, "\ufeff")
+
 	lx := &lexer{src: input}
 	var nodes []Node
 
@@ -132,6 +146,12 @@ func (l *lexer) skipWS() {
 }
 
 func (l *lexer) readList(openPos int) (Node, error) {
+	l.depth++
+	if l.depth > maxParseDepth {
+		return nil, l.errAt(openPos, fmt.Sprintf("nesting too deep (limit %d)", maxParseDepth))
+	}
+	defer func() { l.depth-- }()
+
 	var elems []Node
 	for {
 		l.skipWS()
@@ -200,15 +220,34 @@ func (l *lexer) readString(startPos int) (Node, error) {
 }
 
 func (l *lexer) readBool() (Node, error) {
-	if strings.HasPrefix(l.src[l.i:], "#t") {
+	// A boolean is exactly #t or #f; the next byte must end the token, so #true or
+	// #tt are rejected rather than silently read as #t followed by a symbol.
+	if l.boolLiteralAt("#t") {
 		l.i += 2
 		return &BoolLit{Value: true}, nil
 	}
-	if strings.HasPrefix(l.src[l.i:], "#f") {
+	if l.boolLiteralAt("#f") {
 		l.i += 2
 		return &BoolLit{Value: false}, nil
 	}
 	return nil, l.errAt(l.i, "invalid boolean literal")
+}
+
+// boolLiteralAt reports whether the source at the cursor is the literal lit
+// followed by a token boundary (whitespace, ')', a comment, or end of input).
+func (l *lexer) boolLiteralAt(lit string) bool {
+	if !strings.HasPrefix(l.src[l.i:], lit) {
+		return false
+	}
+	next := l.i + len(lit)
+	if next >= len(l.src) {
+		return true
+	}
+	switch l.src[next] {
+	case ' ', '\t', '\n', '\r', ')', '(', ';', '"':
+		return true
+	}
+	return false
 }
 
 func (l *lexer) readAtom() (Node, error) {

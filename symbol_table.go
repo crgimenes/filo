@@ -37,7 +37,8 @@ func (st *SymbolTable) Resolve(name string) int {
 	defer st.mu.Unlock()
 
 	// Double check
-	if id, ok := st.symbols[name]; ok {
+	id, ok = st.symbols[name]
+	if ok {
 		return id
 	}
 

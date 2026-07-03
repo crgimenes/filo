@@ -58,7 +58,8 @@ func (e *Engine) RegisterBuiltin(name string, fn Builtin) error {
 	if fn == nil {
 		return fmt.Errorf("builtin %q cannot be nil", name)
 	}
-	if _, exists := e.builtins[name]; exists {
+	_, exists := e.builtins[name]
+	if exists {
 		return fmt.Errorf("builtin %q already registered", name)
 	}
 	e.builtins[name] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
@@ -68,7 +69,8 @@ func (e *Engine) RegisterBuiltin(name string, fn Builtin) error {
 }
 
 func (e *Engine) MustRegisterBuiltin(name string, fn Builtin) {
-	if err := e.RegisterBuiltin(name, fn); err != nil {
+	err := e.RegisterBuiltin(name, fn)
+	if err != nil {
 		panic(err)
 	}
 }
@@ -114,7 +116,8 @@ func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]V
 // This is the core execution method used by both RunScript and Script.Execute.
 func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
 	defer func() {
-		if r := recover(); r != nil {
+		r := recover()
+		if r != nil {
 			result = Value{}
 			newGlobals = nil
 			err = fmt.Errorf("panic in script: %v", r)
@@ -124,7 +127,8 @@ func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Va
 	// Initialize Global Environment linked to Engine's SymbolTable
 	// Try to get from pool
 	var root *GlobalEnv
-	if poolVal := e.envPool.Get(); poolVal != nil {
+	poolVal := e.envPool.Get()
+	if poolVal != nil {
 		root = poolVal.(*GlobalEnv)
 		root.Reset(e.symbols)
 	} else {

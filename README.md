@@ -49,6 +49,15 @@ Lisp, minimal:
 
 I picked Lisp because it's the cheapest syntax to implement and the most predictable for someone who has never programmed. There's nowhere to hide logic in syntactic ornament.
 
+Literals and lexical rules:
+
+- Booleans are `#t` and `#f` (exactly those two characters; `#true` is a parse error).
+- Strings are double-quoted UTF-8 text with escapes `\n \t \r \0 \a \b \f \v \\ \"`. A leading UTF-8 BOM is stripped.
+- `;` starts a line comment, running to end of line.
+- Numbers are all `float64` (integers are exact up to 2^53).
+- `(tuple a b ...)` builds a fixed multi-value tuple; `(list ...)` builds a list.
+- A source file may hold several top-level expressions; they are evaluated in order and the last value is the result (as if wrapped in an implicit `(let () ...)`).
+
 ## Go integration shape
 
 - Builtins are written in Go.
@@ -68,7 +77,7 @@ I picked Lisp because it's the cheapest syntax to implement and the most predict
 | `letv` | `(letv (n1 n2) (values v1 v2) body)` | Destructures multi-value returns (tuples). |
 | `fn` | `(fn (args) body)` | Anonymous function. |
 | `def` | `(def name expr)` | Global variable or function (always in the root scope). |
-| `set` | `(set name expr)` | Updates an existing variable in the nearest scope. |
+| `set` | `(set name expr)` | Assigns a variable in the nearest scope that binds it; if the name is unbound, it creates a global. |
 | `values` | `(values v1 v2 ...)` | Returns multiple values (a tuple). |
 | `exit` | `(exit [value])` | Terminates execution immediately. |
 | `return` | `(return [value])` | Returns from the current function. |
@@ -101,8 +110,10 @@ Note: `NewEngine()` includes the core math/logic/list/type builtins by default. 
 Not enabled by default. To use them:
 
 ```go
+import "github.com/crgimenes/filo/filostrings"
+
 eng := filo.NewEngine()
-filo.RegisterStringBuiltins(eng)
+filostrings.RegisterBuiltins(eng)
 ```
 
 | Function | Description |
@@ -121,7 +132,7 @@ filo.RegisterStringBuiltins(eng)
 
 ### Extension: filomath
 
-Requires explicit registration: `filomath.RegisterMathBuiltins(eng)`.
+Requires explicit registration (import `github.com/crgimenes/filo/filomath`): `filomath.RegisterBuiltins(eng)`.
 
 | Function | Description |
 |----------|-------------|
@@ -131,11 +142,11 @@ Requires explicit registration: `filomath.RegisterMathBuiltins(eng)`.
 | `sin`, `cos`, `tan` | Trig (radians). |
 | `log`, `log10`, `exp` | Logarithms / exponential. |
 | `math-min`, `math-max` | Min / max of arguments. |
-| `pi`, `e` | Constants. |
+| `pi`, `e` | Zero-arg builtins: call them as `(pi)`, `(e)`. |
 
 ### Extension: filorand
 
-Requires explicit registration: `filorand.RegisterRandomBuiltins(eng)`. These are intentionally **non-deterministic**.
+Requires explicit registration (import `github.com/crgimenes/filo/filorand`): `filorand.RegisterBuiltins(eng)`. These are intentionally **non-deterministic**.
 
 | Function | Description |
 |----------|-------------|
@@ -145,7 +156,11 @@ Requires explicit registration: `filorand.RegisterRandomBuiltins(eng)`. These ar
 
 ### Extension: filojson
 
-JSON helpers for marshal/unmarshal: `json-marshal`, `json-unmarshal`, `json-null`.
+Requires explicit registration (import `github.com/crgimenes/filo/filojson`): `filojson.RegisterJSONBuiltins(eng)`. JSON helpers for marshal/unmarshal: `json-marshal`, `json-unmarshal`, `json-null`.
+
+### Extension: filoprint
+
+Requires explicit registration (import `github.com/crgimenes/filo/filoprint`): `filoprint.RegisterBuiltins(eng)`. Adds `print`, `println`, and `printf` (the latter understands `%T` for Filo types). Output goes to stdout by default; redirect it with `filoprint.SetOutput(w)`.
 
 ## Pre-parse / execute (template style)
 
@@ -175,7 +190,7 @@ API:
 | `Must(script, err)` | Panics if error (for init). |
 | `Filo.Execute(script, overrides)` | Executes with Filo's globals + optional overrides. |
 
-Pre-parsing eliminates parsing overhead. Roughly 2x faster for repeated executions.
+Pre-parsing eliminates parsing overhead, roughly 1.5x faster for repeated executions (see the `BenchmarkRunScript` vs `BenchmarkPreParsed` benchmarks).
 
 ## Marshal / Unmarshal
 
@@ -188,15 +203,19 @@ type Config struct {
 }
 
 cfg := Config{Name: "app", Port: 8080}
-val, err := filo.Marshal(cfg)
-// val = (list (tuple "name" "app") (tuple "port" 8080))
+src, err := filo.Marshal(cfg)
+// src is Filo source text: (list (tuple "name" "app") (tuple "port" 8080))
 
 var cfg2 Config
-err = filo.Unmarshal(val, &cfg2)
+err = filo.Unmarshal(src, &cfg2)
 // cfg2 = {Name: "app", Port: 8080}
 ```
 
-Type mapping:
+`Marshal` returns a **string** of Filo source and `Unmarshal` parses one back.
+To work with a `Value` directly instead of text, use `MarshalToValue` and
+`UnmarshalFromValue`. `Marshal` rejects a string field that is not valid UTF-8
+(Filo strings are text) rather than corrupting it. The Kind column below is the
+`Value` kind each Go type maps to:
 
 | Go Type | Filo Kind |
 |---------|-----------|
@@ -227,6 +246,21 @@ go test -fuzz=FuzzMarshalUnmarshalString -fuzztime=30s .
 # - FuzzMarshalUnmarshalBytes
 # - FuzzMarshalSliceInt
 ```
+
+## Command-line tools
+
+Two small binaries live under `cmd/`:
+
+- **`filofmt`** -- a formatter for `.filo` files, in the `gofmt` mold. Reads
+  stdin or file/dir paths; `-w` rewrites in place, `-l` lists files that would
+  change, `-d` shows a diff, `-indent N` sets the indent width, and
+  `-fold-const` additionally folds constant expressions. Install with
+  `go install github.com/crgimenes/filo/cmd/filofmt@latest`.
+- **`filo-repl`** -- an interactive REPL (line editing, history, multi-line
+  input) that falls back to batch mode when stdin is a pipe. Load extension
+  packages with `-filo-package math,rand,str,print`, and bound the run with
+  `-step-limit`, `-recursion-limit`, and `-timeout`. Install with
+  `go install github.com/crgimenes/filo/cmd/filo-repl@latest`.
 
 ## Examples
 
@@ -362,7 +396,7 @@ if err != nil {
 
 ### Register an aggregator
 
-`min-max` takes a list of numbers and returns a tuple `(min max)`:
+`min-max` takes a list of numbers and returns a two-element list `(min max)`:
 
 ```go
 func minMax(ctx context.Context, args []filo.Value) (filo.Value, error) {

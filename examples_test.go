@@ -75,7 +75,7 @@ func parseExpectedOutput(t *testing.T, path string) (string, bool) {
 	if err != nil {
 		t.Fatalf("open file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var expected strings.Builder
 	var found bool
@@ -99,10 +99,12 @@ func parseExpectedOutput(t *testing.T, path string) (string, bool) {
 			}
 		} else {
 			// Inside output block, read contiguous comments
-			if after, ok := strings.CutPrefix(trimmed, "//"); ok {
+			after, ok := strings.CutPrefix(trimmed, "//")
+			if ok {
 				// Preserve indentation by removing only the first space (comment marker)
 				content := after
-				if after, ok := strings.CutPrefix(content, " "); ok {
+				after, ok = strings.CutPrefix(content, " ")
+				if ok {
 					content = after
 				}
 

@@ -32,7 +32,8 @@ func builtinRandFloat(_ context.Context, args []filo.Value) (filo.Value, error) 
 		return filo.Value{}, fmt.Errorf("rand-float expects 0 arguments")
 	}
 	var b [8]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	_, err := rand.Read(b[:])
+	if err != nil {
 		return filo.Value{}, fmt.Errorf("rand-float entropy error: %w", err)
 	}
 	// Use upper 53 bits to mirror math/rand Float64 distribution
@@ -80,7 +81,8 @@ func builtinUUIDv4(_ context.Context, args []filo.Value) (filo.Value, error) {
 // where x is any hex digit and y is one of 8, 9, a, or b.
 func newUUIDv4() (string, error) {
 	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
+	_, err := rand.Read(b[:])
+	if err != nil {
 		return "", err
 	}
 
