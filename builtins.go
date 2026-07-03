@@ -107,7 +107,14 @@ func defaultBuiltins() map[string]builtinFunc {
 		if b == 0 {
 			return Value{}, fmt.Errorf("modulo by zero")
 		}
-		return VNum(math.Mod(a, b)), nil
+		// Floored modulo, as in Lua: the result takes the divisor's sign, so
+		// (% -1 2) is 1. Go's math.Mod truncates instead (sign of the
+		// dividend); adjust when the signs disagree.
+		r := math.Mod(a, b)
+		if r != 0 && (r < 0) != (b < 0) {
+			r += b
+		}
+		return VNum(r), nil
 	}
 
 	bi["pow"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {

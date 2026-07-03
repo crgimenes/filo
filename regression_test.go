@@ -184,3 +184,36 @@ func TestStringNumberCasts(t *testing.T) {
 		t.Fatal(`(number #t) must error: booleans do not coerce implicitly`)
 	}
 }
+
+// TestModuloFloored fixes the floored (Lua-compatible) semantics of %: the
+// result takes the divisor's sign. Decided 2026-07-03 after the Prolog
+// conformance spec surfaced the divergence (Go's math.Mod truncates).
+func TestModuloFloored(t *testing.T) {
+	tests := []struct {
+		src  string
+		want float64
+	}{
+		{"(% 10 3)", 1},
+		{"(% -1 2)", 1},
+		{"(% 1 -2)", -1},
+		{"(% -1 -2)", -1},
+		{"(% -7 3)", 2},
+		{"(% 7 -3)", -2},
+		{"(% 6 3)", 0},
+		{"(% -6 3)", 0},
+		{"(% 5.5 2)", 1.5},
+		{"(% -5.5 2)", 0.5},
+	}
+	for _, tc := range tests {
+		n, err := eval(t, tc.src).AsNumber()
+		if err != nil || n != tc.want {
+			t.Errorf("%s = %v (err %v), want %v", tc.src, n, err, tc.want)
+		}
+	}
+
+	eng := NewEngine()
+	_, _, err := eng.RunScript(context.Background(), "(% 1 0)", nil, EvalConfig{})
+	if err == nil {
+		t.Fatal("(% 1 0) must error")
+	}
+}

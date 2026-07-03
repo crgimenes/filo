@@ -89,7 +89,7 @@ Note: `NewEngine()` includes the core math/logic/list/type builtins by default. 
 
 | Category | Function | Description |
 |----------|----------|-------------|
-| **Math** | `+`, `-`, `*`, `/`, `%` | Basic arithmetic. |
+| **Math** | `+`, `-`, `*`, `/`, `%` | Basic arithmetic. `%` is floored modulo as in Lua — the result takes the divisor's sign, so `(% -1 2)` is `1`. |
 | | `pow` | `(pow x y)` |
 | **Logic** | `=`, `!=` | Equality. Comparing values of different kinds is an error — cast first: `(= (string 1) "1")`. |
 | | `<`, `<=`, `>`, `>=` | Numeric comparison. |
