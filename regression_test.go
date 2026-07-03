@@ -2,6 +2,7 @@ package filo
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -215,5 +216,109 @@ func TestModuloFloored(t *testing.T) {
 	_, _, err := eng.RunScript(context.Background(), "(% 1 0)", nil, EvalConfig{})
 	if err == nil {
 		t.Fatal("(% 1 0) must error")
+	}
+}
+
+// TestCond covers the cond special form: ordered clauses, else, no-match, the
+// bool-test requirement, and that clauses after the first match are not
+// evaluated (so an erroring later clause is never reached).
+func TestCond(t *testing.T) {
+	num := func(src string) float64 {
+		t.Helper()
+		n, err := eval(t, src).AsNumber()
+		if err != nil {
+			t.Fatalf("%s: %v", src, err)
+		}
+		return n
+	}
+
+	if got := num(`(cond ((< 1 0) 10) ((> 1 0) 20) (else 30))`); got != 20 {
+		t.Errorf("first matching clause = %v, want 20", got)
+	}
+	if got := num(`(cond ((< 1 0) 10) (else 30))`); got != 30 {
+		t.Errorf("else clause = %v, want 30", got)
+	}
+	if got := num(`(cond (#t 1 2 3))`); got != 3 {
+		t.Errorf("implicit-do body = %v, want 3 (last expr)", got)
+	}
+
+	// No clause matches and no else: empty list.
+	l, err := eval(t, `(cond ((< 1 0) 1) ((> 0 1) 2))`).AsList()
+	if err != nil || len(l) != 0 {
+		t.Fatalf("no-match cond = %v (err %v), want empty list", l, err)
+	}
+
+	// First-match short-circuit: the second clause's test would error, but it
+	// is never evaluated because the first clause matches.
+	if got := num(`(cond (#t 42) ((/ 1 0) 0))`); got != 42 {
+		t.Errorf("short-circuit = %v, want 42 (later clause not evaluated)", got)
+	}
+
+	// A non-bool test is an error.
+	eng := NewEngine()
+	_, _, rerr := eng.RunScript(context.Background(), `(cond (5 1))`, nil, EvalConfig{})
+	if rerr == nil {
+		t.Fatal("(cond (5 1)) must error: a test must be a bool")
+	}
+}
+
+// TestListBuiltins covers filter, range, and reverse.
+func TestListBuiltins(t *testing.T) {
+	render := func(src string) string {
+		t.Helper()
+		l, err := eval(t, src).AsList()
+		if err != nil {
+			t.Fatalf("%s: %v", src, err)
+		}
+		parts := make([]string, len(l))
+		for i, v := range l {
+			n, _ := v.AsNumber()
+			parts[i] = fmt.Sprintf("%g", n)
+		}
+		return strings.Join(parts, ",")
+	}
+
+	if got := render(`(range 5)`); got != "0,1,2,3,4" {
+		t.Errorf("(range 5) = %q", got)
+	}
+	if got := render(`(range 2 5)`); got != "2,3,4" {
+		t.Errorf("(range 2 5) = %q", got)
+	}
+	if got := render(`(range 0)`); got != "" {
+		t.Errorf("(range 0) = %q, want empty", got)
+	}
+	if got := render(`(range 5 2)`); got != "" {
+		t.Errorf("(range 5 2) = %q, want empty (non-increasing)", got)
+	}
+	if got := render(`(reverse (list 1 2 3 4))`); got != "4,3,2,1" {
+		t.Errorf("reverse = %q", got)
+	}
+	if got := render(`(filter (fn (x) (> x 2)) (range 6))`); got != "3,4,5" {
+		t.Errorf("filter = %q", got)
+	}
+
+	// filter predicate must return a bool.
+	eng := NewEngine()
+	_, _, rerr := eng.RunScript(context.Background(), `(filter (fn (x) x) (list 1 2))`, nil, EvalConfig{})
+	if rerr == nil {
+		t.Fatal("filter with non-bool predicate must error")
+	}
+}
+
+// TestErrorBuiltin verifies (error msg) raises the message as a script error.
+func TestErrorBuiltin(t *testing.T) {
+	eng := NewEngine()
+	_, _, err := eng.RunScript(context.Background(), `(error "age must be non-negative")`, nil, EvalConfig{})
+	if err == nil {
+		t.Fatal("(error ...) must produce an error")
+	}
+	if !strings.Contains(err.Error(), "age must be non-negative") {
+		t.Fatalf("error message not propagated: %v", err)
+	}
+
+	// The message must be a string.
+	_, _, err = eng.RunScript(context.Background(), `(error 42)`, nil, EvalConfig{})
+	if err == nil {
+		t.Fatal("(error 42) must error: message must be a string")
 	}
 }

@@ -128,6 +128,8 @@ func (c *compiler) walkList(list *List) (Node, error) {
 			}
 			// Name remains a Symbol (global)
 			return &List{Elems: []Node{list.Elems[0], list.Elems[1], val}}, nil
+		case "cond":
+			return c.compileCond(list)
 		case "if", "do", "and", "or", "set", "values", "tuple", "exit", "return":
 			// Special forms: preserve head, walk arguments
 			newElems := make([]Node, len(list.Elems))
@@ -262,6 +264,38 @@ func (c *compiler) compileLetv(list *List) (Node, error) {
 		resList.Elems[3+i] = b
 	}
 	return resList, nil
+}
+
+// compileCond compiles a cond: (cond (test body...) ... (else body...)). It
+// walks the test and body expressions of each clause but keeps the clause list
+// structure, and keeps a leading `else` as a literal Symbol so the evaluator
+// can recognize it (it is a marker, not a variable to resolve).
+func (c *compiler) compileCond(list *List) (Node, error) {
+	newElems := make([]Node, len(list.Elems))
+	newElems[0] = list.Elems[0] // the cond head
+	for i := 1; i < len(list.Elems); i++ {
+		clause, ok := list.Elems[i].(*List)
+		if !ok || len(clause.Elems) == 0 {
+			// Leave malformed clauses for the runtime to reject.
+			newElems[i] = list.Elems[i]
+			continue
+		}
+		parts := make([]Node, len(clause.Elems))
+		start := 0
+		if sym, ok := clause.Elems[0].(*Symbol); ok && sym.Name == "else" {
+			parts[0] = clause.Elems[0] // keep the else marker verbatim
+			start = 1
+		}
+		for j := start; j < len(clause.Elems); j++ {
+			res, err := c.walk(clause.Elems[j])
+			if err != nil {
+				return nil, err
+			}
+			parts[j] = res
+		}
+		newElems[i] = &List{Elems: parts}
+	}
+	return &List{Elems: newElems}, nil
 }
 
 func (c *compiler) compileFn(list *List) (Node, error) {

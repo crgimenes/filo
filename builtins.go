@@ -2,6 +2,7 @@ package filo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -485,6 +486,106 @@ func defaultBuiltins() map[string]builtinFunc {
 			current = val
 		}
 		return current, nil
+	}
+
+	bi["filter"] = func(ctx context.Context, ev *evaluator, args []Value) (Value, error) {
+		if len(args) != 2 {
+			return Value{}, fmt.Errorf("filter expects function and list")
+		}
+		fn := args[0]
+		if fn.Kind != KFunc {
+			return Value{}, fmt.Errorf("filter expects function as first argument")
+		}
+		list, err := args[1].AsList()
+		if err != nil {
+			return Value{}, err
+		}
+		result := make([]Value, 0, len(list))
+		for _, el := range list {
+			err := checkContext(ctx)
+			if err != nil {
+				return Value{}, err
+			}
+			v, callErr := ev.callFunc(ctx, fn.Fn, []Value{el})
+			if callErr != nil {
+				return Value{}, callErr
+			}
+			keep, boolErr := v.AsBool()
+			if boolErr != nil {
+				return Value{}, fmt.Errorf("filter predicate must return a bool: %w", boolErr)
+			}
+			if keep {
+				result = append(result, el)
+			}
+		}
+		return VList(result), nil
+	}
+
+	bi["reverse"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
+		if len(args) != 1 {
+			return Value{}, fmt.Errorf("reverse expects 1 argument")
+		}
+		list, err := args[0].AsList()
+		if err != nil {
+			return Value{}, err
+		}
+		result := make([]Value, len(list))
+		for i, el := range list {
+			result[len(list)-1-i] = el
+		}
+		return VList(result), nil
+	}
+
+	bi["range"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
+		// (range end) yields 0..end-1; (range start end) yields start..end-1.
+		// Empty when the range is non-increasing, as in a for loop that never runs.
+		if len(args) != 1 && len(args) != 2 {
+			return Value{}, fmt.Errorf("range expects 1 or 2 arguments")
+		}
+		var start, end float64
+		if len(args) == 1 {
+			e, err := args[0].AsNumber()
+			if err != nil {
+				return Value{}, err
+			}
+			end = e
+		} else {
+			s, err := args[0].AsNumber()
+			if err != nil {
+				return Value{}, err
+			}
+			e, err := args[1].AsNumber()
+			if err != nil {
+				return Value{}, err
+			}
+			start, end = s, e
+		}
+		lo, hi := int(start), int(end)
+		if hi <= lo {
+			return VList([]Value{}), nil
+		}
+		result := make([]Value, 0, hi-lo)
+		for i := lo; i < hi; i++ {
+			err := checkContext(ctx)
+			if err != nil {
+				return Value{}, err
+			}
+			result = append(result, VNum(float64(i)))
+		}
+		return VList(result), nil
+	}
+
+	bi["error"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
+		// Lets a script raise a clear failure the host can present, e.g. in a
+		// validation rule: (if (< age 0) (error "age must be non-negative") age).
+		if len(args) != 1 {
+			return Value{}, fmt.Errorf("error expects 1 argument (a message string)")
+		}
+		msg, err := args[0].AsString()
+		if err != nil {
+			return Value{}, fmt.Errorf("error expects a string message: %w", err)
+		}
+		return Value{}, errors.New(msg)
 	}
 
 	return bi

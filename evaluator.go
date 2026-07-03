@@ -117,6 +117,9 @@ func (ev *evaluator) evalList(list *List) (Value, error) {
 		case "if":
 			v, err := ev.evalIf(list.Elems[1:])
 			return v, wrapIn("if", err)
+		case "cond":
+			v, err := ev.evalCond(list.Elems[1:])
+			return v, wrapIn("cond", err)
 		case "do":
 			v, err := ev.evalDo(list.Elems[1:])
 			return v, wrapIn("do", err)
@@ -316,6 +319,39 @@ func (ev *evaluator) evalOr(args []Node) (Value, error) {
 		}
 	}
 	return VBool(false), nil
+}
+
+// evalCond evaluates a multi-way branch:
+//
+//	(cond (test1 body1...) (test2 body2...) (else bodyN...))
+//
+// Clauses are tried in order; the first whose test evaluates to #t runs its
+// body (an implicit do — the last expression is the value). An `else` clause,
+// if present, must be last and always matches. Each evaluated test must be a
+// bool. When no clause matches, the result is the empty list, like (if) with a
+// false condition and no else branch.
+func (ev *evaluator) evalCond(clauses []Node) (Value, error) {
+	for _, c := range clauses {
+		clause, ok := c.(*List)
+		if !ok || len(clause.Elems) < 2 {
+			return Value{}, fmt.Errorf("cond clause must be a list of a test and a body")
+		}
+		if sym, ok := clause.Elems[0].(*Symbol); ok && sym.Name == "else" {
+			return ev.evalBody(clause.Elems[1:])
+		}
+		test, err := ev.eval(clause.Elems[0])
+		if err != nil {
+			return Value{}, err
+		}
+		match, err := test.AsBool()
+		if err != nil {
+			return Value{}, err
+		}
+		if match {
+			return ev.evalBody(clause.Elems[1:])
+		}
+	}
+	return VList([]Value{}), nil
 }
 
 func (ev *evaluator) evalIf(args []Node) (Value, error) {

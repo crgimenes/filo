@@ -72,6 +72,7 @@ Literals and lexical rules:
 | Name | Syntax | Description |
 |------|--------|-------------|
 | `if` | `(if cond then [else])` | Conditional. Returns `list()` (empty/nil) if `else` is missing and `cond` is false. |
+| `cond` | `(cond (test body...) ... (else body...))` | Multi-way branch: the first clause whose `test` is `#t` runs its body (an implicit `do`). An optional final `else` clause always matches. Each test must be a bool; no match and no `else` yields the empty list. |
 | `do` | `(do expr1 expr2 ...)` | Evaluates expressions in order, returns the last result. |
 | `let` | `(let ((n v) ...) body)` | Local variables scoped to the body. |
 | `letv` | `(letv (n1 n2) (values v1 v2) body)` | Destructures multi-value returns (tuples). |
@@ -106,7 +107,11 @@ Note: `NewEngine()` includes the core math/logic/list/type builtins by default. 
 | | `list-append` | `(list-append list item)` Returns new list with item appended. |
 | | `list-concat` | `(list-concat l1 l2 ...)` |
 | | `map` | `(map fn list)` |
+| | `filter` | `(filter fn list)` Keeps elements for which `fn` returns `#t`. |
 | | `fold` | `(fold fn init list)` |
+| | `range` | `(range end)` → `0..end-1`; `(range start end)` → `start..end-1` (empty when non-increasing). |
+| | `reverse` | `(reverse list)` |
+| **Errors** | `error` | `(error "message")` Raises a script error with the message — for validation rules that must fail clearly. |
 
 ### String builtins
 

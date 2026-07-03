@@ -91,6 +91,24 @@ eval(Env, length(E), num(N)) :- eval(Env,E,lst(L)), length(L, N).
 eval(Env, nth(E,I), V) :-
 	eval(Env,E,lst(Xs)), eval(Env,I,num(Idx)),
 	Idx >= 0, length(Xs, Len), Idx < Len, nth0(Idx, Xs, V).
+
+eval(Env, reverse(E), lst(R)) :- eval(Env,E,lst(L)), myreverse(L, [], R).
+eval(Env, range(N), lst(L))   :- eval(Env,N,num(End)), myrange(0, End, L).
+eval(Env, range(A,B), lst(L)) :- eval(Env,A,num(S)), eval(Env,B,num(E)), myrange(S, E, L).
+
+% cond: ordered clauses, first true test wins; else always matches; a non-bool
+% test fails to unify with either true or false, so the whole cond has no
+% solution — an error, as in Filo. No match and no else yields the empty list.
+eval(_, cond([]), lst([])).
+eval(Env, cond([clause(else,B)|_]), R) :- eval(Env, B, R).
+eval(Env, cond([clause(T,B)|_]), R)    :- T \= else, eval(Env,T,bool(true)),  eval(Env,B,R).
+eval(Env, cond([clause(T,_)|Rest]), R) :- T \= else, eval(Env,T,bool(false)), eval(Env, cond(Rest), R).
+
+myreverse([], A, A).
+myreverse([H|T], A, R) :- myreverse(T, [H|A], R).
+
+myrange(I, End, [])       :- I >= End, !.
+myrange(I, End, [num(I)|T]) :- I < End, I1 is I+1, myrange(I1, End, T).
 `
 
 // extExpr is the AST shared by the Filo and Prolog renderers.
@@ -105,7 +123,7 @@ type extExpr struct {
 var (
 	extNumOps  = []string{"add", "sub", "mul"}
 	extCmpOps  = []string{"lt", "le", "gt", "ge"}
-	extFiloOp  = map[string]string{"add": "+", "sub": "-", "mul": "*", "lt": "<", "le": "<=", "gt": ">", "ge": ">=", "eq": "=", "ne": "!=", "and": "and", "or": "or", "not": "not", "if": "if", "list": "list", "head": "head", "tail": "tail", "length": "length", "nth": "nth"}
+	extFiloOp  = map[string]string{"add": "+", "sub": "-", "mul": "*", "lt": "<", "le": "<=", "gt": ">", "ge": ">=", "eq": "=", "ne": "!=", "and": "and", "or": "or", "not": "not", "if": "if", "list": "list", "head": "head", "tail": "tail", "length": "length", "nth": "nth", "reverse": "reverse", "range": "range"}
 	extLeafInt = []int{-1, 0, 1, 2, 3}
 )
 
@@ -128,7 +146,25 @@ func genExt(rng *rand.Rand, depth int, scope []string, counter *int) extExpr {
 	}
 	sub := func(s []string) extExpr { return genExt(rng, rng.Intn(depth), s, counter) }
 
-	switch rng.Intn(20) {
+	switch rng.Intn(24) {
+	case 20:
+		return extExpr{op: "reverse", kids: []extExpr{sub(scope)}}
+	case 21:
+		if rng.Intn(2) == 0 {
+			return extExpr{op: "range", kids: []extExpr{sub(scope)}}
+		}
+		return extExpr{op: "range", kids: []extExpr{sub(scope), sub(scope)}}
+	case 22, 23:
+		// cond: 1-3 (test body) clauses, optionally an else clause last.
+		n := 1 + rng.Intn(3)
+		var clauses []extExpr
+		for i := 0; i < n; i++ {
+			clauses = append(clauses, extExpr{op: "clause", kids: []extExpr{sub(scope), sub(scope)}})
+		}
+		if rng.Intn(2) == 0 {
+			clauses = append(clauses, extExpr{op: "clause", name: "else", kids: []extExpr{sub(scope)}})
+		}
+		return extExpr{op: "cond", kids: clauses}
 	case 0, 1, 2:
 		return extExpr{op: extNumOps[rng.Intn(len(extNumOps))], kids: []extExpr{sub(scope), sub(scope)}}
 	case 3, 4:
@@ -183,6 +219,17 @@ func (e extExpr) filo() string {
 		return e.name
 	case "let":
 		return fmt.Sprintf("(let ((%s %s)) %s)", e.name, e.kids[0].filo(), e.kids[1].filo())
+	case "cond":
+		parts := []string{"cond"}
+		for _, c := range e.kids {
+			parts = append(parts, c.filo())
+		}
+		return "(" + strings.Join(parts, " ") + ")"
+	case "clause":
+		if e.name == "else" {
+			return "(else " + e.kids[0].filo() + ")"
+		}
+		return "(" + e.kids[0].filo() + " " + e.kids[1].filo() + ")"
 	}
 	parts := []string{extFiloOp[e.op]}
 	for _, k := range e.kids {
@@ -210,6 +257,17 @@ func (e extExpr) prolog() string {
 			parts[i] = k.prolog()
 		}
 		return "list([" + strings.Join(parts, ",") + "])"
+	case "cond":
+		parts := make([]string, len(e.kids))
+		for i, c := range e.kids {
+			parts[i] = c.prolog()
+		}
+		return "cond([" + strings.Join(parts, ",") + "])"
+	case "clause":
+		if e.name == "else" {
+			return "clause(else," + e.kids[0].prolog() + ")"
+		}
+		return "clause(" + e.kids[0].prolog() + "," + e.kids[1].prolog() + ")"
 	}
 	parts := make([]string, len(e.kids))
 	for i, k := range e.kids {
