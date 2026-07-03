@@ -50,12 +50,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		writeFlag bool
 		listFlag  bool
 		diffFlag  bool
+		fmtFlag   bool
 		showVer   bool
 	)
 
 	fs.BoolVar(&writeFlag, "w", false, "write result to (source) file instead of stdout")
 	fs.BoolVar(&listFlag, "l", false, "list files that would change")
 	fs.BoolVar(&diffFlag, "d", false, "display diffs instead of rewriting files")
+	fs.BoolVar(&fmtFlag, "fmt", false, "run the formatter (filofmt) on the result")
 	fs.BoolVar(&showVer, "version", false, "print version and exit")
 
 	err := fs.Parse(args)
@@ -77,7 +79,11 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			_, _ = fmt.Fprintf(stderr, "error reading stdin: %v\n", err)
 			return 1
 		}
-		fixed, _ := Fix(string(data))
+		fixed, _, err := fixSource(string(data), fmtFlag)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
+			return 1
+		}
 		_, err = fmt.Fprint(stdout, fixed)
 		if err != nil {
 			return 1
@@ -87,7 +93,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	exitCode := 0
 	for _, path := range paths {
-		err := processPath(path, writeFlag, listFlag, diffFlag, stdout)
+		err := processPath(path, writeFlag, listFlag, diffFlag, fmtFlag, stdout)
 		if err != nil {
 			_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 			exitCode = 1
@@ -96,7 +102,25 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return exitCode
 }
 
-func processPath(path string, write, list, diff bool, stdout io.Writer) error {
+// fixSource applies the filofix rewrites and, when fmtAfter is set, runs the
+// formatter on the result so the output is both modernized and canonically
+// formatted.
+func fixSource(src string, fmtAfter bool) (string, bool, error) {
+	fixed, changed := Fix(src)
+	if !fmtAfter {
+		return fixed, changed, nil
+	}
+	formatted, err := filo.FormatWithConfig(fixed, filo.FormatConfig{Indent: "  ", MaxLineWidth: 80})
+	if err != nil {
+		return "", false, err
+	}
+	if !strings.HasSuffix(formatted, "\n") {
+		formatted += "\n"
+	}
+	return formatted, changed || formatted != src, nil
+}
+
+func processPath(path string, write, list, diff, fmtAfter bool, stdout io.Writer) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return err
@@ -113,14 +137,14 @@ func processPath(path string, write, list, diff bool, stdout io.Writer) error {
 			if !strings.HasSuffix(p, ".filo") {
 				return nil
 			}
-			return processFile(p, write, list, diff, stdout)
+			return processFile(p, write, list, diff, fmtAfter, stdout)
 		})
 	}
 
-	return processFile(path, write, list, diff, stdout)
+	return processFile(path, write, list, diff, fmtAfter, stdout)
 }
 
-func processFile(path string, write, list, diff bool, stdout io.Writer) error {
+func processFile(path string, write, list, diff, fmtAfter bool, stdout io.Writer) error {
 	// #nosec G304 -- filofix intentionally reads paths selected by the user.
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -128,7 +152,10 @@ func processFile(path string, write, list, diff bool, stdout io.Writer) error {
 	}
 
 	original := string(data)
-	fixed, changed := Fix(original)
+	fixed, changed, err := fixSource(original, fmtAfter)
+	if err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
 
 	if !changed {
 		if !write && !list && !diff {
@@ -187,12 +214,14 @@ func printSimpleDiff(w io.Writer, original, fixed string) {
 // reports whether anything changed.
 func Fix(src string) (string, bool) {
 	changed := false
-	// Each fix can expose work for the other (unwrapping can reveal foldable
-	// forms), so iterate to a fixed point with a hard cap as a safety net.
+	// Each fix can expose work for another (unwrapping can reveal foldable
+	// forms; folding can reveal a redundant boolean form), so iterate to a fixed
+	// point with a hard cap as a safety net.
 	for range 32 {
 		out, c1 := unwrapRootLet(src)
 		out, c2 := foldConstSpans(out)
-		if !c1 && !c2 {
+		out, c3 := simplifyBoolSpans(out)
+		if !c1 && !c2 && !c3 {
 			break
 		}
 		changed = true
@@ -462,4 +491,191 @@ func isAtomNode(n filo.Node) bool {
 		return true
 	}
 	return false
+}
+
+// boolProducing reports whether a node is guaranteed to evaluate to a bool: a
+// #t/#f literal, or a call to a builtin that always returns a bool. This guard
+// keeps the boolean simplifications below semantics-preserving — rewriting
+// (if C #t #f) to C is only valid when C cannot instead be some non-bool value
+// that (if ...) would have rejected with an error.
+func boolProducing(n filo.Node) bool {
+	if _, ok := n.(*filo.BoolLit); ok {
+		return true
+	}
+	list, ok := n.(*filo.List)
+	if !ok || len(list.Elems) == 0 {
+		return false
+	}
+	head, ok := list.Elems[0].(*filo.Symbol)
+	if !ok {
+		return false
+	}
+	switch head.Name {
+	case "=", "!=", "<", "<=", ">", ">=", "and", "or", "not":
+		return true
+	}
+	return false
+}
+
+// simplifyBoolSpans rewrites redundant boolean forms to the equivalent shorter
+// expression, one comment- and newline-free span at a time:
+//
+//	(if C #t #f)     -> C
+//	(if C #f #t)     -> (not C)
+//	(not (not C))    -> C
+//
+// Each rewrite only fires when C is boolProducing, so the shorter form keeps
+// both the value and the "condition must be a bool" error behavior.
+func simplifyBoolSpans(src string) (string, bool) {
+	groups := scanGroups(src)
+	if groups == nil {
+		return src, false
+	}
+
+	for _, g := range groups {
+		text := src[g.start : g.end+1]
+		if strings.ContainsRune(text, ';') || strings.ContainsRune(text, '\n') {
+			continue // don't disturb comments or multi-line layout
+		}
+		ast, err := filo.Parse(text)
+		if err != nil {
+			continue
+		}
+		replacement, ok := simplifyBoolText(ast, text)
+		if !ok || replacement == strings.TrimSpace(text) {
+			continue
+		}
+		src = src[:g.start] + replacement + src[g.end+1:]
+		out, _ := simplifyBoolSpans(src) // offsets shifted: rescan
+		return out, true
+	}
+	return src, false
+}
+
+// simplifyBoolText matches a redundant boolean form and returns its replacement
+// as source text taken verbatim from the original (so the surviving
+// subexpression keeps its exact formatting), or ok=false when no rule matches.
+// text is the full source of the parsed node n.
+func simplifyBoolText(n filo.Node, text string) (string, bool) {
+	list, ok := n.(*filo.List)
+	if !ok || len(list.Elems) == 0 {
+		return "", false
+	}
+	head, ok := list.Elems[0].(*filo.Symbol)
+	if !ok {
+		return "", false
+	}
+
+	// (not (not C)) -> C
+	if head.Name == "not" && len(list.Elems) == 2 {
+		inner, ok := list.Elems[1].(*filo.List)
+		if !ok || len(inner.Elems) != 2 {
+			return "", false
+		}
+		innerHead, ok := inner.Elems[0].(*filo.Symbol)
+		if !ok || innerHead.Name != "not" || !boolProducing(inner.Elems[1]) {
+			return "", false
+		}
+		outer := topLevelParts(text) // ["not", "(not <C>)"]
+		if len(outer) != 2 {
+			return "", false
+		}
+		innerParts := topLevelParts(outer[1]) // ["not", "<C>"]
+		if len(innerParts) != 2 {
+			return "", false
+		}
+		return innerParts[1], true
+	}
+
+	// (if C then else)
+	if head.Name != "if" || len(list.Elems) != 4 {
+		return "", false
+	}
+	if !boolProducing(list.Elems[1]) {
+		return "", false
+	}
+	thenB, thenOK := list.Elems[2].(*filo.BoolLit)
+	elseB, elseOK := list.Elems[3].(*filo.BoolLit)
+	if !thenOK || !elseOK {
+		return "", false
+	}
+	parts := topLevelParts(text) // ["if", "<C>", "#t", "#f"]
+	if len(parts) != 4 {
+		return "", false
+	}
+	switch {
+	case thenB.Value && !elseB.Value: // (if C #t #f) -> C
+		return parts[1], true
+	case !thenB.Value && elseB.Value: // (if C #f #t) -> (not C)
+		return "(not " + parts[1] + ")", true
+	}
+	return "", false
+}
+
+// topLevelParts splits a parenthesized form's source into the verbatim source
+// of its top-level elements, respecting strings, escapes, comments, and nested
+// parens. Input must start with '(' and end with the matching ')'.
+func topLevelParts(text string) []string {
+	inner := text[1 : len(text)-1]
+	var parts []string
+	depth := 0
+	start := -1
+	inString := false
+	inComment := false
+	escape := false
+	flush := func(end int) {
+		if start >= 0 {
+			parts = append(parts, inner[start:end])
+			start = -1
+		}
+	}
+	for i := 0; i < len(inner); i++ {
+		c := inner[i]
+		if inComment {
+			if c == '\n' {
+				inComment = false
+			}
+			continue
+		}
+		if inString {
+			switch {
+			case escape:
+				escape = false
+			case c == '\\':
+				escape = true
+			case c == '"':
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case ' ', '\t', '\n', '\r':
+			if depth == 0 {
+				flush(i)
+			}
+		case ';':
+			if depth == 0 {
+				flush(i)
+			}
+			inComment = true
+		case '"':
+			if start < 0 {
+				start = i
+			}
+			inString = true
+		case '(':
+			if start < 0 {
+				start = i
+			}
+			depth++
+		case ')':
+			depth--
+		default:
+			if start < 0 {
+				start = i
+			}
+		}
+	}
+	flush(len(inner))
+	return parts
 }

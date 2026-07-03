@@ -266,11 +266,15 @@ Three small binaries live under `cmd/`; `make tools` builds all of them into
   `-fold-const` additionally folds constant expressions. Install with
   `go install github.com/crgimenes/filo/cmd/filofmt@latest`.
 - **`filofix`** -- modernizes and reduces source, in the `go fix` mold, while
-  preserving formatting and comments. Today it removes the legacy root
-  `(let () ...)` wrapper (the interpreter has handled multiple top-level forms
-  for a long time) and replaces comment-free constant subexpressions with
-  their value (`(* 8 1000)` → `8000`). Same flags as filofmt (`-w`, `-l`,
-  `-d`). Install with `go install github.com/crgimenes/filo/cmd/filofix@latest`.
+  preserving formatting and comments. It removes the legacy root `(let () ...)`
+  wrapper (the interpreter has handled multiple top-level forms for a long
+  time), folds comment-free constant subexpressions to their value
+  (`(* 8 1000)` → `8000`), and simplifies redundant boolean forms —
+  `(if C #t #f)` → `C`, `(if C #f #t)` → `(not C)`, `(not (not C))` → `C` —
+  when `C` is provably a bool, so the shorter form keeps the same value and
+  errors. Flags `-w`, `-l`, `-d` as filofmt, plus `-fmt` to run the formatter
+  on the result. Install with
+  `go install github.com/crgimenes/filo/cmd/filofix@latest`.
 - **`filo-repl`** -- an interactive REPL (line editing, history, multi-line
   input) that falls back to batch mode when stdin is a pipe. Load extension
   packages with `-filo-package math,rand,str,print,json`, and bound the run with
