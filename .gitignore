@@ -93,4 +93,5 @@ cmd/filo-repl/filo-repl
 cmd/filofmt/filofmt
 cmd/filofix/filofix
 /filo
+/bin/
 /filofix

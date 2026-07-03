@@ -257,7 +257,8 @@ go test -fuzz=FuzzMarshalUnmarshalString -fuzztime=30s .
 
 ## Command-line tools
 
-Three small binaries live under `cmd/`:
+Three small binaries live under `cmd/`; `make tools` builds all of them into
+`./bin` (and `make install` puts them in `GOPATH/bin`):
 
 - **`filofmt`** -- a formatter for `.filo` files, in the `gofmt` mold. Reads
   stdin or file/dir paths; `-w` rewrites in place, `-l` lists files that would
