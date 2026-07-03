@@ -21,21 +21,20 @@ func main() {
 
 	// A transformation pipeline that processes a list of records
 	transformScript := `
-(let ()
-  ; Helper to transform a single record
-  (def transform-record (fn (record)
-    (let ((name (nth record 0))
-          (age (nth record 1))
-          (salary (nth record 2)))
-      (list
-        (str-upper name)           ; Normalize name to uppercase
-        age
-        (* salary 1.1)             ; Apply 10% raise
-        (if (>= age 65) "senior" 
-            (if (>= age 30) "mid" "junior"))))))  ; Add category
+; Helper to transform a single record
+(def transform-record (fn (record)
+  (let ((name (nth record 0))
+        (age (nth record 1))
+        (salary (nth record 2)))
+    (list
+      (str-upper name)           ; Normalize name to uppercase
+      age
+      (* salary 1.1)             ; Apply 10% raise
+      (if (>= age 65) "senior" 
+          (if (>= age 30) "mid" "junior"))))))  ; Add category
 
-  ; Apply transformation to all records
-  (map transform-record records))
+; Apply transformation to all records
+(map transform-record records)
 `
 
 	// Input data: list of [name, age, salary]

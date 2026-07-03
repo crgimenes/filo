@@ -148,15 +148,28 @@ func (v Value) String() string {
 	}
 }
 
-func ensureSameKind(values []Value) (Kind, error) {
+// valueToText renders a value as plain text for the (string ...) cast: strings
+// pass through unquoted; everything else uses the same textual form as
+// Value.String. Functions have no textual value and error.
+func valueToText(v Value) (string, error) {
+	switch v.Kind {
+	case KString:
+		return v.Str, nil
+	case KFunc:
+		return "", errors.New("string: cannot convert a function")
+	}
+	return v.String(), nil
+}
+
+func ensureSameKind(values []Value) error {
 	if len(values) == 0 {
-		return KNumber, errors.New("empty value list")
+		return errors.New("empty value list")
 	}
 	target := values[0].Kind
 	for i := 1; i < len(values); i++ {
 		if values[i].Kind != target {
-			return target, fmt.Errorf("expected values of the same kind, got %v and %v", target, values[i].Kind)
+			return fmt.Errorf("expected values of the same kind, got %v and %v", target, values[i].Kind)
 		}
 	}
-	return target, nil
+	return nil
 }

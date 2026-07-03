@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 )
 
 type Builtin func(ctx context.Context, args []Value) (Value, error)
@@ -127,7 +129,7 @@ func defaultBuiltins() map[string]builtinFunc {
 		if len(args) < 2 {
 			return Value{}, fmt.Errorf("= expects at least 2 arguments")
 		}
-		_, err := ensureSameKind(args)
+		err := ensureSameKind(args)
 		if err != nil {
 			return Value{}, err
 		}
@@ -239,30 +241,37 @@ func defaultBuiltins() map[string]builtinFunc {
 		return VBool(!v), nil
 	}
 
-	bi["and"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
-		for _, a := range args {
-			v, err := a.AsBool()
-			if err != nil {
-				return Value{}, err
-			}
-			if !v {
-				return VBool(false), nil
-			}
+	// "and" and "or" are special forms (see evaluator.go): they short-circuit,
+	// so they cannot live here — a builtin receives its arguments already
+	// evaluated.
+
+	bi["string"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
+		if len(args) != 1 {
+			return Value{}, fmt.Errorf("string expects 1 argument")
 		}
-		return VBool(true), nil
+		s, err := valueToText(args[0])
+		if err != nil {
+			return Value{}, err
+		}
+		return VString(s), nil
 	}
 
-	bi["or"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
-		for _, a := range args {
-			v, err := a.AsBool()
-			if err != nil {
-				return Value{}, err
-			}
-			if v {
-				return VBool(true), nil
-			}
+	bi["number"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
+		if len(args) != 1 {
+			return Value{}, fmt.Errorf("number expects 1 argument")
 		}
-		return VBool(false), nil
+		switch args[0].Kind {
+		case KNumber:
+			return args[0], nil
+		case KString:
+			n, err := strconv.ParseFloat(strings.TrimSpace(args[0].Str), 64)
+			if err != nil {
+				return Value{}, fmt.Errorf("number: cannot parse %q", args[0].Str)
+			}
+			return VNum(n), nil
+		default:
+			return Value{}, fmt.Errorf("number expects a number or a numeric string, got %s", args[0].describe())
+		}
 	}
 
 	bi["type-of"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {
@@ -359,16 +368,14 @@ func defaultBuiltins() map[string]builtinFunc {
 		if len(args) != 1 {
 			return Value{}, fmt.Errorf("length expects 1 argument")
 		}
-		list, err := args[0].AsList()
-		if err == nil {
-			return VNum(float64(len(list))), nil
-		}
-		tuple, tupleErr := args[0].AsTuple()
-		if tupleErr != nil {
+		switch args[0].Kind {
+		case KList:
+			return VNum(float64(len(args[0].List))), nil
+		case KTuple:
+			return VNum(float64(len(args[0].Tup))), nil
+		default:
 			return Value{}, fmt.Errorf("length expects list or tuple")
 		}
-		_ = err
-		return VNum(float64(len(tuple))), nil
 	}
 
 	bi["head"] = func(ctx context.Context, _ *evaluator, args []Value) (Value, error) {

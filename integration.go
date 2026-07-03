@@ -88,10 +88,35 @@ func must[T any](v T, err error) T {
 	return v
 }
 
-var (
-	ErrorFunctionNotFound = errors.New("function not found")
-	ErrorNotAllowedType   = errors.New("not allowed return type")
-)
+var ErrorFunctionNotFound = errors.New("function not found")
+
+// integrationConfig bounds every execution made through the high-level Filo
+// API. Tighter than the engine defaults on purpose: config files are small.
+var integrationConfig = EvalConfig{
+	StepLimit:      10000,
+	RecursionLimit: 64,
+	Timeout:        5 * time.Second,
+}
+
+// goValue converts the Go scalar types shared by SetGlobal and CallFunction to
+// a Value; ok reports whether the type was handled.
+func goValue(v any) (val Value, ok bool) {
+	switch x := v.(type) {
+	case string:
+		return VString(x), true
+	case int:
+		return VNum(float64(x)), true
+	case int64:
+		return VNum(float64(x)), true
+	case float32:
+		return VNum(float64(x)), true
+	case float64:
+		return VNum(x), true
+	case bool:
+		return VBool(x), true
+	}
+	return Value{}, false
+}
 
 // New creates a new Filo instance for configuration loading.
 func New() *Filo {
@@ -118,19 +143,12 @@ func (f *Filo) GetEngine() *Engine {
 
 // SetGlobal sets a global variable that will be available in the Filo script.
 func (f *Filo) SetGlobal(name string, value any) {
+	val, ok := goValue(value)
+	if ok {
+		f.globals[name] = val
+		return
+	}
 	switch v := value.(type) {
-	case string:
-		f.globals[name] = VString(v)
-	case int:
-		f.globals[name] = VNum(float64(v))
-	case int64:
-		f.globals[name] = VNum(float64(v))
-	case float32:
-		f.globals[name] = VNum(float64(v))
-	case float64:
-		f.globals[name] = VNum(v)
-	case bool:
-		f.globals[name] = VBool(v)
 	case []string:
 		vals := make([]Value, len(v))
 		for i, s := range v {
@@ -159,11 +177,7 @@ func (f *Filo) SetGlobal(name string, value any) {
 // After execution, instance globals are updated with any (set ...) statements.
 func (f *Filo) Execute(script *Script, overrideGlobals map[string]Value) error {
 	ctx := context.Background()
-	cfg := EvalConfig{
-		StepLimit:      10000,
-		RecursionLimit: 64,
-		Timeout:        5 * time.Second,
-	}
+	cfg := integrationConfig
 
 	// Merge globals: start with instance globals, override with parameter
 	mergedGlobals := make(map[string]Value, len(f.globals)+len(overrideGlobals))
@@ -185,11 +199,7 @@ func (f *Filo) Execute(script *Script, overrideGlobals map[string]Value) error {
 // For scripts executed multiple times, use ParseScript + Execute for better performance.
 func (f *Filo) DoString(filoScript string) error {
 	ctx := context.Background()
-	cfg := EvalConfig{
-		StepLimit:      10000,
-		RecursionLimit: 64,
-		Timeout:        5 * time.Second,
-	}
+	cfg := integrationConfig
 
 	_, updatedGlobals, err := f.eng.RunScript(ctx, filoScript, f.globals, cfg)
 	if err != nil {
@@ -437,19 +447,12 @@ func (f *Filo) CallFunction(name string, args ...any) (Value, error) {
 	// Convert Go args to Filo Values
 	filoArgs := make([]Value, len(args))
 	for i, arg := range args {
+		val, ok := goValue(arg)
+		if ok {
+			filoArgs[i] = val
+			continue
+		}
 		switch v := arg.(type) {
-		case string:
-			filoArgs[i] = VString(v)
-		case int:
-			filoArgs[i] = VNum(float64(v))
-		case int64:
-			filoArgs[i] = VNum(float64(v))
-		case float32:
-			filoArgs[i] = VNum(float64(v))
-		case float64:
-			filoArgs[i] = VNum(v)
-		case bool:
-			filoArgs[i] = VBool(v)
 		case []byte:
 			filoArgs[i] = VString(string(v))
 		case Value:
@@ -475,13 +478,8 @@ func (f *Filo) CallFunction(name string, args ...any) (Value, error) {
 	}
 
 	ctx := context.Background()
-	cfg := EvalConfig{
-		StepLimit:      10000,
-		RecursionLimit: 64,
-		Timeout:        5 * time.Second,
-	}
 
-	result, _, err := f.eng.RunScript(ctx, callExpr, callGlobals, cfg)
+	result, _, err := f.eng.RunScript(ctx, callExpr, callGlobals, integrationConfig)
 	if err != nil {
 		return Value{}, fmt.Errorf("error calling %s: %w", name, err)
 	}

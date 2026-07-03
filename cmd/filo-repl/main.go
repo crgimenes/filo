@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/crgimenes/filo"
+	"github.com/crgimenes/filo/filojson"
 	"github.com/crgimenes/filo/filomath"
 	"github.com/crgimenes/filo/filoprint"
 	"github.com/crgimenes/filo/filorand"
@@ -521,13 +522,21 @@ func (c *crlfReadWriter) Write(p []byte) (int, error) {
 	return c.w.Write(p)
 }
 
-// countParens counts open and close parentheses, ignoring those inside strings.
-// It properly handles escape sequences and UTF-8.
+// countParens counts open and close parentheses, ignoring those inside strings
+// and inside ; comments (which run to end of line). It properly handles escape
+// sequences and UTF-8.
 func countParens(s string) (open, close int) {
 	inString := false
+	inComment := false
 	escape := false
 
 	for _, r := range s {
+		if inComment {
+			if r == '\n' {
+				inComment = false
+			}
+			continue
+		}
 		if escape {
 			escape = false
 			continue
@@ -543,10 +552,8 @@ func countParens(s string) (open, close int) {
 		if inString {
 			continue
 		}
-		// Ignore comment lines
 		if r == ';' {
-			// Skip until end of line - but we're iterating runes, so we need a different approach
-			// For simplicity, comments are handled at line level, not here
+			inComment = true
 			continue
 		}
 		switch r {
@@ -569,8 +576,10 @@ func registerPackage(engine *filo.Engine, pkg string) error {
 		filostrings.RegisterBuiltins(engine)
 	case "print":
 		filoprint.RegisterBuiltins(engine)
+	case "json":
+		filojson.RegisterBuiltins(engine)
 	default:
-		return fmt.Errorf("unknown filo package: %q (available: math, rand, str, print)", pkg)
+		return fmt.Errorf("unknown filo package: %q (available: math, rand, str, print, json)", pkg)
 	}
 	return nil
 }

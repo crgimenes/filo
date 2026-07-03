@@ -112,81 +112,51 @@ func foldIf(list *List) (Node, bool) {
 	return &List{Elems: []Node{&Symbol{Name: "list"}}}, true
 }
 
+// pureFunctions whitelists the default builtins that are safe to evaluate at
+// fold time: pure, atom-in/atom-out. "list" is deliberately absent — an
+// unquoted list node is a call, and the language has no quoted-literal node to
+// fold a list result into (valueToNode only emits atoms for the same reason).
+// "and"/"or" are special forms with short-circuit evaluation, not builtins, so
+// they cannot fold through this path.
 var pureFunctions = map[string]bool{
 	"+": true, "-": true, "*": true, "/": true, "%": true, "pow": true,
 	"=": true, "!=": true, "<": true, ">": true, "<=": true, ">=": true,
-	"not": true, "and": true, "or": true,
+	"not": true, "string": true, "number": true,
 	"type-of": true, "is-empty": true, "is-nil": true,
 	"length": true, "head": true, "tail": true, "nth": true,
-	"list": true, // (list 1 2) -> (1 2)? Value is List.
-	// We want to reduce (list 1 2) to a Literal List?
-	// AST has *List. Literal List is handled by parser as *List?
-	// Note: (list 1 2) IS how we write a literal list in code if using 'list'.
-	// But parser produces *List for (...) calls.
-	// If I have (+ 1 2), parser gives List{+, 1, 2}. Fold -> 3.
-	// If I have (list 1 2), parser gives List{list, 1, 2}.
-	// If I evaluate it, I get VList{1, 2}.
-	// Can I convert VList{1, 2} back to AST?
-	// AST for list is just *List{Node, Node}.
-	// But *List IS interpreted as call unless quoted.
-	// So (list 1 2) -> evaluates to (1 2). Code for (1 2) is... (1 2).
-	// If I replace (list 1 2) with (1 2)... (1 2) will be executed as "call 1".
-	// So (list ...) should NOT be folded if it produces a list that would be executed!
-	// Wait, constant folding runs on AST.
-	// If source is `(list 1 2)`, it effectively IS a constant list.
-	// But we can't replace it with a literal because there is no "Literal List" node type that isn't executed.
-	// Unquoted lists are calls.
-	// Quoted lists `'(1 2)` are literals.
-	// So `(list 1 2)` -> `'(1 2)` (Quote with List).
-	// Does parser support Quote node?
-	// Let's check parser.go.
-	// We might skipping folding 'list' for now to avoid complexity of introducing Quotes if not supported.
 }
 
 func isPureFunction(name string) bool {
 	return pureFunctions[name]
 }
 
+// foldBuiltins is the builtin table shared by every fold; pureFunctions only
+// names default builtins, so the table is read-only after init.
+var foldBuiltins = defaultBuiltins()
+
 func foldPureCall(name string, args []Node) (Node, bool) {
-	// 1. Check if all args are literals
 	values := make([]Value, len(args))
 	for i, arg := range args {
 		v, ok := nodeToValue(arg)
 		if !ok {
-			return nil, false // Not a literal
+			return nil, false // not all arguments are literals
 		}
 		values[i] = v
 	}
 
-	// 2. Evaluate using a fresh engine/eval
-	// We can't easily reuse the main engine because we are in 'filo' package.
-	// We can create a temporary evaluator or reuse builtins.
-	// `defaultBuiltins()` creates a map.
-	// We can manually dispatch to pure implementations or use the real map.
-	// Using real map ensures consistency.
-
-	builtinFuncs := defaultBuiltins()
-	fn, ok := builtinFuncs[name]
+	fn, ok := foldBuiltins[name]
 	if !ok {
 		return nil, false
 	}
 
-	// Context? Background is fine for pure functions.
-	// Evaluator? Pure functions shouldn't need a complex evaluator state unless they map/fold.
-	// pureFunctions map avoids map/fold which take functions.
-	// We only whitelisted simple math/logic.
-	// So passing nil evaluator might crash if they use it?
-	// Let's check builtins.go. simple math ignores evaluator.
-
-	// Create dummy evaluator just in case.
+	// The whitelisted builtins ignore the evaluator state, so a placeholder is
+	// enough here.
 	dummyEv := &evaluator{ctx: context.Background(), cfg: EvalConfig{}}
-
 	val, err := fn(context.Background(), dummyEv, values)
 	if err != nil {
-		return nil, false // Evaluation failure (e.g. division by zero), don't fold.
+		return nil, false // e.g. division by zero: leave it to fail at runtime
 	}
 
-	// 3. Convert Value back to Node
 	return valueToNode(val)
 }
 
@@ -198,13 +168,13 @@ func nodeToValue(n Node) (Value, bool) {
 		return VBool(n.Value), true
 	case *StringLit:
 		return VString(n.Value), true
-		// List literals? Only if quoted?
-		// For now, strict literal arguments.
 	}
 	return Value{}, false
 }
 
 func valueToNode(v Value) (Node, bool) {
+	// Only atom results fold: a List/Tuple result would need a node that
+	// EVALUATES to it, and unquoted list nodes are calls.
 	switch v.Kind {
 	case KNumber:
 		return &NumberLit{Value: v.Num}, true
@@ -212,10 +182,6 @@ func valueToNode(v Value) (Node, bool) {
 		return &BoolLit{Value: v.Bool}, true
 	case KString:
 		return &StringLit{Value: v.Str}, true
-		// Tuple/List?
-		// If result is List/Tuple, we need to return a Node that EVALUATES to that list/tuple.
-		// E.g. (list 1 2).
-		// For now, only support atom results to be safe.
 	}
 	return nil, false
 }

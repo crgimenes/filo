@@ -13,7 +13,7 @@ import (
 func main() {
 	eng := filo.NewEngine()
 	filostrings.RegisterBuiltins(eng)
-	filojson.RegisterJSONBuiltins(eng)
+	filojson.RegisterBuiltins(eng)
 
 	ctx := context.Background()
 	cfg := filo.EvalConfig{StepLimit: 128, RecursionLimit: 16, Timeout: time.Second}

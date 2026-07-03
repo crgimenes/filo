@@ -78,6 +78,7 @@ Literals and lexical rules:
 | `fn` | `(fn (args) body)` | Anonymous function. |
 | `def` | `(def name expr)` | Global variable or function (always in the root scope). |
 | `set` | `(set name expr)` | Assigns a variable in the nearest scope that binds it; if the name is unbound, it creates a global. |
+| `and`, `or` | `(and a b ...)` | Boolean logic with **short-circuit**: arguments evaluate left to right and stop at the first `#f` (`and`) or `#t` (`or`); later arguments never run, so `(or found (expensive-check x))` is a valid guard. Each evaluated argument must be a bool. |
 | `values` | `(values v1 v2 ...)` | Returns multiple values (a tuple). |
 | `exit` | `(exit [value])` | Terminates execution immediately. |
 | `return` | `(return [value])` | Returns from the current function. |
@@ -90,9 +91,11 @@ Note: `NewEngine()` includes the core math/logic/list/type builtins by default. 
 |----------|----------|-------------|
 | **Math** | `+`, `-`, `*`, `/`, `%` | Basic arithmetic. |
 | | `pow` | `(pow x y)` |
-| **Logic** | `=`, `!=` | Equality. |
+| **Logic** | `=`, `!=` | Equality. Comparing values of different kinds is an error — cast first: `(= (string 1) "1")`. |
 | | `<`, `<=`, `>`, `>=` | Numeric comparison. |
-| | `and`, `or`, `not` | Boolean logic. |
+| | `not` | Boolean negation (`and`/`or` are special forms, see above). |
+| **Casts** | `string` | `(string x)` renders any value as text (`42` → `"42"`, `#t` → `"#t"`; strings pass through unchanged). |
+| | `number` | `(number s)` parses a numeric string (`"1.5"` → `1.5`); a non-numeric string is an error. |
 | **Types** | `type-of` | Returns "number", "string", "list", etc. |
 | | `is-empty` | True for `""` or empty list. |
 | | `is-nil` | True for an empty list (closest thing to nil in the current runtime). |
@@ -156,7 +159,7 @@ Requires explicit registration (import `github.com/crgimenes/filo/filorand`): `f
 
 ### Extension: filojson
 
-Requires explicit registration (import `github.com/crgimenes/filo/filojson`): `filojson.RegisterJSONBuiltins(eng)`. JSON helpers for marshal/unmarshal: `json-marshal`, `json-unmarshal`, `json-null`.
+Requires explicit registration (import `github.com/crgimenes/filo/filojson`): `filojson.RegisterBuiltins(eng)`. JSON helpers for marshal/unmarshal: `json-marshal`, `json-unmarshal`, `json-null`.
 
 ### Extension: filoprint
 
@@ -191,6 +194,11 @@ API:
 | `Filo.Execute(script, overrides)` | Executes with Filo's globals + optional overrides. |
 
 Pre-parsing eliminates parsing overhead, roughly 1.5x faster for repeated executions (see the `BenchmarkRunScript` vs `BenchmarkPreParsed` benchmarks).
+
+Compilation also folds constant subexpressions (`(* 2 60)` becomes `120` at
+compile time). Folding is semantics-preserving — a call is only replaced when
+evaluating it with constant arguments succeeds — so there is no switch to turn
+it off, and `TestFoldingMatchesInterpreter` holds the two paths equal.
 
 ## Marshal / Unmarshal
 
@@ -249,16 +257,22 @@ go test -fuzz=FuzzMarshalUnmarshalString -fuzztime=30s .
 
 ## Command-line tools
 
-Two small binaries live under `cmd/`:
+Three small binaries live under `cmd/`:
 
 - **`filofmt`** -- a formatter for `.filo` files, in the `gofmt` mold. Reads
   stdin or file/dir paths; `-w` rewrites in place, `-l` lists files that would
   change, `-d` shows a diff, `-indent N` sets the indent width, and
   `-fold-const` additionally folds constant expressions. Install with
   `go install github.com/crgimenes/filo/cmd/filofmt@latest`.
+- **`filofix`** -- modernizes and reduces source, in the `go fix` mold, while
+  preserving formatting and comments. Today it removes the legacy root
+  `(let () ...)` wrapper (the interpreter has handled multiple top-level forms
+  for a long time) and replaces comment-free constant subexpressions with
+  their value (`(* 8 1000)` → `8000`). Same flags as filofmt (`-w`, `-l`,
+  `-d`). Install with `go install github.com/crgimenes/filo/cmd/filofix@latest`.
 - **`filo-repl`** -- an interactive REPL (line editing, history, multi-line
   input) that falls back to batch mode when stdin is a pipe. Load extension
-  packages with `-filo-package math,rand,str,print`, and bound the run with
+  packages with `-filo-package math,rand,str,print,json`, and bound the run with
   `-step-limit`, `-recursion-limit`, and `-timeout`. Install with
   `go install github.com/crgimenes/filo/cmd/filo-repl@latest`.
 
@@ -284,35 +298,33 @@ Two small binaries live under `cmd/`:
 ### 3. Controlled recursion
 
 ```lisp
-(let ()
-  (def fact (fn (n)
-    (if (<= n 1)
-        1
-        (* n (fact (- n 1))))))
-  (fact 5)) ; 120
+(def fact (fn (n)
+  (if (<= n 1)
+      1
+      (* n (fact (- n 1))))))
+(fact 5) ; 120
 ```
 
 ### 4. Auto-level helpers
 
 ```lisp
-(let ()
-  (def thresholds (list 0 300 900 2700 6500 15000))
+(def thresholds (list 0 300 900 2700 6500 15000))
 
-  (def auto-level (fn (xp thresholds)
-    (fold (fn (lvl threshold)
-            (if (>= xp threshold) (+ lvl 1) lvl))
-         0
-         thresholds)))
+(def auto-level (fn (xp thresholds)
+  (fold (fn (lvl threshold)
+          (if (>= xp threshold) (+ lvl 1) lvl))
+       0
+       thresholds)))
 
-  (def auto-level-progress (fn (xp thresholds)
-    (let ((lvl (auto-level xp thresholds))
-          (total (length thresholds)))
-      (if (>= lvl total)
-          (values lvl 0)
-          (let ((next (nth thresholds lvl)))
-            (values lvl (- next xp))))))
+(def auto-level-progress (fn (xp thresholds)
+  (let ((lvl (auto-level xp thresholds))
+        (total (length thresholds)))
+    (if (>= lvl total)
+        (values lvl 0)
+        (let ((next (nth thresholds lvl)))
+          (values lvl (- next xp)))))))
 
-  (auto-level-progress 1200 thresholds))
+(auto-level-progress 1200 thresholds)
 ```
 
 Returns `(tuple 3 1500)` -- character is at level three and needs 1,500 XP to reach the next tier.

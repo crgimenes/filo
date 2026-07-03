@@ -11,7 +11,7 @@ import (
 func newEngine() *filo.Engine {
 	eng := filo.NewEngine()
 	filostrings.RegisterBuiltins(eng)
-	RegisterJSONBuiltins(eng)
+	RegisterBuiltins(eng)
 	return eng
 }
 

@@ -22,29 +22,28 @@ func main() {
 	// User-defined filter that can be stored in database
 	// This simulates a user creating their own filter criteria
 	filterScript := `
-(let ()
-  ; Define the filter predicate based on user criteria
-  (def matches-filter (fn (item)
-    (let ((name (nth item 0))
-          (price (nth item 1))
-          (category (nth item 2))
-          (in-stock (nth item 3)))
-      (and
-        ; Price range filter
-        (>= price min-price)
-        (<= price max-price)
-        ; Only in-stock items if required
-        (or (not require-stock) in-stock)
-        ; Category filter (empty = all categories)
-        (or (is-empty filter-category) (= category filter-category))))))
+; Define the filter predicate based on user criteria
+(def matches-filter (fn (item)
+  (let ((name (nth item 0))
+        (price (nth item 1))
+        (category (nth item 2))
+        (in-stock (nth item 3)))
+    (and
+      ; Price range filter
+      (>= price min-price)
+      (<= price max-price)
+      ; Only in-stock items if required
+      (or (not require-stock) in-stock)
+      ; Category filter (empty = all categories)
+      (or (is-empty filter-category) (= category filter-category))))))
 
-  ; Filter the items
-  (fold (fn (acc item)
-          (if (matches-filter item)
-              (list-append acc item)
-              acc))
-        (list)
-        items))
+; Filter the items
+(fold (fn (acc item)
+        (if (matches-filter item)
+            (list-append acc item)
+            acc))
+      (list)
+      items)
 `
 
 	// Sample inventory data: [name, price, category, in-stock]

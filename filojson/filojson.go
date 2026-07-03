@@ -30,12 +30,12 @@ import (
 	"github.com/crgimenes/filo"
 )
 
-// RegisterJSONBuiltins adds json-marshal and json-unmarshal to a Filo engine.
+// RegisterBuiltins adds json-marshal and json-unmarshal to a Filo engine.
 //
 // - (json-marshal value) -> string
 // - (json-unmarshal string) -> value
 // - (json-null) -> tuple() sentinel representing JSON null
-func RegisterJSONBuiltins(eng *filo.Engine) {
+func RegisterBuiltins(eng *filo.Engine) {
 	eng.MustRegisterBuiltin("json-marshal", builtinJSONMarshal)
 	eng.MustRegisterBuiltin("json-unmarshal", builtinJSONUnmarshal)
 	eng.MustRegisterBuiltin("json-null", builtinJSONNull)

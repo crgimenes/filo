@@ -82,22 +82,19 @@ func TestEnsureSameKindFunc(t *testing.T) {
 	t.Parallel()
 
 	// Empty list
-	_, err := ensureSameKind([]Value{})
+	err := ensureSameKind([]Value{})
 	if err == nil {
 		t.Fatal("expected error for empty list")
 	}
 
 	// Same kind
-	kind, err := ensureSameKind([]Value{VNum(1), VNum(2), VNum(3)})
+	err = ensureSameKind([]Value{VNum(1), VNum(2), VNum(3)})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if kind != KNumber {
-		t.Fatalf("want KNumber, got %v", kind)
-	}
 
 	// Mixed kinds
-	_, err = ensureSameKind([]Value{VNum(1), VString("a")})
+	err = ensureSameKind([]Value{VNum(1), VString("a")})
 	if err == nil {
 		t.Fatal("expected error for mixed kinds")
 	}

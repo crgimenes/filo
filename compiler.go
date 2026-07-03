@@ -128,7 +128,7 @@ func (c *compiler) walkList(list *List) (Node, error) {
 			}
 			// Name remains a Symbol (global)
 			return &List{Elems: []Node{list.Elems[0], list.Elems[1], val}}, nil
-		case "if", "do", "set", "values", "tuple", "exit", "return":
+		case "if", "do", "and", "or", "set", "values", "tuple", "exit", "return":
 			// Special forms: preserve head, walk arguments
 			newElems := make([]Node, len(list.Elems))
 			newElems[0] = list.Elems[0] // Preserve head Symbol
@@ -190,29 +190,10 @@ func (c *compiler) compileLet(list *List) (Node, error) {
 			return nil, err
 		}
 
-		// Define variable in scope
-		// We don't need to change the Name symbol in the binding definition itself,
-		// because 'let' runtime will set the slot.
-		// BUT the runtime needs to know WHICH slot to set.
-		// Implementation Detail: 'let' runtime will simply push values to Frame?
-		// No, ResolvedSymbol is for usage. Definition might need info too?
-		// Actually, if we use pure stack machine, 'let' pushes values.
-		// But Filo keeps structure.
-		// Optimization: We can annotate the binding symbol too!
-		// But let's keep it simple: Define returns index.
-		// We don't alter the binding name symbol in the AST,
-		// but we might need to if the Runtime needs to know where to put it.
-		// With Static Frames, Let just extends the frame.
-		// The compiler calculates that 'x' is at index 0, 'y' at index 1.
-		// The runtime 'let' starts at index K (inherited) and sets K, K+1...
-
-		// Simple approach: The AST for let binding def doesn't need resolution index
-		// if the runtime simply appends to the frame sequentially.
-		// Since 'let' bindings are declared in order, the runtime just append values.
-		// Accesses to 'x' will become ResolvedSymbol(depth=0, index=K).
-
-		idx := c.scope.define(nameSym.Name)
-		_ = idx // Used to track next slot
+		// The binding name keeps its plain Symbol: bindings are declared in order,
+		// so the runtime fills frame slots sequentially and only READS need a
+		// ResolvedSymbol. define() records the slot index for those reads.
+		c.scope.define(nameSym.Name)
 
 		newBindingsElems[i] = &List{Elems: []Node{nameSym, valComp}}
 	}
@@ -320,17 +301,8 @@ func (c *compiler) compileFn(list *List) (Node, error) {
 		resList.Elems[2+i] = b
 	}
 
-	// Annotate the function node with frame size info?
-	// The runtime needs to know how big the frame should be?
-	// Actually, for 'fn', the frame size is determined by args + locals inside.
-	// But 'fn' creates a fresh frame.
-	// If body contains 'let', 'let' extends that frame (or creates nested frame, but static frames usually imply one flat frame per function or nested frames).
-	// Current Filo: Let creates NEW Env.
-	// Static Strategy: Let creates NEW Frame linked to parent.
-	// So each Scope = New Frame.
-	// So 'fn' scope has N args. 'let' inside has M vars.
-	// This matches.
-
+	// No frame-size annotation is needed: every scope gets its own Frame (fn's
+	// frame holds the args; a let inside creates a child frame for its vars).
 	return resList, nil
 }
 

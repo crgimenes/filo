@@ -7,20 +7,18 @@ import (
 )
 
 type evaluator struct {
-	ctx           context.Context
-	cfg           EvalConfig
-	builtins      map[string]builtinFunc
-	steps         int
-	recursion     int
-	global        *GlobalEnv
-	frame         *Frame // Current local scope (can be nil if at top level)
-	lastTickCheck time.Time
-	startedAt     time.Time
+	ctx       context.Context
+	cfg       EvalConfig
+	builtins  map[string]builtinFunc
+	steps     int
+	recursion int
+	global    *GlobalEnv
+	frame     *Frame // Current local scope (can be nil if at top level)
+	startedAt time.Time
 }
 
 func newEvaluator(ctx context.Context, cfg EvalConfig, global *GlobalEnv, builtins map[string]builtinFunc) *evaluator {
-	now := time.Now()
-	return &evaluator{ctx: ctx, cfg: cfg, builtins: builtins, global: global, lastTickCheck: now, startedAt: now}
+	return &evaluator{ctx: ctx, cfg: cfg, builtins: builtins, global: global, startedAt: time.Now()}
 }
 
 func (ev *evaluator) eval(node Node) (Value, error) {
@@ -56,17 +54,8 @@ func (ev *evaluator) eval(node Node) (Value, error) {
 		// Global resolution by ID: O(1) access
 		v, ok := ev.global.GetByID(n.ID)
 		if !ok {
-			// This can happen if symbol was resolved at compile time but global never set at runtime
-			// Return default or error?
-			// To mimic legacy behavior (undefined symbol -> error), we should check if it was set.
-			// But GetByID returning !ok means ID out of bounds.
-			// If ID is in bounds but value is zero-value?
-			// Current GetByID implementations checks bounds.
-			// If bounds OK, returns value.
-			// If value is empty Value{}, it returns it.
-			// If we want error for undefined, we need IsDefined check.
-			// For now, assume consistent state.
-			// If GetByID fails (bounds), it's definitely error.
+			// The symbol resolved at compile time but the global was never set at
+			// runtime (GetByID only fails on an out-of-bounds ID).
 			return Value{}, fmt.Errorf("undefined global: %s", n.Name)
 		}
 		return v, nil
@@ -120,11 +109,8 @@ func (ev *evaluator) evalList(list *List) (Value, error) {
 	}
 
 	headSym, ok := list.Elems[0].(*Symbol)
-	// Note: Head could be ResolvedSymbol if 'fn' or 'let' was somehow resolved?
-	// But special forms (if, let, fn) are usually plain Symbols in AST root.
-	// Compiler might have resolved "if" if it matched a local?
-	// No, special forms are keywords, compiler shouldn't resolve them as vars if they are in head pos?
-	// ACTUALLY, my compiler 'resolve' checks scope. "if" is not in scope. So it returns Symbol("if"). Correct.
+	// Special forms stay plain Symbols: the compiler only resolves names bound in
+	// scope, and keywords like "if"/"let"/"fn" never are.
 
 	if ok {
 		switch headSym.Name {
@@ -134,6 +120,12 @@ func (ev *evaluator) evalList(list *List) (Value, error) {
 		case "do":
 			v, err := ev.evalDo(list.Elems[1:])
 			return v, wrapIn("do", err)
+		case "and":
+			v, err := ev.evalAnd(list.Elems[1:])
+			return v, wrapIn("and", err)
+		case "or":
+			v, err := ev.evalOr(list.Elems[1:])
+			return v, wrapIn("or", err)
 		case "let":
 			v, err := ev.evalLet(list.Elems[1:])
 			return v, wrapIn("let", err)
@@ -217,15 +209,8 @@ func (ev *evaluator) callFuncAST(ctx context.Context, fn *Func, argNodes []Node)
 		return Value{}, fmt.Errorf("recursion limit exceeded")
 	}
 
-	// Create Frame with size of params
-	// Evaluate args directly into slots (avoiding intermediate slice)
-	// We allocate the backing array for slots here. 1 allocation for Frame+Array?
-	// Slice 'make' allocates array. Frame struct allocates struct.
-	// To minimize allocs, we'd need Frame to embed array.
-	// But this is already better than make([]Value) + Frame{slots: slice}.
-	// Because evalArgs did make(), then callFunc did Frame{}. -> 2 allocs.
-	// Here: make([]Value) inside Frame creation? No, Frame creation takes existing slice usually.
-
+	// Evaluate the arguments directly into the frame's slots, skipping the
+	// intermediate slice an evalArgs helper would allocate.
 	slots := make([]Value, len(fn.Params))
 	for i, node := range argNodes {
 		val, err := ev.eval(node)
@@ -293,6 +278,46 @@ func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Valu
 	return result, nil
 }
 
+// evalAnd evaluates its arguments left to right and short-circuits: the first
+// false stops evaluation and later arguments never run. Every evaluated
+// argument must be a bool. (and) with no arguments is #t.
+func (ev *evaluator) evalAnd(args []Node) (Value, error) {
+	for _, node := range args {
+		v, err := ev.eval(node)
+		if err != nil {
+			return Value{}, err
+		}
+		b, err := v.AsBool()
+		if err != nil {
+			return Value{}, err
+		}
+		if !b {
+			return VBool(false), nil
+		}
+	}
+	return VBool(true), nil
+}
+
+// evalOr evaluates its arguments left to right and short-circuits: the first
+// true stops evaluation and later arguments never run. Every evaluated
+// argument must be a bool. (or) with no arguments is #f.
+func (ev *evaluator) evalOr(args []Node) (Value, error) {
+	for _, node := range args {
+		v, err := ev.eval(node)
+		if err != nil {
+			return Value{}, err
+		}
+		b, err := v.AsBool()
+		if err != nil {
+			return Value{}, err
+		}
+		if b {
+			return VBool(true), nil
+		}
+	}
+	return VBool(false), nil
+}
+
 func (ev *evaluator) evalIf(args []Node) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return Value{}, fmt.Errorf("if expects 2 or 3 arguments (condition then [else])")
@@ -346,15 +371,10 @@ func (ev *evaluator) evalLet(args []Node) (Value, error) {
 	}
 
 	// Temporarily switch to new frame?
-	// Let bindings are evaluated in specific order.
-	// Since `let` allows seeing previous bindings, we usually:
-	// 1. Eval val in scope (parent + prev bindings).
-	// 2. Define in scope.
-	// Our Compiler treats `let` as ONE scope where variables are defined sequentially.
-	// The `ResolvedSymbol` for `x` in `(let ((x 1) (y x)) ...)`:
-	// `y`'s value `x` resolves to index 0.
-	// So we need `newFrame` to be active availability WHILE evaluating bindings!
-
+	// A binding may read the ones before it — (let ((x 1) (y x)) ...) — and the
+	// compiler resolves such reads into THIS frame, so newFrame must already be
+	// active while the binding values are evaluated. Reads of outer variables
+	// resolve through the parent frame and are unaffected.
 	oldFrame := ev.frame
 	ev.frame = newFrame
 
@@ -364,10 +384,6 @@ func (ev *evaluator) evalLet(args []Node) (Value, error) {
 			ev.frame = oldFrame
 			return Value{}, fmt.Errorf("invalid let binding")
 		}
-		// The compiler resolved access to previous bindings to point to THIS frame.
-		// Access to outer vars points to PARENT frame (oldFrame).
-		// So `ev.frame = newFrame` handles both correctly!
-
 		val, err := ev.eval(pair.Elems[1])
 		if err != nil {
 			ev.frame = oldFrame
@@ -544,9 +560,6 @@ func (ev *evaluator) tick() error {
 	if ev.cfg.Timeout > 0 {
 		if time.Since(ev.startedAt) > ev.cfg.Timeout {
 			return fmt.Errorf("execution timeout")
-		}
-		if time.Since(ev.lastTickCheck) >= time.Millisecond*5 {
-			ev.lastTickCheck = time.Now()
 		}
 	}
 	select {

@@ -108,3 +108,79 @@ func TestFoldIfNoElseMatchesInterpreter(t *testing.T) {
 		t.Fatalf("folded (if #f 42) = %v (err %v), want empty list", v, err)
 	}
 }
+
+// TestAndOrShortCircuit verifies and/or stop evaluating at the first deciding
+// argument: the (/ 1 0) in the tail must never run.
+func TestAndOrShortCircuit(t *testing.T) {
+	b, err := eval(t, "(or #t (/ 1 0))").AsBool()
+	if err != nil || !b {
+		t.Fatalf("(or #t (/ 1 0)) = %v (err %v), want #t without evaluating the division", b, err)
+	}
+	b, err = eval(t, "(and #f (/ 1 0))").AsBool()
+	if err != nil || b {
+		t.Fatalf("(and #f (/ 1 0)) = %v (err %v), want #f without evaluating the division", b, err)
+	}
+
+	// Arguments that DO get evaluated still enforce bool typing and propagate
+	// their errors.
+	eng := NewEngine()
+	_, _, rerr := eng.RunScript(context.Background(), "(and #t (/ 1 0))", nil, EvalConfig{})
+	if rerr == nil {
+		t.Fatal("(and #t (/ 1 0)) must fail: the second argument is evaluated")
+	}
+	_, _, rerr = eng.RunScript(context.Background(), "(or #f 42)", nil, EvalConfig{})
+	if rerr == nil {
+		t.Fatal("(or #f 42) must fail: evaluated arguments must be bool")
+	}
+}
+
+// TestStringNumberCasts covers the explicit coercion builtins used to compare
+// across kinds: (= (string 1) "1") and (= (number "1") 1).
+func TestStringNumberCasts(t *testing.T) {
+	tests := []struct {
+		src  string
+		want string
+	}{
+		{`(string 42)`, "42"},
+		{`(string 1.5)`, "1.5"},
+		{`(string #t)`, "#t"},
+		{`(string "already")`, "already"},
+		{`(string (list 1 2))`, "(list 1 2)"},
+	}
+	for _, tc := range tests {
+		s, err := eval(t, tc.src).AsString()
+		if err != nil || s != tc.want {
+			t.Errorf("%s = %q (err %v), want %q", tc.src, s, err, tc.want)
+		}
+	}
+
+	n, err := eval(t, `(number "1.5")`).AsNumber()
+	if err != nil || n != 1.5 {
+		t.Fatalf(`(number "1.5") = %v (err %v), want 1.5`, n, err)
+	}
+	n, err = eval(t, `(number " 42 ")`).AsNumber()
+	if err != nil || n != 42 {
+		t.Fatalf(`(number " 42 ") = %v (err %v), want 42 (whitespace trimmed)`, n, err)
+	}
+
+	// The cross-kind comparison idiom the casts exist for.
+	b, err := eval(t, `(= (string 1) "1")`).AsBool()
+	if err != nil || !b {
+		t.Fatalf(`(= (string 1) "1") = %v (err %v), want #t`, b, err)
+	}
+	b, err = eval(t, `(= (number "2") 2)`).AsBool()
+	if err != nil || !b {
+		t.Fatalf(`(= (number "2") 2) = %v (err %v), want #t`, b, err)
+	}
+
+	// A failed numeric parse is a script error, same as any other builtin error.
+	eng := NewEngine()
+	_, _, rerr := eng.RunScript(context.Background(), `(number "abc")`, nil, EvalConfig{})
+	if rerr == nil {
+		t.Fatal(`(number "abc") must error`)
+	}
+	_, _, rerr = eng.RunScript(context.Background(), `(number #t)`, nil, EvalConfig{})
+	if rerr == nil {
+		t.Fatal(`(number #t) must error: booleans do not coerce implicitly`)
+	}
+}

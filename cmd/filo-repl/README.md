@@ -85,7 +85,7 @@ HELLO
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--filo-package` | (none) | Comma-separated: `math`, `rand`, `str`, `print` |
+| `--filo-package` | (none) | Comma-separated: `math`, `rand`, `str`, `print`, `json` |
 | `--step-limit` | 100000 | Maximum evaluation steps |
 | `--recursion-limit` | 128 | Maximum recursion depth |
 | `--timeout` | 30 | Timeout in seconds |
@@ -99,6 +99,7 @@ HELLO
 | `rand` | rand-float, rand-int, uuid-v4 |
 | `str` | str-upper, str-lower, str-trim, str-split, str-join, etc. |
 | `print` | print, println, printf |
+| `json` | json-marshal, json-unmarshal, json-null |
 
 ## Exit Codes
 

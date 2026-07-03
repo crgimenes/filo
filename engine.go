@@ -91,8 +91,12 @@ func (e *Engine) Compile(src string) (*Program, error) {
 }
 
 // CompileAST compiles a parsed AST into a reusable Program bound to this Engine.
+// Constant subexpressions are folded first; folding is semantics-preserving (it
+// only replaces a call when evaluating it with constant arguments succeeds), so
+// there is no knob to turn it off.
 func (e *Engine) CompileAST(ast Node) (*Program, error) {
-	compiled, err := Compile(ast, e.builtins, e.symbols)
+	folded, _ := FoldConstants(ast)
+	compiled, err := Compile(folded, e.builtins, e.symbols)
 	if err != nil {
 		return nil, fmt.Errorf("compile error: %w", err)
 	}
@@ -124,16 +128,11 @@ func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Va
 		}
 	}()
 
-	// Initialize Global Environment linked to Engine's SymbolTable
-	// Try to get from pool
-	var root *GlobalEnv
-	poolVal := e.envPool.Get()
-	if poolVal != nil {
-		root = poolVal.(*GlobalEnv)
-		root.Reset(e.symbols)
-	} else {
-		root = NewGlobalEnv(e.symbols)
-	}
+	// Initialize the global environment linked to the Engine's SymbolTable. The
+	// pool has New set, so Get never returns nil, and Reset also initializes a
+	// virgin *GlobalEnv.
+	root := e.envPool.Get().(*GlobalEnv)
+	root.Reset(e.symbols)
 	defer e.envPool.Put(root)
 
 	for k, v := range globals {
