@@ -487,3 +487,14 @@ if err != nil {
 }
 // res = 15
 ```
+
+---
+
+## More of my projects
+
+- [kutta](https://github.com/crgimenes/kutta): a 2D wind tunnel; watch air misbehave around an airfoil.
+- [glaze](https://github.com/crgimenes/glaze): WebView desktop apps in Go, cgo-free.
+- [compterm](https://github.com/crgimenes/compterm): share your terminal over the network.
+- [native](https://github.com/crgimenes/native): cgo-free Go bindings for OS APIs: clipboard, mmap, keep-awake, and friends.
+
+More at [github.com/crgimenes](https://github.com/crgimenes) and [crg.eti.br](https://crg.eti.br).
