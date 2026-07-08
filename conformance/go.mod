@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/crgimenes/filo v0.0.0
-	github.com/crgimenes/prolog v0.1.2
+	github.com/crgimenes/prolog v0.1.3
 )
 
 // filo is the module under development; always test against the working tree.
