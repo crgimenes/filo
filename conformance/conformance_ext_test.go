@@ -158,7 +158,7 @@ func genExt(rng *rand.Rand, depth int, scope []string, counter *int) extExpr {
 		// cond: 1-3 (test body) clauses, optionally an else clause last.
 		n := 1 + rng.Intn(3)
 		var clauses []extExpr
-		for i := 0; i < n; i++ {
+		for range n {
 			clauses = append(clauses, extExpr{op: "clause", kids: []extExpr{sub(scope), sub(scope)}})
 		}
 		if rng.Intn(2) == 0 {
