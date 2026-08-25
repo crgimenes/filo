@@ -179,94 +179,14 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 	var buffer strings.Builder
 	globals := make(map[string]filo.Value)
 
-	// State for Ctrl+X prefix
-	ctrlXPressed := false
-	exitRequested := false
-
-	// AutoCompleteCallback to handle Ctrl+X, E, ESC, and constant folding
-	t.AutoCompleteCallback = func(line string, pos int, key rune) (newLine string, newPos int, ok bool) {
-		// ESC key (0x1B) - request exit
-		if key == 0x1B {
-			exitRequested = true
-			return "", 0, true
-		}
-
-		// Folding hook
-		if foldConst && key == ')' {
-			balance := 1
-			startIdx := -1
-			// Scan backwards for matching '(' in current line
-			for i := len(line) - 1; i >= 0; i-- {
-				switch line[i] {
-				case ')':
-					balance++
-				case '(':
-					balance--
-				}
-				if balance == 0 {
-					startIdx = i
-					break
-				}
-			}
-
-			if startIdx != -1 {
-				snippet := line[startIdx:] + ")"
-				ast, err := filo.Parse(snippet)
-				if err == nil {
-					folded, changed := filo.FoldConstants(ast)
-					if changed {
-						replacement, err := filo.FormatAST(folded, filo.FormatConfig{})
-						if err == nil {
-							replacement = strings.TrimSpace(replacement)
-							newLine = line[:startIdx] + replacement
-							newPos = len(newLine)
-							return newLine, newPos, true // consume the ')'
-						}
-					}
-				}
-			}
-		}
-
-		// Ctrl+X is rune 0x18 (ASCII 24)
-		if key == 0x18 {
-			ctrlXPressed = true
-			return line, pos, true // consume the key, don't echo
-		}
-
-		if ctrlXPressed {
-			ctrlXPressed = false
-			if key == 'e' || key == 'E' {
-				// Open editor with current content (line + buffer)
-				fullContent := buffer.String()
-				if fullContent != "" {
-					fullContent += "\n"
-				}
-				fullContent += line
-
-				editedContent, err := openEditor(stdinFd, oldState, fullContent)
-				if err != nil {
-					_, _ = fmt.Fprintf(t, "error: %v\n", err)
-					return line, pos, true
-				}
-				buffer.Reset()
-
-				// If edited content has multiple lines, put all but last in buffer
-				lines := strings.Split(strings.TrimSuffix(editedContent, "\n"), "\n")
-				if len(lines) > 1 {
-					buffer.WriteString(strings.Join(lines[:len(lines)-1], "\n"))
-					return lines[len(lines)-1], len(lines[len(lines)-1]), true
-				}
-				if len(lines) == 1 {
-					return lines[0], len(lines[0]), true
-				}
-				return "", 0, true
-			}
-			// Any other key after Ctrl+X - just pass through
-			return line, pos, false
-		}
-
-		return line, pos, false // let terminal handle other keys
+	keys := &replKeys{
+		foldConst: foldConst,
+		stdinFd:   stdinFd,
+		oldState:  oldState,
+		t:         t,
+		buffer:    &buffer,
 	}
+	t.AutoCompleteCallback = keys.handle
 
 	// Print welcome message
 	_, _ = fmt.Fprintln(t, "Filo REPL - Type expressions to evaluate. Ctrl+D to exit.")
@@ -278,7 +198,7 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 		line, err := t.ReadLine()
 
 		// Check if ESC was pressed
-		if exitRequested {
+		if keys.exit {
 			_, _ = fmt.Fprintln(t, "\nBye!")
 			return 0
 		}
@@ -372,6 +292,107 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 		t.SetPrompt(promptMain)
 
 	}
+}
+
+// replKeys holds the state shared between the terminal key callback and the
+// REPL loop.
+type replKeys struct {
+	foldConst bool
+	stdinFd   int
+	oldState  *term.State
+	t         *term.Terminal
+	buffer    *strings.Builder
+	ctrlX     bool
+	exit      bool
+}
+
+// handle is the term.Terminal AutoCompleteCallback: ESC to exit, constant
+// folding on ')', and Ctrl+X,E to open $EDITOR.
+func (k *replKeys) handle(line string, pos int, key rune) (string, int, bool) {
+	if key == 0x1B { // ESC - request exit
+		k.exit = true
+		return "", 0, true
+	}
+	if k.foldConst && key == ')' {
+		folded, ok := tryFold(line)
+		if ok {
+			return folded, len(folded), true // consume the ')'
+		}
+	}
+	if key == 0x18 { // Ctrl+X
+		k.ctrlX = true
+		return line, pos, true // consume the key, don't echo
+	}
+	if !k.ctrlX {
+		return line, pos, false // let terminal handle other keys
+	}
+	k.ctrlX = false
+	if key != 'e' && key != 'E' {
+		// Any other key after Ctrl+X - just pass through
+		return line, pos, false
+	}
+	return k.editLine(line, pos)
+}
+
+// editLine opens $EDITOR on the pending buffer plus the current line; all but
+// the last edited line go back to the buffer, the last becomes the new line.
+func (k *replKeys) editLine(line string, pos int) (string, int, bool) {
+	fullContent := k.buffer.String()
+	if fullContent != "" {
+		fullContent += "\n"
+	}
+	fullContent += line
+
+	editedContent, err := openEditor(k.stdinFd, k.oldState, fullContent)
+	if err != nil {
+		_, _ = fmt.Fprintf(k.t, "error: %v\n", err)
+		return line, pos, true
+	}
+	k.buffer.Reset()
+
+	lines := strings.Split(strings.TrimSuffix(editedContent, "\n"), "\n")
+	if len(lines) > 1 {
+		k.buffer.WriteString(strings.Join(lines[:len(lines)-1], "\n"))
+	}
+	last := lines[len(lines)-1]
+	return last, len(last), true
+}
+
+// tryFold constant-folds the expression closed by the ')' just typed,
+// returning the rewritten line and whether a fold changed it.
+func tryFold(line string) (string, bool) {
+	balance := 1
+	startIdx := -1
+	// Scan backwards for matching '(' in current line
+	for i := len(line) - 1; i >= 0; i-- {
+		switch line[i] {
+		case ')':
+			balance++
+		case '(':
+			balance--
+		}
+		if balance == 0 {
+			startIdx = i
+			break
+		}
+	}
+	if startIdx == -1 {
+		return "", false
+	}
+	snippet := line[startIdx:] + ")"
+	ast, err := filo.Parse(snippet)
+	if err != nil {
+		return "", false
+	}
+	folded, changed := filo.FoldConstants(ast)
+	if !changed {
+		return "", false
+	}
+	replacement, err := filo.FormatAST(folded, filo.FormatConfig{})
+	if err != nil {
+		return "", false
+	}
+	return line[:startIdx] + strings.TrimSpace(replacement), true
 }
 
 func executeAndPrint(t *term.Terminal, engine *filo.Engine, script string, globals map[string]filo.Value, cfg filo.EvalConfig) map[string]filo.Value {

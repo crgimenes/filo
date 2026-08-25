@@ -163,7 +163,7 @@ func TestFormatValue(t *testing.T) {
 		{"bool", VBool(true), "#t"},
 		{"string", VString("hello"), `"hello"`},
 		{"string with quote", VString(`say "hi"`), `"say \"hi\""`},
-		{"empty list", VList(nil), "()"},
+		{"empty list", VList(nil), "(list)"},
 		{"simple list", VList([]Value{VNum(1), VNum(2)}), "(list 1 2)"},
 	}
 

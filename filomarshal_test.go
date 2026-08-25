@@ -56,6 +56,24 @@ func TestMarshalSlice(t *testing.T) {
 	}
 }
 
+func TestMarshalEmptySliceRoundtrip(t *testing.T) {
+	s, err := Marshal([]int{})
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+	if s != "(list)" {
+		t.Fatalf("expected (list), got %q", s)
+	}
+	var out []int
+	err = Unmarshal(s, &out)
+	if err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("expected empty slice, got %v", out)
+	}
+}
+
 func TestMarshalMap(t *testing.T) {
 	input := map[string]int{"a": 1, "b": 2}
 	val, err := MarshalToValue(input)

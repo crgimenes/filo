@@ -336,14 +336,10 @@ func formatValueCompact(v Value) string {
 	case KString:
 		return formatString(v.Str)
 	case KList:
-		if len(v.List) == 0 {
-			return "()"
-		}
+		// (list), never (): the evaluator rejects () as an empty
+		// list expression, and Marshal output must round-trip.
 		return formatListCompact(v.List)
 	case KTuple:
-		if len(v.Tup) == 0 {
-			return "()"
-		}
 		return formatTupleCompact(v.Tup)
 	case KFunc:
 		return "<fn>"

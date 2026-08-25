@@ -22,6 +22,7 @@ func checkContext(ctx context.Context) error {
 	}
 }
 
+//nolint:gocognit // flat registry: the score is the sum of dozens of independent builtin closures with no shared control flow; once-called registrars would add indirection only
 func defaultBuiltins() map[string]builtinFunc {
 	bi := map[string]builtinFunc{}
 
