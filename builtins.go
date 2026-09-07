@@ -578,6 +578,9 @@ func defaultBuiltins() map[string]builtinFunc {
 		if hi <= lo {
 			return VList([]Value{}), nil
 		}
+		if hi-lo > rangeMax {
+			return Value{}, fmt.Errorf("range too large (max %d elements)", rangeMax)
+		}
 		result := make([]Value, 0, hi-lo)
 		for i := lo; i < hi; i++ {
 			err := checkContext(ctx)

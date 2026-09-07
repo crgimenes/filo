@@ -2843,8 +2843,8 @@ static int b_range(filo_ctx *ctx, const filo_value *args, uint32_t n, filo_value
         *out = empty_list();
         return FILO_OK;
     }
-    if (hi - lo > (int64_t)UINT32_MAX) {
-        return filo_fail(ctx, "out of memory");
+    if (hi - lo > (int64_t)FILO_RANGE_MAX) {
+        return filo_fail(ctx, "range too large");
     }
     uint32_t count = (uint32_t)(hi - lo);
     if (make_seq(ctx, FILO_LIST, NULL, count, out) != FILO_OK) {

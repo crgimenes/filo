@@ -150,6 +150,9 @@ their arguments and validate them when evaluated, as listed in the table.
   arena reset after every run, copying surviving globals out. Neither is
   visible to a script.
 - Limits (parse depth, default step/recursion limits) are configuration.
+  The one memory ceiling in the language is `range`: more than 2^20
+  elements is an error on every runtime, so a script cannot exhaust the
+  host before the first step check.
 - Number formatting for `(string n)` must be the shortest representation
   that round-trips; how it is computed is the runtime's business.
 - The wording of error messages: see *Error context*.

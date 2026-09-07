@@ -36,3 +36,11 @@ limits steps=100000
 (fold (fn (acc x) (+ acc x)) 0 (range 100))
 --- want
 4950
+
+=== range beyond the element ceiling is an error
+(range 1e18)
+--- error
+
+=== range with a huge negative start is an error
+(range -1e18 0)
+--- error

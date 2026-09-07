@@ -109,7 +109,7 @@ Note: `NewEngine()` includes the core math/logic/list/type builtins by default. 
 | | `map` | `(map fn list)` |
 | | `filter` | `(filter fn list)` Keeps elements for which `fn` returns `#t`. |
 | | `fold` | `(fold fn init list)` |
-| | `range` | `(range end)` → `0..end-1`; `(range start end)` → `start..end-1` (empty when non-increasing). Bounds must be integers. |
+| | `range` | `(range end)` → `0..end-1`; `(range start end)` → `start..end-1` (empty when non-increasing). Bounds must be integers, and the list is capped at 2^20 elements. |
 | | `reverse` | `(reverse list)` |
 | **Errors** | `error` | `(error "message")` Raises a script error with the message — for validation rules that must fail clearly. |
 

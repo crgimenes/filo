@@ -20,7 +20,12 @@ type EvalConfig struct {
 }
 
 const (
-	defaultStepLimit      = 100_000
+	defaultStepLimit = 100_000
+	// range is the only builtin whose output is not bounded by its inputs;
+	// without a ceiling (range 1e18) exhausts the host before the first step
+	// check. 2^20 values is ~100 MB here and far more than a script can
+	// iterate under the default step limit. The C runtime uses the same cap.
+	rangeMax              = 1 << 20
 	defaultRecursionLimit = 128
 	defaultTimeout        = 30 * time.Second
 )

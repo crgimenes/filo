@@ -29,6 +29,7 @@ enum {
     FILO_SYMBOLS_MAX = 512,
     FILO_STEP_LIMIT_DEFAULT = 100000,
     FILO_RECURSION_LIMIT_DEFAULT = 128,
+    FILO_RANGE_MAX = 1048576,   /* 2^20 elements; same ceiling as the Go runtime */
     FILO_PARSE_DEPTH_MAX = 256, /* the Go engine allows 4096; this is a
                                    configuration, not part of the language */
     FILO_EVAL_DEPTH_MAX = 512,  /* nesting of eval() calls: bounds the C stack */
