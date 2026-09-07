@@ -1,0 +1,110 @@
+# Functions: fn, calls, arity, builtins as values, higher-order use.
+
+=== identity
+((fn (x) x) 42)
+--- want
+42
+
+=== no parameters
+((fn () 1))
+--- want
+1
+
+=== body is a sequence
+((fn (x) (set x (+ x 1)) x) 1)
+--- want
+2
+
+=== arity mismatch too many
+((fn (x) x) 1 2)
+--- error
+
+=== arity mismatch too few
+((fn (x y) x) 1)
+--- error
+
+=== fn needs parameters and body
+(fn)
+--- error
+
+=== fn needs a body
+(fn (x))
+--- error
+
+=== fn parameters must be symbols
+((fn (1) 1) 2)
+--- error
+
+=== calling a number
+(1 2)
+--- error
+
+=== calling a string
+("a")
+--- error
+
+=== calling the result of a call
+((+ 1 2) 3)
+--- error
+
+=== empty list expression
+()
+--- error
+
+=== builtin is not a value
++
+--- error
+
+=== builtin cannot be passed as an argument
+(fold + 0 (list 1 2))
+--- error
+
+=== builtin cannot be inspected as a value
+(type-of +)
+--- error
+
+=== function is a value
+(type-of (fn (x) x))
+--- want
+"func"
+
+=== function stored in a global
+(do (def sq (fn (x) (* x x))) (sq 7))
+--- want
+49
+
+=== function stored in a local
+(let ((sq (fn (x) (* x x)))) (sq 7))
+--- want
+49
+
+=== function passed to a function
+(let ((apply (fn (f x) (f x)))) (apply (fn (n) (+ n 1)) 41))
+--- want
+42
+
+=== function returned from a function
+(((fn () (fn (x) (* x 3)))) 5)
+--- want
+15
+
+=== argument evaluation order is left to right
+(do
+  (set log (list))
+  (def note (fn (x) (set log (list-append log x)) x))
+  ((fn (a b c) log) (note 1) (note 2) (note 3)))
+--- want
+(list 1 2 3)
+
+=== arguments are evaluated before the body runs
+((fn (a b) (+ a b)) (* 2 3) (* 4 5))
+--- want
+26
+
+=== error inside an argument propagates
+((fn (x) x) (/ 1 0))
+--- error
+
+=== error inside the body propagates
+((fn (x) (/ x 0)) 1)
+--- error

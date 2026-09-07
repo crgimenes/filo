@@ -1,0 +1,107 @@
+packs: strings
+
+=== str-len
+(str-len "abc")
+--- want
+3
+
+=== str-len counts runes
+(str-len "héllo")
+--- want
+5
+
+=== str-len empty
+(str-len "")
+--- want
+0
+
+=== str-concat
+(str-concat "a" "b" "c")
+--- want
+"abc"
+
+=== str-concat needs strings
+(str-concat "a" 1)
+--- error
+
+=== str-join
+(str-join "-" (list "a" "b"))
+--- want
+"a-b"
+
+=== str-join empty list
+(str-join "-" (list))
+--- want
+""
+
+=== str-split
+(str-split "," "a,b")
+--- want
+(list "a" "b")
+
+=== str-split no separator present
+(str-split "," "abc")
+--- want
+(list "abc")
+
+=== str-find present
+(str-find "foo" "foobar")
+--- want
+#t
+
+=== str-find absent
+(str-find "baz" "foobar")
+--- want
+#f
+
+=== str-sub
+(str-sub "héllo" 1 3)
+--- want
+"él"
+
+=== str-sub to end
+(str-sub "hello" 3)
+--- want
+"lo"
+
+=== str-replace
+(str-replace "l" "L" "hello")
+--- want
+"heLLo"
+
+=== str-trim
+(str-trim "  hi  ")
+--- want
+"hi"
+
+=== str-upper
+(str-upper "abc")
+--- want
+"ABC"
+
+=== str-lower
+(str-lower "ABC")
+--- want
+"abc"
+
+=== str-fmt string
+(str-fmt "%s!" "hi")
+--- want
+"hi!"
+
+=== str-fmt float
+(str-fmt "%.2f" 3.14159)
+--- want
+"3.14"
+
+# Quirks, flagged for a decision (see quirks.txt): Go's fmt leaks through.
+
+=== str-fmt leaks the Go verb error for %d
+(str-fmt "%d" 1)
+--- want
+"%!d(float64=1)"
+
+=== str-fmt prints a list as a Go slice
+(str-fmt "%v" (list 1 2))
+--- want
+"[1 2]"

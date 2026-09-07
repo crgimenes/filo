@@ -490,6 +490,22 @@ if err != nil {
 
 ---
 
+## C runtime
+
+`c/` holds the same language as a C library: `filo.h` and `filo.c`, no libc
+beyond `memcpy`/`memcmp`/`strlen`, and no allocation after init — the host
+hands over two memory blocks (a persistent arena for programs and globals, a
+run arena reset on every run) and a script that exhausts them fails with an
+error instead of corrupting anything. It compiles for a freestanding wasm32
+target and for microcontrollers; `filo_libc.c` adds number formatting and
+parsing for hosts that have a libc.
+
+Both runtimes lower source to the instruction set in `docs/ir.md` and are
+held to the same behavior by `testdata/corpus`: plain-text cases pinning what
+a script evaluates to, run by `corpus_test.go` here and by `c/corpus_runner.c`
+there (`make -C c qa` runs it under ASan/UBSan together with clang-tidy and
+cppcheck). Error messages are a Go-side promise; the corpus asserts outcomes.
+
 ## More of my projects
 
 - [kutta](https://github.com/crgimenes/kutta): a 2D wind tunnel; watch air misbehave around an airfoil.

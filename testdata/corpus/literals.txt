@@ -1,0 +1,148 @@
+# Literals and lexical rules.
+
+=== integer
+42
+--- want
+42
+
+=== negative integer
+-7
+--- want
+-7
+
+=== float
+3.14
+--- want
+3.14
+
+=== exponent
+1e3
+--- want
+1000
+
+=== leading dot
+.5
+--- want
+0.5
+
+=== trailing dot
+5.
+--- want
+5
+
+=== true
+#t
+--- want
+#t
+
+=== false
+#f
+--- want
+#f
+
+=== string
+"hello"
+--- want
+"hello"
+
+=== empty string
+""
+--- want
+""
+
+=== string escapes
+"a\tb\nc\r\"d\"\\e"
+--- want
+(string "a\tb\nc\r\"d\"\\e")
+
+=== string escapes all
+"\0\a\b\f\v"
+--- want
+"\0\a\b\f\v"
+
+=== utf8 passes through
+"héllo wörld ✓"
+--- want
+"héllo wörld ✓"
+
+=== empty list
+(list)
+--- want
+(list)
+
+=== list of mixed kinds
+(list 1 "a" #t)
+--- want
+(list 1 "a" #t)
+
+=== nested list
+(list (list) (list 1 (list 2)))
+--- want
+(list (list) (list 1 (list 2)))
+
+=== empty tuple
+(tuple)
+--- want
+(tuple)
+
+=== tuple
+(tuple 1 2)
+--- want
+(tuple 1 2)
+
+=== values is tuple
+(values 1 2)
+--- want
+(tuple 1 2)
+
+=== line comment
+(+ 1 2) ; a comment
+--- want
+3
+
+=== comment lines between expressions
+;; first
+(set a 1)
+;; second
+(+ a 1)
+--- want
+2
+
+=== bom is stripped
+﻿(+ 1 2)
+--- want
+3
+
+=== symbol with colon
+given field:for = 3
+(* field:for 2)
+--- want
+6
+
+=== bool literal must be exact
+#true
+--- error
+
+=== bool literal needs a boundary
+#t#f
+--- error
+
+=== unsupported escape
+"\q"
+--- error
+
+=== unterminated string
+"abc
+--- error
+
+=== unterminated list
+(list 1
+--- error
+
+=== stray close paren
+)
+--- error
+
+=== only a comment is an empty script
+; nothing here
+--- error

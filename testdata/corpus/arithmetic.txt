@@ -1,0 +1,162 @@
+# Arithmetic builtins: + - * / % pow.
+
+=== add
+(+ 1 2)
+--- want
+3
+
+=== add variadic
+(+ 1 2 3 4)
+--- want
+10
+
+=== add one
+(+ 1)
+--- want
+1
+
+=== add zero args is identity
+(+)
+--- want
+0
+
+=== add floats
+(+ 0.1 0.2)
+--- want
+0.30000000000000004
+
+=== sub
+(- 10 3)
+--- want
+7
+
+=== sub variadic
+(- 10 3 2)
+--- want
+5
+
+=== sub unary negates
+(- 5)
+--- want
+-5
+
+=== sub needs an argument
+(-)
+--- error
+
+=== mul
+(* 2 3)
+--- want
+6
+
+=== mul variadic
+(* 2 3 4)
+--- want
+24
+
+=== mul zero args is identity
+(*)
+--- want
+1
+
+=== div
+(/ 10 2)
+--- want
+5
+
+=== div variadic
+(/ 100 5 2)
+--- want
+10
+
+=== div float result
+(/ 1 4)
+--- want
+0.25
+
+=== div by zero
+(/ 1 0)
+--- error
+
+=== div zero by zero
+(/ 0 0)
+--- error
+
+=== div by float zero
+(/ 1 0.0)
+--- error
+
+=== div needs an argument
+(/)
+--- error
+
+=== mod
+(% 10 3)
+--- want
+1
+
+=== mod is floored: negative divisor
+(% 5 -3)
+--- want
+-1
+
+=== mod is floored: negative dividend
+(% -1 2)
+--- want
+1
+
+=== mod exact
+(% 7 7)
+--- want
+0
+
+=== mod floats
+(% 5.5 2)
+--- want
+1.5
+
+=== mod negative float dividend
+(% -5.5 2)
+--- want
+0.5
+
+=== mod by zero
+(% 1 0)
+--- error
+
+=== pow
+(pow 2 10)
+--- want
+1024
+
+=== pow fractional
+(pow 2 0.5)
+--- want
+1.4142135623730951
+
+=== pow zero zero
+(pow 0 0)
+--- want
+1
+
+=== pow arity
+(pow 2)
+--- error
+
+=== type error
+(+ 1 "a")
+--- error
+
+=== type error nested
+(* 2 (+ 1 #t))
+--- error
+
+=== nested arithmetic
+(+ (* 2 3) (- 10 4) (/ 8 2))
+--- want
+16
+
+=== large integers stay exact
+(+ 9007199254740992 1)
+--- want
+9007199254740992

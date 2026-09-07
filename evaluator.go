@@ -13,7 +13,7 @@ type evaluator struct {
 	steps     int
 	recursion int
 	global    *GlobalEnv
-	frame     *Frame // Current local scope (can be nil if at top level)
+	frame     *Frame // current local scope; nil at top level
 	startedAt time.Time
 }
 
@@ -21,7 +21,10 @@ func newEvaluator(ctx context.Context, cfg EvalConfig, global *GlobalEnv, builti
 	return &evaluator{ctx: ctx, cfg: cfg, builtins: builtins, global: global, startedAt: time.Now()}
 }
 
-func (ev *evaluator) eval(node Node) (Value, error) {
+// eval runs one instruction. Every instruction costs one step, counted before
+// it does anything, which keeps the count equal to the number of parse-tree
+// nodes visited — the accounting docs/ir.md promises across runtimes.
+func (ev *evaluator) eval(in *Instr) (Value, error) {
 	err := ev.tick()
 	if err != nil {
 		return Value{}, err
@@ -31,47 +34,79 @@ func (ev *evaluator) eval(node Node) (Value, error) {
 		return Value{}, fmt.Errorf("step limit exceeded")
 	}
 
-	switch n := node.(type) {
-	case *NumberLit:
-		return VNum(n.Value), nil
-	case *BoolLit:
-		return VBool(n.Value), nil
-	case *StringLit:
-		return VString(n.Value), nil
-
-	case *ResolvedSymbol:
-		// Static resolution: O(1) access
+	switch in.Op {
+	case OpConst:
+		return in.Val, nil
+	case OpLocal:
 		cur := ev.frame
-		for i := 0; i < n.Depth; i++ {
+		for i := 0; i < in.A; i++ {
 			cur = cur.parent
 		}
-		return cur.slots[n.Index], nil
-
-	case *ResolvedBuiltin:
-		return Value{}, fmt.Errorf("builtin %q cannot be used as value", n.Name)
-
-	case *ResolvedGlobal:
-		// Global resolution by ID: O(1) access
-		v, ok := ev.global.GetByID(n.ID)
+		return cur.slots[in.B], nil
+	case OpGlobal:
+		v, ok := ev.global.GetByID(in.A)
 		if !ok {
-			// The symbol resolved at compile time but the global was never set at
-			// runtime (GetByID only fails on an out-of-bounds ID).
-			return Value{}, fmt.Errorf("undefined global: %s", n.Name)
+			return Value{}, fmt.Errorf("undefined global: %s", in.Name)
 		}
 		return v, nil
-
-	case *Symbol:
-		// Dynamic/Global resolution
-		val, ok := ev.global.Get(n.Name)
-		if ok {
-			return val, nil
+	case OpDynamic:
+		v, ok := ev.global.Get(in.Name)
+		if !ok {
+			return Value{}, fmt.Errorf("undefined symbol: %s", in.Name)
 		}
-		return Value{}, fmt.Errorf("undefined symbol: %s", n.Name)
-
-	case *List:
-		return ev.evalList(n)
+		return v, nil
+	case OpBuiltin:
+		return Value{}, fmt.Errorf("builtin %q cannot be used as value", in.Name)
+	case OpEmpty:
+		return Value{}, fmt.Errorf("empty list expression")
+	case OpInvalid:
+		return Value{}, fmt.Errorf("in %s: %s", in.Name, in.Msg)
+	case OpIf:
+		v, err := ev.evalIf(in.Args)
+		return v, wrapIn("if", err)
+	case OpCond:
+		v, err := ev.evalCond(in.Clauses)
+		return v, wrapIn("cond", err)
+	case OpDo:
+		v, err := ev.evalDo(in.Args)
+		return v, wrapIn("do", err)
+	case OpAnd:
+		v, err := ev.evalAnd(in.Args)
+		return v, wrapIn("and", err)
+	case OpOr:
+		v, err := ev.evalOr(in.Args)
+		return v, wrapIn("or", err)
+	case OpLet:
+		v, err := ev.evalLet(in)
+		return v, wrapIn("let", err)
+	case OpLetv:
+		v, err := ev.evalLetv(in)
+		return v, wrapIn("letv", err)
+	case OpSet:
+		v, err := ev.evalSet(in.Args)
+		return v, wrapIn("set", err)
+	case OpFn:
+		v, err := ev.evalFn(in)
+		return v, wrapIn("fn", err)
+	case OpDef:
+		v, err := ev.evalDef(in)
+		return v, wrapIn("def", err)
+	case OpTuple:
+		vals, err := ev.evalArgs(in.Args)
+		if err != nil {
+			return Value{}, wrapIn(in.Name, err)
+		}
+		return VTuple(vals), nil
+	case OpExit:
+		return ev.evalSignal(in.Args, "exit")
+	case OpReturn:
+		return ev.evalSignal(in.Args, "return")
+	case OpCallB:
+		return ev.callBuiltin(in.Name, in.Fn, in.Args)
+	case OpCall:
+		return ev.evalCall(in.Args)
 	default:
-		return Value{}, fmt.Errorf("unknown node type: %T", node)
+		return Value{}, fmt.Errorf("unknown instruction: %d", in.Op)
 	}
 }
 
@@ -90,109 +125,49 @@ func wrapIn(ctx string, err error) error {
 	return fmt.Errorf("in %s: %w", ctx, err)
 }
 
-func (ev *evaluator) evalList(list *List) (Value, error) {
-	if len(list.Elems) == 0 {
-		return Value{}, fmt.Errorf("empty list expression")
+func (ev *evaluator) callBuiltin(name string, fn builtinFunc, argInstrs []*Instr) (Value, error) {
+	args, err := ev.evalArgs(argInstrs)
+	if err != nil {
+		return Value{}, fmt.Errorf("while evaluating arguments for %q: %w", name, err)
 	}
-
-	rb, ok := list.Elems[0].(*ResolvedBuiltin)
-	if ok {
-		args, err := ev.evalArgs(list.Elems[1:])
-		if err != nil {
-			return Value{}, fmt.Errorf("while evaluating arguments for %q: %w", rb.Name, err)
-		}
-		v, callErr := rb.fn(ev.ctx, ev, args)
-		if callErr != nil {
-			return Value{}, fmt.Errorf("in builtin %q: %w", rb.Name, callErr)
-		}
-		return v, nil
+	v, callErr := fn(ev.ctx, ev, args)
+	if callErr != nil {
+		return Value{}, fmt.Errorf("in builtin %q: %w", name, callErr)
 	}
+	return v, nil
+}
 
-	headSym, ok := list.Elems[0].(*Symbol)
-	// Special forms stay plain Symbols: the compiler only resolves names bound in
-	// scope, and keywords like "if"/"let"/"fn" never are.
-
-	if ok {
-		switch headSym.Name {
-		case "if":
-			v, err := ev.evalIf(list.Elems[1:])
-			return v, wrapIn("if", err)
-		case "cond":
-			v, err := ev.evalCond(list.Elems[1:])
-			return v, wrapIn("cond", err)
-		case "do":
-			v, err := ev.evalDo(list.Elems[1:])
-			return v, wrapIn("do", err)
-		case "and":
-			v, err := ev.evalAnd(list.Elems[1:])
-			return v, wrapIn("and", err)
-		case "or":
-			v, err := ev.evalOr(list.Elems[1:])
-			return v, wrapIn("or", err)
-		case "let":
-			v, err := ev.evalLet(list.Elems[1:])
-			return v, wrapIn("let", err)
-		case "letv":
-			v, err := ev.evalLetv(list.Elems[1:])
-			return v, wrapIn("letv", err)
-		case "set":
-			v, err := ev.evalSet(list.Elems[1:])
-			return v, wrapIn("set", err)
-		case "fn":
-			v, err := ev.evalFn(list.Elems[1:])
-			return v, wrapIn("fn", err)
-		case "def":
-			v, err := ev.evalDef(list.Elems[1:])
-			return v, wrapIn("def", err)
-		case "values":
-			v, err := ev.evalValues(list.Elems[1:])
-			return v, wrapIn("values", err)
-		case "tuple":
-			v, err := ev.evalValues(list.Elems[1:])
-			return v, wrapIn("tuple", err)
-		case "exit":
-			return ev.evalExit(list.Elems[1:])
-		case "return":
-			return ev.evalReturn(list.Elems[1:])
-		}
-		builtin, okBuiltin := ev.builtins[headSym.Name]
-		if okBuiltin {
-			args, err := ev.evalArgs(list.Elems[1:])
-			if err != nil {
-				return Value{}, fmt.Errorf("while evaluating arguments for %q: %w", headSym.Name, err)
-			}
-			v, callErr := builtin(ev.ctx, ev, args)
-			if callErr != nil {
-				return Value{}, fmt.Errorf("in builtin %q: %w", headSym.Name, callErr)
-			}
-			return v, nil
+// evalCall runs a closure call: args[0] is the head, the rest its arguments. A
+// by-name head that names a builtin takes the builtin path instead, which is
+// how lowering without a builtin table keeps working.
+func (ev *evaluator) evalCall(args []*Instr) (Value, error) {
+	head := args[0]
+	if head.Op == OpDynamic {
+		builtin, ok := ev.builtins[head.Name]
+		if ok {
+			return ev.callBuiltin(head.Name, builtin, args[1:])
 		}
 	}
-
-	// Function call
-	fnVal, err := ev.eval(list.Elems[0])
+	fnVal, err := ev.eval(head)
 	if err != nil {
 		return Value{}, wrapIn("call", err)
 	}
-
 	if fnVal.Kind != KFunc {
 		return Value{}, fmt.Errorf("attempt to call non-function (got %s)", fnVal.describe())
 	}
-	// Optimization: Pass AST nodes directly to avoid intermediate slice alloc
-	v, callErr := ev.callFuncAST(ev.ctx, fnVal.Fn, list.Elems[1:])
+	v, callErr := ev.callFuncInstrs(fnVal.Fn, args[1:])
 	return v, wrapIn("function call", callErr)
 }
 
-// evalArgs creates a slice of values from nodes
-func (ev *evaluator) evalArgs(nodes []Node) ([]Value, error) {
-	n := len(nodes)
+// evalArgs evaluates instructions into values, naming the failing argument.
+func (ev *evaluator) evalArgs(instrs []*Instr) ([]Value, error) {
+	n := len(instrs)
 	if n == 0 {
 		return nil, nil
 	}
-
 	result := make([]Value, n)
-	for i, node := range nodes {
-		val, err := ev.eval(node)
+	for i, in := range instrs {
+		val, err := ev.eval(in)
 		if err != nil {
 			return nil, fmt.Errorf("argument %d: %w", i, err)
 		}
@@ -201,54 +176,33 @@ func (ev *evaluator) evalArgs(nodes []Node) ([]Value, error) {
 	return result, nil
 }
 
-// Logic for callFuncAST (add to end or replace callFunc)
-func (ev *evaluator) callFuncAST(ctx context.Context, fn *Func, argNodes []Node) (Value, error) {
-	if len(fn.Params) != len(argNodes) {
-		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(argNodes))
+// callFuncInstrs calls fn with unevaluated arguments, evaluating them straight
+// into the new frame's slots.
+func (ev *evaluator) callFuncInstrs(fn *Func, argInstrs []*Instr) (Value, error) {
+	if len(fn.Params) != len(argInstrs) {
+		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(argInstrs))
 	}
 	ev.recursion++
 	if ev.cfg.RecursionLimit > 0 && ev.recursion > ev.cfg.RecursionLimit {
 		ev.recursion--
 		return Value{}, fmt.Errorf("recursion limit exceeded")
 	}
-
-	// Evaluate the arguments directly into the frame's slots, skipping the
-	// intermediate slice an evalArgs helper would allocate.
 	slots := make([]Value, len(fn.Params))
-	for i, node := range argNodes {
-		val, err := ev.eval(node)
+	for i, in := range argInstrs {
+		val, err := ev.eval(in)
 		if err != nil {
 			ev.recursion--
 			return Value{}, fmt.Errorf("in call arguments: argument %d: %w", i, err)
 		}
 		slots[i] = val
 	}
-
-	newFrame := &Frame{
-		slots:  slots,
-		parent: fn.Frame,
-	}
-
-	oldFrame := ev.frame
-	ev.frame = newFrame
-
-	result, err := ev.evalBody(fn.Body)
-
-	ev.frame = oldFrame
-	ev.recursion--
-
-	if err != nil {
-		ret, ok := err.(*returnSignal)
-		if ok {
-			return ret.Value, nil
-		}
-		return Value{}, err
-	}
-	return result, nil
+	return ev.runFunc(fn, slots)
 }
 
-// Keep callFunc for Builtins usage (takes []Value)
+// callFunc calls fn with already evaluated arguments; builtins such as map and
+// fold use it to run the closures they receive.
 func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Value, error) {
+	_ = ctx // the evaluator's own context governs cancellation
 	if len(args) != len(fn.Params) {
 		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(args))
 	}
@@ -257,12 +211,17 @@ func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Valu
 		ev.recursion--
 		return Value{}, fmt.Errorf("recursion limit exceeded")
 	}
+	return ev.runFunc(fn, args)
+}
 
+// runFunc runs a function body in a frame of slots whose parent is the frame
+// the closure captured. The recursion counter was already incremented by the
+// caller and is released here. A return signal becomes the function's value.
+func (ev *evaluator) runFunc(fn *Func, slots []Value) (Value, error) {
 	newFrame := &Frame{
-		slots:  args,
+		slots:  slots,
 		parent: fn.Frame,
 	}
-
 	oldFrame := ev.frame
 	ev.frame = newFrame
 
@@ -281,12 +240,12 @@ func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Valu
 	return result, nil
 }
 
-// evalAnd evaluates its arguments left to right and short-circuits: the first
-// false stops evaluation and later arguments never run. Every evaluated
-// argument must be a bool. (and) with no arguments is #t.
-func (ev *evaluator) evalAnd(args []Node) (Value, error) {
-	for _, node := range args {
-		v, err := ev.eval(node)
+// evalAnd evaluates left to right and short-circuits: the first false stops
+// evaluation and later arguments never run. Every evaluated argument must be a
+// bool. (and) with no arguments is #t.
+func (ev *evaluator) evalAnd(args []*Instr) (Value, error) {
+	for _, in := range args {
+		v, err := ev.eval(in)
 		if err != nil {
 			return Value{}, err
 		}
@@ -301,12 +260,10 @@ func (ev *evaluator) evalAnd(args []Node) (Value, error) {
 	return VBool(true), nil
 }
 
-// evalOr evaluates its arguments left to right and short-circuits: the first
-// true stops evaluation and later arguments never run. Every evaluated
-// argument must be a bool. (or) with no arguments is #f.
-func (ev *evaluator) evalOr(args []Node) (Value, error) {
-	for _, node := range args {
-		v, err := ev.eval(node)
+// evalOr mirrors evalAnd: the first true stops evaluation. (or) is #f.
+func (ev *evaluator) evalOr(args []*Instr) (Value, error) {
+	for _, in := range args {
+		v, err := ev.eval(in)
 		if err != nil {
 			return Value{}, err
 		}
@@ -321,25 +278,18 @@ func (ev *evaluator) evalOr(args []Node) (Value, error) {
 	return VBool(false), nil
 }
 
-// evalCond evaluates a multi-way branch:
-//
-//	(cond (test1 body1...) (test2 body2...) (else bodyN...))
-//
-// Clauses are tried in order; the first whose test evaluates to #t runs its
-// body (an implicit do — the last expression is the value). An `else` clause,
-// if present, must be last and always matches. Each evaluated test must be a
-// bool. When no clause matches, the result is the empty list, like (if) with a
-// false condition and no else branch.
-func (ev *evaluator) evalCond(clauses []Node) (Value, error) {
+// evalCond tries the clauses in order; the first whose test is #t runs its
+// body (an implicit do). An invalid clause errors only when it is reached, so
+// an earlier match hides it. No match and no else: the empty list.
+func (ev *evaluator) evalCond(clauses []Clause) (Value, error) {
 	for _, c := range clauses {
-		clause, ok := c.(*List)
-		if !ok || len(clause.Elems) < 2 {
-			return Value{}, fmt.Errorf("cond clause must be a list of a test and a body")
+		if c.Invalid {
+			return Value{}, fmt.Errorf("%s", c.Msg)
 		}
-		if sym, ok := clause.Elems[0].(*Symbol); ok && sym.Name == "else" {
-			return ev.evalBody(clause.Elems[1:])
+		if c.Else {
+			return ev.evalBody(c.Body)
 		}
-		test, err := ev.eval(clause.Elems[0])
+		test, err := ev.eval(c.Test)
 		if err != nil {
 			return Value{}, err
 		}
@@ -348,13 +298,13 @@ func (ev *evaluator) evalCond(clauses []Node) (Value, error) {
 			return Value{}, err
 		}
 		if match {
-			return ev.evalBody(clause.Elems[1:])
+			return ev.evalBody(c.Body)
 		}
 	}
 	return VList([]Value{}), nil
 }
 
-func (ev *evaluator) evalIf(args []Node) (Value, error) {
+func (ev *evaluator) evalIf(args []*Instr) (Value, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return Value{}, fmt.Errorf("if expects 2 or 3 arguments (condition then [else])")
 	}
@@ -375,13 +325,13 @@ func (ev *evaluator) evalIf(args []Node) (Value, error) {
 	return ev.eval(args[2])
 }
 
-func (ev *evaluator) evalDo(args []Node) (Value, error) {
+func (ev *evaluator) evalDo(args []*Instr) (Value, error) {
 	if len(args) == 0 {
 		return Value{}, fmt.Errorf("do expects at least 1 expression")
 	}
 	var result Value
-	for _, arg := range args {
-		val, err := ev.eval(arg)
+	for _, in := range args {
+		val, err := ev.eval(in)
 		if err != nil {
 			return Value{}, err
 		}
@@ -390,61 +340,37 @@ func (ev *evaluator) evalDo(args []Node) (Value, error) {
 	return result, nil
 }
 
-func (ev *evaluator) evalLet(args []Node) (Value, error) {
-	if len(args) < 2 {
+// evalLet: in.A binding values come first in Args, the body after. The new
+// frame is active while the values are evaluated, so a binding may read the
+// ones before it; reads of outer variables resolve through the parent.
+func (ev *evaluator) evalLet(in *Instr) (Value, error) {
+	n := in.A
+	if len(in.Args) <= n {
 		return Value{}, fmt.Errorf("let expects bindings and body")
 	}
-	bindingsList, ok := args[0].(*List)
-	if !ok {
-		return Value{}, fmt.Errorf("let expects binding list")
-	}
-
-	// Create Frame
-	numVars := len(bindingsList.Elems)
 	newFrame := &Frame{
-		slots:  make([]Value, numVars),
+		slots:  make([]Value, n),
 		parent: ev.frame,
 	}
-
-	// Temporarily switch to new frame?
-	// A binding may read the ones before it — (let ((x 1) (y x)) ...) — and the
-	// compiler resolves such reads into THIS frame, so newFrame must already be
-	// active while the binding values are evaluated. Reads of outer variables
-	// resolve through the parent frame and are unaffected.
 	oldFrame := ev.frame
 	ev.frame = newFrame
-
-	for i, b := range bindingsList.Elems {
-		pair, okPair := b.(*List)
-		if !okPair || len(pair.Elems) != 2 {
-			ev.frame = oldFrame
-			return Value{}, fmt.Errorf("invalid let binding")
-		}
-		val, err := ev.eval(pair.Elems[1])
+	for i := range n {
+		val, err := ev.eval(in.Args[i])
 		if err != nil {
 			ev.frame = oldFrame
 			return Value{}, err
 		}
 		newFrame.slots[i] = val
 	}
-
-	// Eval body
-	res, err := ev.evalBody(args[1:])
-	ev.frame = oldFrame // Restore
+	res, err := ev.evalBody(in.Args[n:])
+	ev.frame = oldFrame
 	return res, err
 }
 
-func (ev *evaluator) evalLetv(args []Node) (Value, error) {
-	if len(args) < 2 {
-		return Value{}, fmt.Errorf("letv expects bindings and body")
-	}
-	namesList, ok := args[0].(*List)
-	if !ok {
-		return Value{}, fmt.Errorf("letv expects name list")
-	}
-
-	// Eval tuple in OUTER scope (unlike let, letv values are one expression)
-	tupleVal, err := ev.eval(args[1])
+// evalLetv: Args[0] is the tuple expression, evaluated in the OUTER scope;
+// the rest is the body.
+func (ev *evaluator) evalLetv(in *Instr) (Value, error) {
+	tupleVal, err := ev.eval(in.Args[0])
 	if err != nil {
 		return Value{}, err
 	}
@@ -452,30 +378,25 @@ func (ev *evaluator) evalLetv(args []Node) (Value, error) {
 	if err != nil {
 		return Value{}, fmt.Errorf("letv expects tuple expression")
 	}
-	if len(namesList.Elems) != len(elements) {
+	if len(in.Names) != len(elements) {
 		return Value{}, fmt.Errorf("letv arity mismatch")
 	}
-
-	// Copy the tuple's elements into the frame. The slice must NOT be shared with
-	// the source tuple: a later (set var ...) writes into the frame's slots, and
-	// aliasing would mutate the original tuple in place (corrupting a value that
-	// is still reachable from another binding or the Go host).
+	// The slots must NOT alias the tuple: a later (set var ...) writes into
+	// the frame, and sharing would mutate a tuple still reachable elsewhere.
 	slots := make([]Value, len(elements))
 	copy(slots, elements)
 	newFrame := &Frame{
 		slots:  slots,
 		parent: ev.frame,
 	}
-
-	// Switch frame for body
 	oldFrame := ev.frame
 	ev.frame = newFrame
-	res, err := ev.evalBody(args[2:])
+	res, err := ev.evalBody(in.Args[1:])
 	ev.frame = oldFrame
 	return res, err
 }
 
-func (ev *evaluator) evalSet(args []Node) (Value, error) {
+func (ev *evaluator) evalSet(args []*Instr) (Value, error) {
 	if len(args) != 2 {
 		return Value{}, fmt.Errorf("set expects name and expression")
 	}
@@ -483,77 +404,53 @@ func (ev *evaluator) evalSet(args []Node) (Value, error) {
 	if err != nil {
 		return Value{}, err
 	}
-
-	switch sym := args[0].(type) {
-	case *ResolvedSymbol:
+	target := args[0]
+	switch target.Op {
+	case OpLocal:
 		cur := ev.frame
-		for i := 0; i < sym.Depth; i++ {
+		for i := 0; i < target.A; i++ {
 			cur = cur.parent
 		}
-		cur.slots[sym.Index] = val
+		cur.slots[target.B] = val
 		return val, nil
-	case *ResolvedGlobal:
-		ev.global.DefineID(sym.ID, val)
+	case OpGlobal:
+		ev.global.DefineID(target.A, val)
 		return val, nil
-	case *Symbol:
-		ev.global.Define(sym.Name, val)
+	case OpDynamic:
+		ev.global.Define(target.Name, val)
 		return val, nil
 	default:
 		return Value{}, fmt.Errorf("set name must be symbol")
 	}
 }
 
-func (ev *evaluator) evalFn(args []Node) (Value, error) {
-	if len(args) < 2 {
+func (ev *evaluator) evalFn(in *Instr) (Value, error) {
+	if len(in.Args) == 0 {
 		return Value{}, fmt.Errorf("fn expects parameters and body")
 	}
-	paramsList, ok := args[0].(*List)
-	if !ok {
-		return Value{}, fmt.Errorf("fn expects parameter list")
-	}
-	params := make([]string, len(paramsList.Elems))
-	for i, p := range paramsList.Elems {
-		sym, okSym := p.(*Symbol)
-		if !okSym {
-			return Value{}, fmt.Errorf("fn parameters must be symbols")
-		}
-		params[i] = sym.Name
-	}
-	fn := &Func{Params: params, Body: args[1:], Frame: ev.frame}
+	fn := &Func{Params: in.Names, Body: in.Args, Frame: ev.frame}
 	return VFunc(fn), nil
 }
 
-func (ev *evaluator) evalDef(args []Node) (Value, error) {
-	if len(args) != 2 {
-		return Value{}, fmt.Errorf("def expects name and expression")
+func (ev *evaluator) evalDef(in *Instr) (Value, error) {
+	if in.Msg != "" {
+		return Value{}, fmt.Errorf("%s", in.Msg)
 	}
-	nameSym, ok := args[0].(*Symbol)
-	if !ok {
-		return Value{}, fmt.Errorf("def name must be symbol")
-	}
-	val, err := ev.eval(args[1])
+	val, err := ev.eval(in.Args[0])
 	if err != nil {
 		return Value{}, err
 	}
-	ev.global.Define(nameSym.Name, val)
+	ev.global.Define(in.Name, val)
 	return val, nil
 }
 
-func (ev *evaluator) evalValues(args []Node) (Value, error) {
-	vals, err := ev.evalArgs(args)
-	if err != nil {
-		return Value{}, err
-	}
-	return VTuple(vals), nil
-}
-
-func (ev *evaluator) evalBody(nodes []Node) (Value, error) {
-	if len(nodes) == 0 {
+func (ev *evaluator) evalBody(body []*Instr) (Value, error) {
+	if len(body) == 0 {
 		return Value{}, fmt.Errorf("empty body")
 	}
 	var result Value
-	for _, n := range nodes {
-		val, err := ev.eval(n)
+	for _, in := range body {
+		val, err := ev.eval(in)
 		if err != nil {
 			return Value{}, err
 		}
@@ -562,9 +459,11 @@ func (ev *evaluator) evalBody(nodes []Node) (Value, error) {
 	return result, nil
 }
 
-func (ev *evaluator) evalExit(args []Node) (Value, error) {
+// evalSignal implements exit and return: an optional value, then the signal.
+// Neither adds error context — a signal is not an error.
+func (ev *evaluator) evalSignal(args []*Instr, form string) (Value, error) {
 	if len(args) > 1 {
-		return Value{}, fmt.Errorf("exit expects 0 or 1 argument")
+		return Value{}, fmt.Errorf("%s expects 0 or 1 argument", form)
 	}
 	val := VList([]Value{})
 	if len(args) == 1 {
@@ -574,20 +473,8 @@ func (ev *evaluator) evalExit(args []Node) (Value, error) {
 			return Value{}, err
 		}
 	}
-	return Value{}, &exitSignal{Value: val}
-}
-
-func (ev *evaluator) evalReturn(args []Node) (Value, error) {
-	if len(args) > 1 {
-		return Value{}, fmt.Errorf("return expects 0 or 1 argument")
-	}
-	val := VList([]Value{})
-	if len(args) == 1 {
-		var err error
-		val, err = ev.eval(args[0])
-		if err != nil {
-			return Value{}, err
-		}
+	if form == "exit" {
+		return Value{}, &exitSignal{Value: val}
 	}
 	return Value{}, &returnSignal{Value: val}
 }

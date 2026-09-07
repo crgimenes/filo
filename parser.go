@@ -28,16 +28,6 @@ type List struct {
 	Elems []Node
 }
 
-type ResolvedBuiltin struct {
-	Name string
-	fn   builtinFunc
-}
-
-type ResolvedGlobal struct {
-	Name string
-	ID   int
-}
-
 // ParseError represents a syntax/lexing error with a byte position in the source.
 // Position is 0-based and refers to a byte offset in the original string.
 // Near contains a small snippet around the error location to aid debugging.

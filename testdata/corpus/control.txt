@@ -1,0 +1,221 @@
+# Control flow: if, cond, do, exit, return.
+
+=== if true
+(if #t 1 2)
+--- want
+1
+
+=== if false
+(if #f 1 2)
+--- want
+2
+
+=== if without else, true
+(if #t "yes")
+--- want
+"yes"
+
+=== if without else, false is the empty list
+(if #f "yes")
+--- want
+(list)
+
+=== if condition must be a bool
+(if 1 2 3)
+--- error
+
+=== if condition list is not a bool
+(if (list) 1 2)
+--- error
+
+=== if too few arguments
+(if #t)
+--- error
+
+=== if too many arguments
+(if #t 1 2 3)
+--- error
+
+=== if only evaluates the taken branch
+(if #t 1 (/ 1 0))
+--- want
+1
+
+=== if nested
+(if (< 1 2) (if (> 3 2) "inner" "no") "outer")
+--- want
+"inner"
+
+=== cond first match
+(cond ((< 1 0) 1) ((> 2 1) 2) (else 3))
+--- want
+2
+
+=== cond else
+(cond ((< 1 0) 1) (else 3))
+--- want
+3
+
+=== cond no match is the empty list
+(cond ((< 1 0) 1) ((> 0 1) 2))
+--- want
+(list)
+
+=== cond empty
+(cond)
+--- want
+(list)
+
+=== cond only else
+(cond (else 5))
+--- want
+5
+
+=== cond body is an implicit do
+(cond (#t 1 2 3))
+--- want
+3
+
+=== cond stops at the first match
+(cond (#t 1) ((/ 1 0) 2))
+--- want
+1
+
+=== cond test must be a bool
+(cond (5 1))
+--- error
+
+=== cond clause needs a body
+(cond (else))
+--- error
+
+=== cond malformed clause
+(cond 5)
+--- error
+
+=== do returns the last
+(do 1 2 3)
+--- want
+3
+
+=== do nested
+(do (do 1 2) 3)
+--- want
+3
+
+=== do with side effects
+(let ((x 0)) (do (set x 1) (set x 2) x))
+--- want
+2
+
+=== do empty
+(do)
+--- error
+
+=== exit no value
+(exit)
+--- want
+(list)
+
+=== exit with value
+(exit 42)
+--- want
+42
+
+=== exit with string
+(exit "done")
+--- want
+"done"
+
+=== exit in if branch
+(if #t (exit 1) 2)
+--- want
+1
+
+=== exit in do
+(do 1 (exit 42) 3)
+--- want
+42
+
+=== exit in let
+(let ((x 10)) (exit x) 99)
+--- want
+10
+
+=== exit stops execution
+(do (set a 1) (exit) (set a 2))
+--- want
+(list)
+--- globals
+a = 1
+
+=== exit with expression
+(exit (* 6 7))
+--- want
+42
+
+=== exit from inside a function ends the script
+(let () (def f (fn () (exit 99))) (f) 42)
+--- want
+99
+
+=== exit arity
+(exit 1 2)
+--- error
+
+=== return at top level acts like exit
+(return 42)
+--- want
+42
+
+=== return at top level no value
+(return)
+--- want
+(list)
+
+=== return in function
+((fn (x) (return x) 99) 42)
+--- want
+42
+
+=== return early
+((fn (x) (if (< x 0) (return 0)) x) -5)
+--- want
+0
+
+=== return not taken
+((fn (x) (if (< x 0) (return 0)) x) 5)
+--- want
+5
+
+=== return from a let inside a function
+(let () (def outer (fn () (let () (return 42) 99))) (outer))
+--- want
+42
+
+=== return inside map
+(let () (def check (fn (x) (if (> x 5) (return x)) 0)) (map check (list 3 7 2)))
+--- want
+(list 0 7 0)
+
+=== return inside fold
+(let () (def f (fn (acc x) (if (> x 10) (return acc) (+ acc x)))) (fold f 0 (list 1 2 3)))
+--- want
+6
+
+=== return nested functions
+(let ()
+  (def inner (fn (x) (return (* x 2))))
+  (def outer (fn (y) (+ (inner y) 1)))
+  (outer 5))
+--- want
+11
+
+=== return with expression
+((fn () (return (+ 1 2 3))))
+--- want
+6
+
+=== return arity
+(return 1 2)
+--- error

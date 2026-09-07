@@ -20,7 +20,7 @@ const (
 
 type Func struct {
 	Params []string
-	Body   []Node
+	Body   []*Instr
 	Frame  *Frame
 }
 

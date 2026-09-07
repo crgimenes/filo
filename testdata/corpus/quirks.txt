@@ -1,0 +1,93 @@
+# Current behavior that was noticed while building the corpus and has NOT been
+# decided on. Each case here pins what the Go engine does today so that a
+# change is deliberate and visible, not accidental. When a behavior is fixed
+# on purpose, delete its case here and add the intended one to the proper file.
+#
+# Flagged for a decision:
+#   - "inf", "nan", "Infinity" and "-inf" read as number literals, not symbols
+#     (the lexer tries ParseFloat first), and "1_000" / "+5" are numbers too.
+#   - (number ...) accepts the same forms.
+#   - (nth ...) and (range ...) silently truncate fractional arguments.
+#   - (/ x) with one argument returns x, not 1/x.
+#   - (pow -8 1/3) yields NaN instead of an error.
+#   - (exit ...) inside a function that a builtin calls (map/filter/fold) is
+#     reported as an error instead of ending the script with that value —
+#     the signal is wrapped by the builtin's error context and lost.
+#   - str-fmt leaks Go formatting (recorded in strings.txt, its own pack).
+
+=== inf literal
+inf
+--- want
+(number "inf")
+
+=== negative inf literal
+-inf
+--- want
+(- 0 (number "inf"))
+
+=== nan literal
+nan
+--- want
+(number "nan")
+
+=== Infinity literal
+Infinity
+--- want
+(number "inf")
+
+=== underscore digit separator literal
+1_000
+--- want
+1000
+
+=== plus sign literal
++5
+--- want
+5
+
+=== number accepts inf
+(number "inf")
+--- want
+(/ 1e308 1e-308)
+
+=== number accepts underscore separator
+(number "1_000")
+--- want
+1000
+
+=== number rejects hex
+(number "0x10")
+--- error
+
+=== hex literal is a symbol
+0x10
+--- error
+
+=== nth truncates a fractional index
+(nth (list 1 2) 1.5)
+--- want
+2
+
+=== range truncates a fractional end
+(range 1.5)
+--- want
+(list 0)
+
+=== range truncates a fractional start
+(range 2.5 5)
+--- want
+(list 2 3 4)
+
+=== unary division returns the argument
+(/ 2)
+--- want
+2
+
+=== pow of a negative base to a fractional exponent is NaN
+(pow -8 (/ 1 3))
+--- want
+(number "nan")
+
+=== exit inside a builtin-called function is an error
+(map (fn (x) (exit 7)) (list 1 2))
+--- error

@@ -1,0 +1,38 @@
+# Evaluation limits. Cases keep a wide margin: the exact step count is
+# implementation-defined, only the fact that a runaway script stops is not.
+
+=== infinite recursion stops on the step limit
+limits steps=100
+(let () (def loop (fn (n) (loop n))) (loop 0))
+--- error
+
+=== infinite recursion stops on the recursion limit
+limits recursion=5
+(let () (def loop (fn (n) (loop n))) (loop 0))
+--- error
+
+=== deep recursion fails under a small recursion limit
+limits recursion=5
+(let () (def f (fn (n) (if (= n 0) 0 (f (- n 1))))) (f 50))
+--- error
+
+=== the same recursion succeeds with the default limits
+(let () (def f (fn (n) (if (= n 0) 0 (f (- n 1))))) (f 50))
+--- want
+0
+
+=== a long loop fails under a small step limit
+limits steps=50
+(fold (fn (acc x) (+ acc x)) 0 (range 100))
+--- error
+
+=== the same loop succeeds with the default limits
+(fold (fn (acc x) (+ acc x)) 0 (range 100))
+--- want
+4950
+
+=== limits reset between runs
+limits steps=100000
+(fold (fn (acc x) (+ acc x)) 0 (range 100))
+--- want
+4950

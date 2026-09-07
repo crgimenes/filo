@@ -1,0 +1,271 @@
+# Lists and tuples: constructors, access, higher-order builtins.
+
+=== list
+(list 1 2 3)
+--- want
+(list 1 2 3)
+
+=== list evaluates its elements
+(list (+ 1 1) (* 2 2))
+--- want
+(list 2 4)
+
+=== length
+(length (list 1 2 3))
+--- want
+3
+
+=== length empty
+(length (list))
+--- want
+0
+
+=== length tuple
+(length (tuple 1 2))
+--- want
+2
+
+=== length of a string is an error
+(length "abc")
+--- error
+
+=== head
+(head (list 10 20 30))
+--- want
+10
+
+=== head of empty
+(head (list))
+--- error
+
+=== head of tuple is an error
+(head (tuple 1))
+--- error
+
+=== tail
+(tail (list 1 2 3))
+--- want
+(list 2 3)
+
+=== tail of one
+(tail (list 1))
+--- want
+(list)
+
+=== tail of empty
+(tail (list))
+--- error
+
+=== nth
+(nth (list 10 20 30) 1)
+--- want
+20
+
+=== nth first
+(nth (list 10 20 30) 0)
+--- want
+10
+
+=== nth out of range
+(nth (list 1 2) 5)
+--- error
+
+=== nth negative
+(nth (list 1 2) -1)
+--- error
+
+=== nth on tuple is an error
+(nth (tuple 1 2) 0)
+--- error
+
+=== nth arity
+(nth (list 1 2))
+--- error
+
+=== list-append
+(list-append (list 1) 2)
+--- want
+(list 1 2)
+
+=== list-append nests a list
+(list-append (list 1) (list 2))
+--- want
+(list 1 (list 2))
+
+=== list-append does not mutate
+(let ((xs (list 1))) (list-append xs 2) xs)
+--- want
+(list 1)
+
+=== list-concat
+(list-concat (list 1) (list 2))
+--- want
+(list 1 2)
+
+=== list-concat three
+(list-concat (list 1) (list) (list 2 3))
+--- want
+(list 1 2 3)
+
+=== list-concat needs two lists
+(list-concat (list 1))
+--- error
+
+=== list-concat needs lists
+(list-concat (list 1) 2)
+--- error
+
+=== map
+(map (fn (x) (* x 2)) (list 1 2 3))
+--- want
+(list 2 4 6)
+
+=== map empty
+(map (fn (x) x) (list))
+--- want
+(list)
+
+=== map with a named function
+(let () (def sq (fn (x) (* x x))) (map sq (list 1 2 3)))
+--- want
+(list 1 4 9)
+
+=== map function arity
+(map (fn (x y) x) (list 1))
+--- error
+
+=== map on tuple is an error
+(map (fn (x) x) (tuple 1 2))
+--- error
+
+=== filter
+(filter (fn (x) (> x 1)) (list 1 2 3))
+--- want
+(list 2 3)
+
+=== filter keeps none
+(filter (fn (x) #f) (list 1 2))
+--- want
+(list)
+
+=== filter empty
+(filter (fn (x) #t) (list))
+--- want
+(list)
+
+=== filter predicate must return a bool
+(filter (fn (x) x) (list 1 2))
+--- error
+
+=== fold
+(fold (fn (acc x) (+ acc x)) 0 (list 1 2 3 4))
+--- want
+10
+
+=== fold empty returns init
+(fold (fn (acc x) (+ acc x)) 7 (list))
+--- want
+7
+
+=== fold builds a list
+(fold (fn (acc x) (list-append acc (* x x))) (list) (list 1 2 3))
+--- want
+(list 1 4 9)
+
+=== range one argument
+(range 3)
+--- want
+(list 0 1 2)
+
+=== range two arguments
+(range 2 5)
+--- want
+(list 2 3 4)
+
+=== range non-increasing is empty
+(range 5 2)
+--- want
+(list)
+
+=== range zero
+(range 0)
+--- want
+(list)
+
+=== range negative start
+(range -2 1)
+--- want
+(list -2 -1 0)
+
+=== range arity
+(range)
+--- error
+
+=== reverse
+(reverse (list 1 2 3))
+--- want
+(list 3 2 1)
+
+=== reverse empty
+(reverse (list))
+--- want
+(list)
+
+=== reverse on tuple is an error
+(reverse (tuple 1 2))
+--- error
+
+=== is-empty list
+(is-empty (list))
+--- want
+#t
+
+=== is-empty non-empty list
+(is-empty (list 1))
+--- want
+#f
+
+=== is-empty string
+(is-empty "")
+--- want
+#t
+
+=== is-empty non-empty string
+(is-empty "a")
+--- want
+#f
+
+=== is-empty tuple
+(is-empty (tuple))
+--- want
+#t
+
+=== is-empty number
+(is-empty 5)
+--- want
+#f
+
+=== is-nil empty list
+(is-nil (list))
+--- want
+#t
+
+=== is-nil non-empty list
+(is-nil (list 1))
+--- want
+#f
+
+=== is-nil tuple is not nil
+(is-nil (tuple))
+--- want
+#f
+
+=== is-nil number
+(is-nil 0)
+--- want
+#f
+
+=== composed pipeline
+(fold (fn (acc x) (+ acc x)) 0 (map (fn (x) (* x x)) (filter (fn (x) (> x 1)) (range 5))))
+--- want
+29

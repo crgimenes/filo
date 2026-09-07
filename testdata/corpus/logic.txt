@@ -1,0 +1,85 @@
+# Boolean logic: not is a builtin; and/or are short-circuit special forms.
+
+=== not true
+(not #t)
+--- want
+#f
+
+=== not false
+(not #f)
+--- want
+#t
+
+=== not needs a bool
+(not 1)
+--- error
+
+=== not arity
+(not)
+--- error
+
+=== and true
+(and #t #t)
+--- want
+#t
+
+=== and false
+(and #t #f)
+--- want
+#f
+
+=== and empty is true
+(and)
+--- want
+#t
+
+=== and single
+(and #t)
+--- want
+#t
+
+=== and variadic
+(and #t #t #t #f)
+--- want
+#f
+
+=== and needs bools
+(and 1)
+--- error
+
+=== and short-circuits past an error
+(and #f (/ 1 0))
+--- want
+#f
+
+=== and evaluates the tail when needed
+(and #t (/ 1 0))
+--- error
+
+=== or true
+(or #f #t)
+--- want
+#t
+
+=== or false
+(or #f #f)
+--- want
+#f
+
+=== or empty is false
+(or)
+--- want
+#f
+
+=== or short-circuits past an error
+(or #t (/ 1 0))
+--- want
+#t
+
+=== or evaluates the tail when needed
+(or #f (/ 1 0))
+--- error
+
+=== or tail must be a bool
+(or #f 1)
+--- error

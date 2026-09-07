@@ -1,0 +1,130 @@
+# Equality and ordering.
+
+=== equal numbers
+(= 1 1)
+--- want
+#t
+
+=== unequal numbers
+(= 1 2)
+--- want
+#f
+
+=== equal variadic
+(= 1 1 1)
+--- want
+#t
+
+=== equal variadic fails
+(= 1 1 2)
+--- want
+#f
+
+=== equal needs two
+(= 1)
+--- error
+
+=== equal bools
+(= #t #t)
+--- want
+#t
+
+=== equal strings
+(= "a" "a")
+--- want
+#t
+
+=== unequal strings
+(= "a" "b")
+--- want
+#f
+
+=== equal lists deep
+(= (list 1 (list 2)) (list 1 (list 2)))
+--- want
+#t
+
+=== unequal lists
+(= (list 1 2) (list 1 3))
+--- want
+#f
+
+=== unequal list lengths
+(= (list 1) (list 1 2))
+--- want
+#f
+
+=== equal tuples
+(= (tuple 1 2) (tuple 1 2))
+--- want
+#t
+
+=== cross kind is an error
+(= 1 "1")
+--- error
+
+=== tuple vs list is an error
+(= (tuple 1) (list 1))
+--- error
+
+=== not equal
+(!= 1 2)
+--- want
+#t
+
+=== not equal false
+(!= 1 1)
+--- want
+#f
+
+=== not equal cross kind is an error
+(!= 1 "1")
+--- error
+
+=== less
+(< 1 2)
+--- want
+#t
+
+=== less false
+(< 2 1)
+--- want
+#f
+
+=== less chained
+(< 1 2 3)
+--- want
+#t
+
+=== less chained fails
+(< 1 3 2)
+--- want
+#f
+
+=== less equal
+(<= 1 1 2)
+--- want
+#t
+
+=== greater
+(> 2 1)
+--- want
+#t
+
+=== greater equal
+(>= 2 2)
+--- want
+#t
+
+=== greater equal false
+(>= 1 2)
+--- want
+#f
+
+=== ordering needs numbers
+(< "a" "b")
+--- error
+
+=== ordering needs two
+(< 1)
+--- error

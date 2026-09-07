@@ -77,7 +77,7 @@ func (e *Engine) MustRegisterBuiltin(name string, fn Builtin) {
 
 // Program represents a compiled Filo script bound to an Engine instance.
 type Program struct {
-	ast Node
+	ir  *Instr
 	eng *Engine
 }
 
@@ -96,16 +96,30 @@ func (e *Engine) Compile(src string) (*Program, error) {
 // there is no knob to turn it off.
 func (e *Engine) CompileAST(ast Node) (*Program, error) {
 	folded, _ := FoldConstants(ast)
-	compiled, err := Compile(folded, e.builtins, e.symbols)
+	ir, err := e.lower(folded)
 	if err != nil {
 		return nil, fmt.Errorf("compile error: %w", err)
 	}
-	return &Program{ast: compiled, eng: e}, nil
+	return &Program{ir: ir, eng: e}, nil
+}
+
+// lower turns a parse tree into IR bound to this engine's builtins and
+// symbol table.
+func (e *Engine) lower(ast Node) (*Instr, error) {
+	compiled, err := Compile(ast, e.builtins, e.symbols)
+	if err != nil {
+		return nil, err
+	}
+	ir, ok := compiled.(*Instr)
+	if !ok {
+		return nil, fmt.Errorf("compile produced %T, not IR", compiled)
+	}
+	return ir, nil
 }
 
 // Execute runs the compiled program.
 func (p *Program) Execute(ctx context.Context, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
-	return p.eng.ExecuteAST(ctx, p.ast, globals, cfg)
+	return p.eng.ExecuteAST(ctx, p.ir, globals, cfg)
 }
 
 func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
@@ -116,9 +130,18 @@ func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]V
 	return prog.Execute(ctx, globals, cfg)
 }
 
-// ExecuteAST executes a pre-parsed (and compiled) AST with the given globals.
-// This is the core execution method used by both RunScript and Script.Execute.
+// ExecuteAST executes a script with the given globals. ast is either the IR
+// returned by Compile or a parse tree, which is lowered first (without
+// constant folding). This is the core execution method used by both RunScript
+// and Script.Execute.
 func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
+	ir, ok := ast.(*Instr)
+	if !ok {
+		ir, err = e.lower(ast)
+		if err != nil {
+			return Value{}, nil, fmt.Errorf("compile error: %w", err)
+		}
+	}
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -150,8 +173,7 @@ func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Va
 
 	ev := newEvaluator(runCtx, cfg, root, e.builtins)
 
-	// Eval with single argument (state needed is inside ev)
-	result, err = ev.eval(ast)
+	result, err = ev.eval(ir)
 	if err != nil {
 		switch sig := err.(type) {
 		case *exitSignal:

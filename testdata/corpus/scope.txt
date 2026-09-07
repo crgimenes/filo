@@ -1,0 +1,272 @@
+# Scopes: let, letv, set, def, closures, globals.
+
+=== let local
+(let ((x 10)) x)
+--- want
+10
+
+=== let two bindings
+(let ((a 10) (b 20)) (+ a b))
+--- want
+30
+
+=== let is sequential
+(let ((x 1) (y (+ x 1))) y)
+--- want
+2
+
+=== let shadowing
+(let ((x 1)) (let ((x 2)) x))
+--- want
+2
+
+=== let outer access
+(let ((x 1)) (let ((y 2)) x))
+--- want
+1
+
+=== let inner does not leak
+(let ((x 1)) (let ((x 2)) x) x)
+--- want
+1
+
+=== let body is a sequence
+(let ((x 1)) (set x 2) (set x 3) x)
+--- want
+3
+
+=== let empty bindings
+(let () 5)
+--- want
+5
+
+=== let needs a body
+(let ((x 1)))
+--- error
+
+=== let needs bindings
+(let)
+--- error
+
+=== let binding must be a pair
+(let (x) x)
+--- error
+
+=== let binding without value
+(let ((x)) x)
+--- error
+
+=== let binding name must be a symbol
+(let ((1 2)) 1)
+--- error
+
+=== letv destructures a tuple
+(letv (a b) (tuple 1 2) (+ a b))
+--- want
+3
+
+=== letv with values
+(letv (a b) (values 2 3) (+ a b))
+--- want
+5
+
+=== letv empty
+(letv () (values) 1)
+--- want
+1
+
+=== letv arity mismatch, too few
+(letv (a b) (values 1) a)
+--- error
+
+=== letv arity mismatch, too many
+(letv (a) (values 1 2) a)
+--- error
+
+=== letv needs a tuple
+(letv (a) (list 1) a)
+--- error
+
+=== letv does not alias the tuple
+(let ((tup (values 5 6)))
+  (letv (a b) tup (set a 99))
+  tup)
+--- want
+(tuple 5 6)
+
+=== set local
+(let ((x 1)) (do (set x 2) x))
+--- want
+2
+
+=== set returns the value
+(let ((x 1)) (set x 7))
+--- want
+7
+
+=== set outer from inner scope
+(let ((x 1)) (let ((y 2)) (set x 5)) x)
+--- want
+5
+
+=== set unbound creates a global
+(set y 5)
+--- want
+5
+--- globals
+y = 5
+
+=== set global then read
+(do (set y 5) y)
+--- want
+5
+
+=== set name must be a symbol
+(set 1 2)
+--- error
+
+=== set arity
+(set)
+--- error
+
+=== undefined global
+y
+--- error
+
+=== undefined symbol in expression
+(+ missing 1)
+--- error
+
+=== def global
+(do (def g 100) g)
+--- want
+100
+--- globals
+g = 100
+
+=== def then set
+(do (def g 1) (set g 2) g)
+--- want
+2
+--- globals
+g = 2
+
+=== def inside a function is still global
+(do ((fn () (def inner 9))) inner)
+--- want
+9
+--- globals
+inner = 9
+
+=== def needs a value
+(def z)
+--- error
+
+=== def name must be a symbol
+(def 1 2)
+--- error
+
+=== read a given global
+given x = 5
+(* x 2)
+--- want
+10
+
+=== given list global
+given xs = (list 1 2 3)
+(length xs)
+--- want
+3
+
+=== given string global
+given ENV = "prod"
+(if (= ENV "prod") "https://app.example.com" "http://localhost")
+--- want
+"https://app.example.com"
+
+=== set overwrites a given global
+given Address = "http://localhost"
+(set Address "https://example.com")
+--- want
+"https://example.com"
+--- globals
+Address = "https://example.com"
+
+=== given globals untouched are returned
+given a = 1
+(set b 2)
+--- want
+2
+--- globals
+a = 1
+b = 2
+
+=== closure captures a local
+(let ((x 10)) ((fn (y) (+ x y)) 5))
+--- want
+15
+
+=== closure sees later mutation of its captured variable
+(let ((x 1)) (let ((f (fn () x))) (set x 2) (f)))
+--- want
+2
+
+=== closure mutates its captured variable
+(let ((x 1)) (let ((f (fn () (set x (+ x 1)) x))) (f) (f) x))
+--- want
+3
+
+=== closure factory
+(do
+  (def make-adder (fn (k) (fn (x) (+ x k))))
+  (def add5 (make-adder 5))
+  (add5 10))
+--- want
+15
+
+=== two closures keep separate captures
+(do
+  (def make-adder (fn (k) (fn (x) (+ x k))))
+  (def add1 (make-adder 1))
+  (def add5 (make-adder 5))
+  (list (add1 10) (add5 10)))
+--- want
+(list 11 15)
+
+=== recursion factorial
+(let () (def fact (fn (n) (if (<= n 1) 1 (* n (fact (- n 1)))))) (fact 5))
+--- want
+120
+
+=== recursion fibonacci
+(do
+  (def fib (fn (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))
+  (fib 10))
+--- want
+55
+
+=== multiple top-level expressions, last wins
+(+ 1 1)
+(+ 2 2)
+--- want
+4
+
+=== multiple top-level expressions share globals
+(set x 10)
+(set y 20)
+(+ x y)
+--- want
+30
+--- globals
+x = 10
+y = 20
+
+=== special form name is free as a variable
+(let ((if 1)) if)
+--- want
+1
+
+=== special form in head position is not shadowed
+(let ((if 1)) (if #t 2 3))
+--- want
+2

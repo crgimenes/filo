@@ -1,0 +1,174 @@
+# Casts and type introspection.
+
+=== string of integer
+(string 42)
+--- want
+"42"
+
+=== string of float
+(string 1.5)
+--- want
+"1.5"
+
+=== string of small float
+(string 0.1)
+--- want
+"0.1"
+
+=== string of large number uses exponent
+(string 100000000000000000000)
+--- want
+"1e+20"
+
+=== string switches to exponent form at a million
+(string 1000000)
+--- want
+"1e+06"
+
+=== string stays decimal below a million
+(string 999999)
+--- want
+"999999"
+
+=== string keeps fraction digits in exponent form
+(string 1234567.8)
+--- want
+"1.2345678e+06"
+
+=== string stays decimal down to ten-thousandths
+(string 0.0001)
+--- want
+"0.0001"
+
+=== string switches to exponent form below that
+(string 0.00001)
+--- want
+"1e-05"
+
+=== string of a negative number
+(string -42.5)
+--- want
+"-42.5"
+
+=== string of true
+(string #t)
+--- want
+"#t"
+
+=== string of false
+(string #f)
+--- want
+"#f"
+
+=== string passes through
+(string "x")
+--- want
+"x"
+
+=== string of list
+(string (list 1 2))
+--- want
+"(list 1 2)"
+
+=== string of nested list with string
+(string (list "a" (list 2)))
+--- want
+"(list \"a\" (list 2))"
+
+=== string of tuple
+(string (tuple 1 2))
+--- want
+"(tuple 1 2)"
+
+=== string of a function is an error
+(string (fn (x) x))
+--- error
+
+=== string arity
+(string)
+--- error
+
+=== number of numeric string
+(number "1.5")
+--- want
+1.5
+
+=== number trims whitespace
+(number " 42 ")
+--- want
+42
+
+=== number with exponent
+(number "1e3")
+--- want
+1000
+
+=== number with plus sign
+(number "+5")
+--- want
+5
+
+=== number of a number
+(number 7)
+--- want
+7
+
+=== number of non-numeric string
+(number "abc")
+--- error
+
+=== number of empty string
+(number "")
+--- error
+
+=== number of malformed
+(number "1.5.5")
+--- error
+
+=== number of a bool
+(number #t)
+--- error
+
+=== cross-kind compare via string
+(= (string 1) "1")
+--- want
+#t
+
+=== cross-kind compare via number
+(= (number "2") 2)
+--- want
+#t
+
+=== type-of number
+(type-of 1)
+--- want
+"number"
+
+=== type-of string
+(type-of "s")
+--- want
+"string"
+
+=== type-of bool
+(type-of #t)
+--- want
+"bool"
+
+=== type-of list
+(type-of (list 1))
+--- want
+"list"
+
+=== type-of tuple
+(type-of (tuple 1))
+--- want
+"tuple"
+
+=== type-of function
+(type-of (fn (x) x))
+--- want
+"func"
+
+=== type-of arity
+(type-of)
+--- error
