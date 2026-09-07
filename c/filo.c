@@ -295,8 +295,24 @@ static node *new_node(parser *p, uint8_t kind) {
     return n;
 }
 
-static int parse_fail(parser *p, const char *msg) {
-    return filo_fail2(p->ctx, "parse error: ", msg);
+static int parse_fail(parser *p, const char *what) {
+    uint32_t line = 1;
+    uint32_t col = 1;
+    for (size_t k = 0; k < p->i && k < p->len; k++) {
+        if (p->src[k] == '\n') {
+            line++;
+            col = 1;
+        } else {
+            col++;
+        }
+    }
+    char prefix[64];
+    size_t n = cstr_copy(prefix, sizeof(prefix), "parse error at line ");
+    n += u32_text(prefix + n, sizeof(prefix) - n, line);
+    n += cstr_copy(prefix + n, sizeof(prefix) - n, ", col ");
+    n += u32_text(prefix + n, sizeof(prefix) - n, col);
+    (void)cstr_copy(prefix + n, sizeof(prefix) - n, ": ");
+    return filo_fail2(p->ctx, prefix, what);
 }
 
 static node *read_node(parser *p);
@@ -2129,6 +2145,18 @@ int filo_value_text(filo_ctx *ctx, const filo_value *v, char *dst, size_t cap, s
     return FILO_OK;
 }
 
+int filo_value_repr(filo_ctx *ctx, const filo_value *v, char *dst, size_t cap, size_t *len) {
+    sink s = {dst, cap, 0};
+    if (render(ctx, v, &s, true) != FILO_OK) {
+        return FILO_ERR;
+    }
+    *len = s.pos;
+    if (dst != NULL && s.pos < cap) {
+        dst[s.pos] = '\0';
+    }
+    return FILO_OK;
+}
+
 /* Renders into a fresh run-arena string value — what (string v) yields. */
 static int render_to_value(filo_ctx *ctx, const filo_value *v, filo_value *out) {
     sink count = {NULL, 0, 0};
@@ -2912,4 +2940,26 @@ static void register_core(filo_ctx *ctx) {
     for (size_t i = 0; i < sizeof(core) / sizeof(core[0]); i++) {
         (void)filo_register_builtin(ctx, core[i].name, core[i].fn);
     }
+}
+
+/* ---------------------------------------------------------- for builtins */
+
+int filo_arg_num(filo_ctx *ctx, const filo_value *v, double *out) {
+    return as_num(ctx, v, out);
+}
+
+int filo_arg_str(filo_ctx *ctx, const filo_value *v, filo_str *out) {
+    if (v->kind != FILO_STRING) {
+        return fail_expected(ctx, "string", v);
+    }
+    *out = v->u.str;
+    return FILO_OK;
+}
+
+int filo_arg_list(filo_ctx *ctx, const filo_value *v, filo_seq *out) {
+    return as_list(ctx, v, out);
+}
+
+void *filo_alloc(filo_ctx *ctx, size_t n) {
+    return ralloc(ctx, n);
 }

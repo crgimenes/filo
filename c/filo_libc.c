@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "filo.h"
+#include "filo_libc.h"
 
 /* The shortest digit string that round-trips, then Go's placement rule for
    FormatFloat(x, 'g', -1, 64): plain decimal when the exponent is in
@@ -147,3 +147,15 @@ const filo_host filo_libc_host = {
     filo_libc_str_to_num,
     NULL,
 };
+
+const filo_math_fns filo_libc_math = {sqrt, sin, cos, tan, log, log10, exp};
+
+size_t filo_libc_fmt_fixed(double x, uint32_t prec, char *dst, size_t cap) {
+    int n = snprintf(dst, cap, "%.*f", (int)prec, x);
+    if (n < 0 || (size_t)n >= cap) {
+        return 0;
+    }
+    return (size_t)n;
+}
+
+const filo_strings_fns filo_libc_strings = {filo_libc_fmt_fixed};

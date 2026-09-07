@@ -1,6 +1,7 @@
 /* Runs the language corpus (the .txt files under testdata/corpus) against the C runtime.
    Same format the Go runner reads (see testdata/corpus/README.md); a file
-   that names a pack this runtime does not have is skipped. Exit status is
+   that names a pack this runtime does not have is skipped (math and strings
+   are registered on demand). Exit status is
    the number of failing cases, capped at 255. */
 #include <math.h>
 #include <stdio.h>
@@ -40,6 +41,38 @@ typedef struct {
 static uint8_t persistent_mem[MEM_PERSISTENT];
 static uint8_t run_mem[MEM_RUN];
 
+/* the packs the current file asked for */
+static bool want_math = false;
+static bool want_strings = false;
+
+static void init_ctx(filo_ctx *ctx, void *p, size_t pcap, void *r, size_t rcap) {
+    filo_init(ctx, &filo_libc_host, p, pcap, r, rcap);
+    if (want_math) {
+        (void)filo_math_register(ctx, &filo_libc_math);
+    }
+    if (want_strings) {
+        (void)filo_strings_register(ctx, &filo_libc_strings);
+    }
+}
+
+/* Reads a "packs:" line; false when it names a pack this runtime lacks. */
+static bool select_packs(const char *list) {
+    want_math = false;
+    want_strings = false;
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%s", list);
+    for (const char *tok = strtok(buf, " \t,"); tok != NULL; tok = strtok(NULL, " \t,")) {
+        if (strcmp(tok, "math") == 0) {
+            want_math = true;
+        } else if (strcmp(tok, "strings") == 0) {
+            want_strings = true;
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool same_value(const filo_value *a, const filo_value *b) {
     if (a->kind != b->kind) {
         return false;
@@ -78,7 +111,7 @@ static bool eval_into(filo_ctx *dst, const char *global, const char *expr, char 
         snprintf(why, cap, "out of memory");
         return false;
     }
-    filo_init(tmp, &filo_libc_host, p2, sizeof(p2), r2, sizeof(r2));
+    init_ctx(tmp, p2, sizeof(p2), r2, sizeof(r2));
     filo_prog prog;
     filo_value v;
     bool ok = false;
@@ -105,8 +138,7 @@ static bool run_case(const corpus_case *c, char *why, size_t cap) {
         snprintf(why, cap, "out of memory");
         return false;
     }
-    filo_init(ctx, &filo_libc_host, persistent_mem, sizeof(persistent_mem), run_mem,
-              sizeof(run_mem));
+    init_ctx(ctx, persistent_mem, sizeof(persistent_mem), run_mem, sizeof(run_mem));
     for (int i = 0; i < c->ngiven; i++) {
         if (!eval_into(ctx, c->given[i].name, c->given[i].expr, why, cap)) {
             free(ctx);
@@ -271,6 +303,8 @@ static void append_line(char *dst, size_t cap, const char *line) {
 }
 
 static bool run_file(const char *path) {
+    want_math = false;
+    want_strings = false;
     FILE *f = fopen(path, "r");
     if (f == NULL) {
         printf("cannot open %s\n", path);
@@ -311,7 +345,7 @@ static bool run_file(const char *path) {
             continue;
         }
         if (!in_case) {
-            if (strncmp(line, "packs:", 6) == 0) {
+            if (strncmp(line, "packs:", 6) == 0 && !select_packs(line + 6)) {
                 printf("skip %s: needs packs%s\n", base, line + 6);
                 free(c);
                 fclose(f);

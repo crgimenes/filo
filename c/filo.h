@@ -203,6 +203,19 @@ int filo_call(filo_ctx *ctx, const filo_value *fn, const filo_value *args, uint3
 int filo_fail(filo_ctx *ctx, const char *msg);
 int filo_fail2(filo_ctx *ctx, const char *msg, const char *detail);
 
+/* Argument coercion with the core's own messages ("expected number, got
+   string"), so a pack or host builtin fails the way a core builtin does. */
+int filo_arg_num(filo_ctx *ctx, const filo_value *v, double *out);
+int filo_arg_str(filo_ctx *ctx, const filo_value *v, filo_str *out);
+int filo_arg_list(filo_ctx *ctx, const filo_value *v, filo_seq *out);
+
+/* Run-arena memory for a builtin's result; gone when the run ends. NULL
+   (with the error set) when the arena is exhausted. */
+void *filo_alloc(filo_ctx *ctx, size_t n);
+
+/* Renders v in source form: strings quoted, lists as (list ...). */
+int filo_value_repr(filo_ctx *ctx, const filo_value *v, char *dst, size_t cap, size_t *len);
+
 const char *filo_kind_name(uint8_t kind);
 
 /* pow with a fractional exponent needs libm; a host that has it installs

@@ -498,7 +498,14 @@ hands over two memory blocks (a persistent arena for programs and globals, a
 run arena reset on every run) and a script that exhausts them fails with an
 error instead of corrupting anything. It compiles for a freestanding wasm32
 target and for microcontrollers; `filo_libc.c` adds number formatting and
-parsing for hosts that have a libc.
+parsing for hosts that have a libc. The `math` and `strings` packs exist as
+one opt-in file each (`filo_math.c`, `filo_strings.c`), freestanding too:
+the transcendental functions and `%f` formatting come from the host through
+a small table (`filo_libc.c` fills it from libm), and everything else is
+self-contained. Case mapping covers ASCII and the Latin-1 letters. The QA
+gate also fuzzes the runtime with libFuzzer for a few seconds (`make -C c
+fuzz`, seeded from the corpus), since any byte string is a script and none
+may fault.
 
 Both runtimes lower source to the instruction set in `docs/ir.md` and are
 held to the same behavior by `testdata/corpus`: plain-text cases pinning what
