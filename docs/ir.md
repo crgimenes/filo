@@ -43,6 +43,9 @@ Lowering happens after parsing and constant folding, on the parse tree:
 
 ## Execution model
 
+- **Number literals** in source are `[+-]?(digits[.digits*]|.digits)
+  ([eE][+-]?digits)?`; any other atom is a symbol. Only `(number s)` defers
+  to the host's parser.
 - **Values**: number (IEEE double), bool, string (bytes, UTF-8 by
   convention), list, tuple, func. Lists and tuples are immutable from the
   script's point of view — builtins return new ones.
@@ -66,8 +69,10 @@ Lowering happens after parsing and constant folding, on the parse tree:
   measured is the host's business.
 - **Signals**: `exit` and `return` unwind as signals, not errors. `return`
   is caught by the nearest closure call and becomes its value; at top level
-  it acts like `exit`. `exit` ends the run with its value. Error context
-  (below) is never added around a signal.
+  it acts like `exit`. `exit` ends the run with its value from wherever it
+  is raised: inside a closure that a builtin calls, in a builtin's or a
+  call's arguments, in a binding. Error context (below) is never added
+  around a signal, so no layer can turn it into an error.
 
 ## Error context
 
@@ -114,7 +119,7 @@ counted, and may have had side effects).
 | `TUPLE` | *ctx*, args… | Evaluates all, yields a tuple. Context is *ctx*: `values` or `tuple`, whichever was written. |
 | `EXIT` | args… | Errors `exit expects 0 or 1 argument` beyond one (no context). Evaluates the arg if present (else the empty list) and raises the exit signal with it. |
 | `RETURN` | args… | Same with `return expects 0 or 1 argument` and the return signal. |
-| `CALLB` | *name*, *fn*, args… | Evaluates args left to right (argument context on failure), then calls the builtin (builtin context on failure). Yields its result. |
+| `CALLB` | *name*, *fn*, args… | Evaluates args left to right (argument context on failure), then calls the builtin (builtin context on failure). Yields its result. A signal from an argument or from a closure the builtin calls passes through untouched. |
 | `CALL` | head, args… | Evaluates head (context `call`). It must be a func, else errors `attempt to call non-function (got <kind>)` with no context. Then, with context `function call`: increments recursion depth (`recursion limit exceeded`), checks arity (`function expects <n> arguments, got <m>`), evaluates args left to right into a new frame whose parent is the func's captured frame (`in call arguments: argument <i>: <err>`), runs the body as a sequence, catches a return signal as the value, decrements depth. |
 
 A `CALL` whose head is a `DYNAMIC` first checks whether *name* is a

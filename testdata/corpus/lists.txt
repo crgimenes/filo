@@ -74,6 +74,19 @@
 (nth (list 1 2) -1)
 --- error
 
+=== nth rejects a fractional index
+(nth (list 1 2) 1.5)
+--- error
+
+=== nth rejects nan
+(nth (list 1 2) (number "nan"))
+--- error
+
+=== nth accepts an integral float
+(nth (list 1 2) 1.0)
+--- want
+2
+
 === nth on tuple is an error
 (nth (tuple 1 2) 0)
 --- error
@@ -196,6 +209,19 @@
 (range -2 1)
 --- want
 (list -2 -1 0)
+
+=== range rejects a fractional end
+(range 1.5)
+--- error
+
+=== range rejects a fractional start
+(range 2.5 5)
+--- error
+
+=== range accepts integral floats
+(range 2.0 4.0)
+--- want
+(list 2 3)
 
 === range arity
 (range)

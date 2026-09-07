@@ -37,10 +37,11 @@ x = 42
 
 ## What belongs here
 
-Intended behavior. `quirks.txt` is the exception: it records current behavior
-that was noticed and not yet decided on, so a change there is deliberate and
-visible instead of accidental. Delete a quirk case when its behavior is fixed
-on purpose, and move the fixed behavior into the proper file.
+Intended behavior only. A behavior that was noticed and not yet decided on
+goes in a `quirks.txt` that pins what the engine does today, so a change is
+deliberate and visible instead of accidental; when the decision is made, the
+case moves to the proper file with the intended outcome. (The file does not
+exist right now: every quirk found so far has been decided.)
 
 Limits (parse depth, step counts) are implementation-defined; cases that use
 `limits` keep a wide margin and never probe the exact boundary.

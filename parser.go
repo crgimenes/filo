@@ -255,11 +255,58 @@ done:
 	if text == "" {
 		return nil, l.errAt(start, "expected token")
 	}
-	num, err := strconv.ParseFloat(text, 64)
-	if err == nil {
-		return &NumberLit{Value: num}, nil
+	if numberShape(text) {
+		num, err := strconv.ParseFloat(text, 64)
+		if err == nil {
+			return &NumberLit{Value: num}, nil
+		}
 	}
 	return &Symbol{Name: text}, nil
+}
+
+// numberShape is the source grammar of a number literal:
+// [+-]?(digits[.digits*]|.digits)([eE][+-]?digits)?. Everything else is a
+// symbol, so a typo such as nan or inf is an undefined symbol rather than a
+// silent number, and 1_000 or 0x10 are not literals a C lexer must accept.
+func numberShape(text string) bool {
+	i := 0
+	if i < len(text) && (text[i] == '+' || text[i] == '-') {
+		i++
+	}
+	digits := 0
+	for i < len(text) && isDigit(text[i]) {
+		i++
+		digits++
+	}
+	if i < len(text) && text[i] == '.' {
+		i++
+		for i < len(text) && isDigit(text[i]) {
+			i++
+			digits++
+		}
+	}
+	if digits == 0 {
+		return false
+	}
+	if i < len(text) && (text[i] == 'e' || text[i] == 'E') {
+		i++
+		if i < len(text) && (text[i] == '+' || text[i] == '-') {
+			i++
+		}
+		exp := 0
+		for i < len(text) && isDigit(text[i]) {
+			i++
+			exp++
+		}
+		if exp == 0 {
+			return false
+		}
+	}
+	return i == len(text)
+}
+
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
 }
 
 func (l *lexer) errAt(pos int, msg string) error {

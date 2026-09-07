@@ -261,6 +261,13 @@ static bool is_ws(uint8_t c) {
     return false;
 }
 
+static bool is_digit(uint8_t c) {
+    if (c >= '0' && c <= '9') {
+        return true;
+    }
+    return false;
+}
+
 static void skip_ws(parser *p) {
     while (p->i < p->len) {
         uint8_t c = p->src[p->i];
@@ -450,6 +457,46 @@ static node *read_bool(parser *p) {
     return NULL;
 }
 
+/* Source grammar of a number literal: [+-]?(digits[.digits*]|.digits)
+   ([eE][+-]?digits)?. Any other atom is a symbol, whatever the host's
+   str_to_num would accept (inf, nan, 1_000). */
+static bool number_shape(const uint8_t *s, size_t len) {
+    size_t i = 0;
+    if (i < len && (s[i] == '+' || s[i] == '-')) {
+        i++;
+    }
+    size_t digits = 0;
+    while (i < len && is_digit(s[i])) {
+        i++;
+        digits++;
+    }
+    if (i < len && s[i] == '.') {
+        i++;
+        while (i < len && is_digit(s[i])) {
+            i++;
+            digits++;
+        }
+    }
+    if (digits == 0) {
+        return false;
+    }
+    if (i < len && (s[i] == 'e' || s[i] == 'E')) {
+        i++;
+        if (i < len && (s[i] == '+' || s[i] == '-')) {
+            i++;
+        }
+        size_t exp = 0;
+        while (i < len && is_digit(s[i])) {
+            i++;
+            exp++;
+        }
+        if (exp == 0) {
+            return false;
+        }
+    }
+    return i == len;
+}
+
 static node *read_atom(parser *p) {
     size_t start = p->i;
     while (p->i < p->len) {
@@ -464,7 +511,7 @@ static node *read_atom(parser *p) {
         return NULL;
     }
     double x = 0;
-    if (p->ctx->host.str_to_num != NULL &&
+    if (number_shape(p->src + start, p->i - start) && p->ctx->host.str_to_num != NULL &&
         p->ctx->host.str_to_num(p->ctx->host.user, p->src + start, p->i - start, &x)) {
         node *n = new_node(p, N_NUMBER);
         if (n == NULL) {
@@ -1375,14 +1422,7 @@ int filo_call(filo_ctx *ctx, const filo_value *fnv, const filo_value *args, uint
         }
         memcpy(slots, args, sizeof(filo_value) * n);
     }
-    int rc = run_func(ctx, fn, slots, n, out);
-    if (rc != FILO_OK && ctx->signal != SIG_NONE) {
-        /* an exit inside a builtin-called closure is reported as an error by
-           the Go engine (see quirks.txt); a return was already consumed */
-        ctx->signal = SIG_NONE;
-        return filo_fail(ctx, "exit");
-    }
-    return rc;
+    return run_func(ctx, fn, slots, n, out);
 }
 
 static int eval_call(filo_ctx *ctx, const filo_instr *in, filo_value *out) {
@@ -2285,6 +2325,14 @@ static int b_div(filo_ctx *ctx, const filo_value *args, uint32_t n, filo_value *
     if (as_num(ctx, &args[0], &r) != FILO_OK) {
         return FILO_ERR;
     }
+    if (n == 1) {
+        /* reciprocal, the counterpart of (- x) being negation */
+        if (r == 0) {
+            return filo_fail(ctx, "division by zero");
+        }
+        *out = filo_num(1 / r);
+        return FILO_OK;
+    }
     for (uint32_t i = 1; i < n; i++) {
         double x = 0;
         if (as_num(ctx, &args[i], &x) != FILO_OK) {
@@ -2604,6 +2652,15 @@ static int b_tail(filo_ctx *ctx, const filo_value *args, uint32_t n, filo_value 
     return filo_list(ctx, l.items + 1, l.len - 1, out);
 }
 
+/* Integral and exactly representable (|x| <= 2^53); NaN and infinities fail,
+   as does anything a 64-bit cast could not round-trip. */
+static bool is_integral(double x) {
+    if (!(x >= -9007199254740992.0 && x <= 9007199254740992.0)) {
+        return false;
+    }
+    return (double)(int64_t)x == x;
+}
+
 static int b_nth(filo_ctx *ctx, const filo_value *args, uint32_t n, filo_value *out) {
     if (n != 2) {
         return filo_fail(ctx, "nth expects 2 arguments");
@@ -2613,14 +2670,13 @@ static int b_nth(filo_ctx *ctx, const filo_value *args, uint32_t n, filo_value *
     if (as_list(ctx, &args[0], &l) != FILO_OK || as_num(ctx, &args[1], &idx) != FILO_OK) {
         return FILO_ERR;
     }
-    if (!(idx > -1 && idx < (double)l.len)) { /* NaN and out of range both fail */
+    if (!is_integral(idx)) {
+        return filo_fail(ctx, "nth expects an integer index");
+    }
+    if (idx < 0 || idx >= (double)l.len) {
         return filo_fail(ctx, "index out of range");
     }
-    uint32_t i = (uint32_t)idx; /* desvio: truncar é a semântica do Go int() */
-    if (i >= l.len) {
-        return filo_fail(ctx, "index out of range");
-    }
-    *out = l.items[i];
+    *out = l.items[(uint32_t)idx];
     return FILO_OK;
 }
 
@@ -2778,7 +2834,10 @@ static int b_range(filo_ctx *ctx, const filo_value *args, uint32_t n, filo_value
     } else if (as_num(ctx, &args[0], &start) != FILO_OK || as_num(ctx, &args[1], &end) != FILO_OK) {
         return FILO_ERR;
     }
-    int64_t lo = (int64_t)start; /* desvio: truncar é a semântica do Go int() */
+    if (!is_integral(start) || !is_integral(end)) {
+        return filo_fail(ctx, "range expects integer bounds");
+    }
+    int64_t lo = (int64_t)start;
     int64_t hi = (int64_t)end;
     if (hi <= lo) {
         *out = empty_list();

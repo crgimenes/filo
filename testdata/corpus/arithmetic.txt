@@ -134,6 +134,12 @@
 --- want
 1.4142135623730951
 
+# IEEE behavior on every host; Filo does not invent a real cube root.
+=== pow of a negative base to a fractional exponent is NaN
+(pow -8 (/ 1 3))
+--- want
+(number "nan")
+
 === pow zero zero
 (pow 0 0)
 --- want
@@ -160,3 +166,17 @@
 (+ 9007199254740992 1)
 --- want
 9007199254740992
+
+=== unary division is the reciprocal
+(/ 4)
+--- want
+0.25
+
+=== unary division of one
+(/ 1)
+--- want
+1
+
+=== unary division of zero
+(/ 0)
+--- error

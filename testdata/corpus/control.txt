@@ -159,6 +159,53 @@ a = 1
 --- want
 99
 
+=== exit inside a builtin-called function ends the script
+(map (fn (x) (exit 7)) (list 1 2))
+--- want
+7
+
+=== exit inside fold ends the script with the value seen so far
+(fold (fn (acc x) (if (> x 2) (exit acc) (+ acc x))) 0 (list 1 2 3 4))
+--- want
+3
+
+=== exit inside filter ends the script
+(filter (fn (x) (exit "stop")) (list 1 2))
+--- want
+"stop"
+
+=== exit in a builtin argument ends the script
+(+ 1 (exit 5) 2)
+--- want
+5
+
+=== exit in a list argument ends the script
+(list 1 (exit 5) 3)
+--- want
+5
+
+=== exit in a function call argument ends the script
+((fn (x) x) (exit 5))
+--- want
+5
+
+=== exit in a defined function call argument ends the script
+(let () (def f (fn (x) x)) (f (exit 5)) 99)
+--- want
+5
+
+=== exit in a let binding ends the script
+(let ((x (exit 5))) 99)
+--- want
+5
+
+=== exit from a nested closure keeps the globals set so far
+(do (set a 1) (map (fn (x) (exit x)) (list 7 8)) (set a 2))
+--- want
+7
+--- globals
+a = 1
+
 === exit arity
 (exit 1 2)
 --- error

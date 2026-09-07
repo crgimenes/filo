@@ -19,7 +19,7 @@ func main() {
 	script := `
 (let ((name "Alice")
       (points 100))
-  (str-fmt "User %s has %g points" (str-upper name) points))
+  (str-fmt "User %s has %s points" (str-upper name) points))
 `
 
 	result, _, err := eng.RunScript(ctx, script, nil, cfg)

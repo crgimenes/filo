@@ -110,29 +110,35 @@ func (ev *evaluator) eval(in *Instr) (Value, error) {
 	}
 }
 
+func isSignal(err error) bool {
+	switch err.(type) {
+	case *exitSignal, *returnSignal:
+		return true
+	}
+	return false
+}
+
+// wrapf adds context to an error. A signal is not an error: exit must end the
+// run from wherever it is raised, so it passes through every layer untouched.
+func wrapf(err error, format string, args ...any) error {
+	if err == nil || isSignal(err) {
+		return err
+	}
+	return fmt.Errorf("%s: %w", fmt.Sprintf(format, args...), err)
+}
+
 func wrapIn(ctx string, err error) error {
-	if err == nil {
-		return nil
-	}
-	_, ok := err.(*exitSignal)
-	if ok {
-		return err
-	}
-	_, ok = err.(*returnSignal)
-	if ok {
-		return err
-	}
-	return fmt.Errorf("in %s: %w", ctx, err)
+	return wrapf(err, "in %s", ctx)
 }
 
 func (ev *evaluator) callBuiltin(name string, fn builtinFunc, argInstrs []*Instr) (Value, error) {
 	args, err := ev.evalArgs(argInstrs)
 	if err != nil {
-		return Value{}, fmt.Errorf("while evaluating arguments for %q: %w", name, err)
+		return Value{}, wrapf(err, "while evaluating arguments for %q", name)
 	}
 	v, callErr := fn(ev.ctx, ev, args)
 	if callErr != nil {
-		return Value{}, fmt.Errorf("in builtin %q: %w", name, callErr)
+		return Value{}, wrapf(callErr, "in builtin %q", name)
 	}
 	return v, nil
 }
@@ -169,7 +175,7 @@ func (ev *evaluator) evalArgs(instrs []*Instr) ([]Value, error) {
 	for i, in := range instrs {
 		val, err := ev.eval(in)
 		if err != nil {
-			return nil, fmt.Errorf("argument %d: %w", i, err)
+			return nil, wrapf(err, "argument %d", i)
 		}
 		result[i] = val
 	}
@@ -192,7 +198,7 @@ func (ev *evaluator) callFuncInstrs(fn *Func, argInstrs []*Instr) (Value, error)
 		val, err := ev.eval(in)
 		if err != nil {
 			ev.recursion--
-			return Value{}, fmt.Errorf("in call arguments: argument %d: %w", i, err)
+			return Value{}, wrapf(err, "in call arguments: argument %d", i)
 		}
 		slots[i] = val
 	}

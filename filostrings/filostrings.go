@@ -27,11 +27,12 @@ func RegisterBuiltins(eng *filo.Engine) {
 	eng.MustRegisterBuiltin("str-fmt", builtinStrFmt)
 }
 
-// builtinStrFmt formats a string according to a format specifier.
-// Usage: (str-fmt format args...) -> string
-// Example: (str-fmt "Hello %s" "World") -> "Hello World"
-// Supports %s, %d, %f, %v, %t.
-func builtinStrFmt(ctx context.Context, args []filo.Value) (filo.Value, error) {
+// builtinStrFmt formats with Filo's own verbs so that a wrong verb is an
+// error instead of Go's "%!d(float64=1)" leaking into the output:
+// (str-fmt "%s=%d" "n" 3) -> "n=3". Verbs: %s any value as text, %v any value
+// as a Filo literal, %d an integral number, %f a number, %% a percent sign.
+// Flags -, 0, +, a width and a .precision are accepted before the verb.
+func builtinStrFmt(_ context.Context, args []filo.Value) (filo.Value, error) {
 	if len(args) < 1 {
 		return filo.Value{}, fmt.Errorf("str-fmt expects at least 1 argument (format string)")
 	}
@@ -39,25 +40,93 @@ func builtinStrFmt(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	if err != nil {
 		return filo.Value{}, fmt.Errorf("str-fmt: format must be string: %w", err)
 	}
+	rest := args[1:]
+	var b strings.Builder
+	for i := 0; i < len(format); i++ {
+		c := format[i]
+		if c != '%' {
+			b.WriteByte(c)
+			continue
+		}
+		i++
+		specStart := i
+		for i < len(format) && strings.IndexByte("-+0123456789.", format[i]) >= 0 {
+			i++
+		}
+		if i >= len(format) {
+			return filo.Value{}, fmt.Errorf("str-fmt: incomplete verb at end of format")
+		}
+		spec := format[specStart:i]
+		verb := format[i]
+		if verb == '%' && spec == "" {
+			b.WriteByte('%')
+			continue
+		}
+		if len(rest) == 0 {
+			return filo.Value{}, fmt.Errorf("str-fmt: missing argument for %%%s%c", spec, verb)
+		}
+		piece, err := fmtVerb(spec, verb, rest[0])
+		if err != nil {
+			return filo.Value{}, fmt.Errorf("str-fmt: %w", err)
+		}
+		rest = rest[1:]
+		b.WriteString(piece)
+	}
+	if len(rest) > 0 {
+		return filo.Value{}, fmt.Errorf("str-fmt: %d extra arguments", len(rest))
+	}
+	return filo.VString(b.String()), nil
+}
 
-	fmtArgs := make([]any, len(args)-1)
-	for i, arg := range args[1:] {
-		switch arg.Kind {
-		case filo.KNumber:
-			fmtArgs[i] = arg.Num
-		case filo.KString:
-			fmtArgs[i] = arg.Str
-		case filo.KBool:
-			fmtArgs[i] = arg.Bool
-		case filo.KList:
-			fmtArgs[i] = arg.List
-		case filo.KTuple:
-			fmtArgs[i] = arg.Tup
-		default:
-			fmtArgs[i] = arg
+func fmtVerb(spec string, verb byte, arg filo.Value) (string, error) {
+	if !specShape(spec) {
+		return "", fmt.Errorf("bad verb %%%s%c", spec, verb)
+	}
+	switch verb {
+	case 's':
+		text := arg.String()
+		if arg.Kind == filo.KString {
+			text = arg.Str
+		}
+		return fmt.Sprintf("%"+spec+"s", text), nil
+	case 'v':
+		return fmt.Sprintf("%"+spec+"s", arg.String()), nil
+	case 'd':
+		n, err := arg.AsNumber()
+		if err != nil {
+			return "", err
+		}
+		if n != math.Trunc(n) || math.IsInf(n, 0) {
+			return "", fmt.Errorf("%%d expects an integer, got %s", arg)
+		}
+		return fmt.Sprintf("%"+spec+"d", int64(n)), nil
+	case 'f':
+		n, err := arg.AsNumber()
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%"+spec+"f", n), nil
+	}
+	return "", fmt.Errorf("unknown verb %%%s%c", spec, verb)
+}
+
+// specShape is [-+0]*digits*(.digits*)?: what fmt renders without a BADWIDTH
+// or BADPREC marker.
+func specShape(spec string) bool {
+	i := 0
+	for i < len(spec) && strings.IndexByte("-+0", spec[i]) >= 0 {
+		i++
+	}
+	for i < len(spec) && spec[i] >= '0' && spec[i] <= '9' {
+		i++
+	}
+	if i < len(spec) && spec[i] == '.' {
+		i++
+		for i < len(spec) && spec[i] >= '0' && spec[i] <= '9' {
+			i++
 		}
 	}
-	return filo.VString(fmt.Sprintf(format, fmtArgs...)), nil
+	return i == len(spec)
 }
 
 // builtinStrJoin joins a list of strings with a separator.

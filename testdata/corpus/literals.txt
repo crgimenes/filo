@@ -146,3 +146,59 @@ given field:for = 3
 === only a comment is an empty script
 ; nothing here
 --- error
+
+=== plus sign literal
++5
+--- want
+5
+
+=== plus sign with leading dot
++.5
+--- want
+0.5
+
+=== exponent with sign
+1e-2
+--- want
+0.01
+
+=== uppercase exponent
+2E3
+--- want
+2000
+
+=== inf is a symbol
+inf
+--- error
+
+=== negative inf is a symbol
+-inf
+--- error
+
+=== nan is a symbol
+nan
+--- error
+
+=== Infinity is a symbol
+Infinity
+--- error
+
+=== underscore is not a digit separator
+1_000
+--- error
+
+=== hex literal is a symbol
+0x10
+--- error
+
+=== exponent without digits is a symbol
+1e
+--- error
+
+=== dot alone is a symbol
+.
+--- error
+
+=== trailing garbage makes a symbol
+12abc
+--- error

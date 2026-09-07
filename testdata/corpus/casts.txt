@@ -108,6 +108,21 @@
 --- want
 5
 
+# The cast follows the host's numeric parser, unlike a source literal.
+=== number accepts inf
+(number "inf")
+--- want
+(/ 1e308 1e-308)
+
+=== number accepts an underscore separator
+(number "1_000")
+--- want
+1000
+
+=== number rejects hex
+(number "0x10")
+--- error
+
 === number of a number
 (number 7)
 --- want

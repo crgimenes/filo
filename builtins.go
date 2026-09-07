@@ -80,6 +80,13 @@ func defaultBuiltins() map[string]builtinFunc {
 		if err != nil {
 			return Value{}, err
 		}
+		if len(args) == 1 {
+			// reciprocal, the counterpart of (- x) being negation
+			if first == 0 {
+				return Value{}, fmt.Errorf("division by zero")
+			}
+			return VNum(1 / first), nil
+		}
 		result := first
 		for i := 1; i < len(args); i++ {
 			val, convErr := args[i].AsNumber()
@@ -427,6 +434,9 @@ func defaultBuiltins() map[string]builtinFunc {
 		if err != nil {
 			return Value{}, err
 		}
+		if idx != math.Trunc(idx) {
+			return Value{}, fmt.Errorf("nth expects an integer index, got %s", args[1])
+		}
 		i := int(idx)
 		if i < 0 || i >= len(list) {
 			return Value{}, fmt.Errorf("index out of range")
@@ -560,6 +570,9 @@ func defaultBuiltins() map[string]builtinFunc {
 				return Value{}, err
 			}
 			start, end = s, e
+		}
+		if start != math.Trunc(start) || end != math.Trunc(end) {
+			return Value{}, fmt.Errorf("range expects integer bounds, got %s and %s", VNum(start), VNum(end))
 		}
 		lo, hi := int(start), int(end)
 		if hi <= lo {

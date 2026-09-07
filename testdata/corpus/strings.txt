@@ -94,14 +94,65 @@ packs: strings
 --- want
 "3.14"
 
-# Quirks, flagged for a decision (see quirks.txt): Go's fmt leaks through.
-
-=== str-fmt leaks the Go verb error for %d
+=== str-fmt %d
 (str-fmt "%d" 1)
 --- want
-"%!d(float64=1)"
+"1"
 
-=== str-fmt prints a list as a Go slice
-(str-fmt "%v" (list 1 2))
+=== str-fmt %d with width
+(str-fmt "[%3d]" 7)
 --- want
-"[1 2]"
+"[  7]"
+
+=== str-fmt %d zero padded
+(str-fmt "%03d" 7)
+--- want
+"007"
+
+=== str-fmt %d rejects a fraction
+(str-fmt "%d" 1.5)
+--- error
+
+=== str-fmt %d rejects a string
+(str-fmt "%d" "1")
+--- error
+
+=== str-fmt %s renders any value as text
+(str-fmt "%s %s %s" 42 #t "x")
+--- want
+"42 #t x"
+
+=== str-fmt %v renders a Filo literal
+(str-fmt "%v" (list 1 "a"))
+--- want
+"(list 1 \"a\")"
+
+=== str-fmt left-aligned width
+(str-fmt "[%-4s]" "ab")
+--- want
+"[ab  ]"
+
+=== str-fmt percent sign
+(str-fmt "100%%")
+--- want
+"100%"
+
+=== str-fmt unknown verb is an error
+(str-fmt "%x" 1)
+--- error
+
+=== str-fmt incomplete verb is an error
+(str-fmt "50%")
+--- error
+
+=== str-fmt missing argument is an error
+(str-fmt "%s %s" "a")
+--- error
+
+=== str-fmt extra argument is an error
+(str-fmt "%s" "a" "b")
+--- error
+
+=== str-fmt format must be a string
+(str-fmt 1)
+--- error

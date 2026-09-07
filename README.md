@@ -54,7 +54,7 @@ Literals and lexical rules:
 - Booleans are `#t` and `#f` (exactly those two characters; `#true` is a parse error).
 - Strings are double-quoted UTF-8 text with escapes `\n \t \r \0 \a \b \f \v \\ \"`. A leading UTF-8 BOM is stripped.
 - `;` starts a line comment, running to end of line.
-- Numbers are all `float64` (integers are exact up to 2^53).
+- Numbers are all `float64` (integers are exact up to 2^53). A literal is `[+-]?digits[.digits][e[+-]digits]` or `.digits`; any other atom is a symbol, so `inf`, `nan`, `1_000` and `0x10` are undefined symbols, not numbers. `(number s)` accepts whatever the host's parser accepts.
 - `(tuple a b ...)` builds a fixed multi-value tuple; `(list ...)` builds a list.
 - A source file may hold several top-level expressions; they are evaluated in order and the last value is the result (as if wrapped in an implicit `(let () ...)`).
 
@@ -90,8 +90,8 @@ Note: `NewEngine()` includes the core math/logic/list/type builtins by default. 
 
 | Category | Function | Description |
 |----------|----------|-------------|
-| **Math** | `+`, `-`, `*`, `/`, `%` | Basic arithmetic. `%` is floored modulo as in Lua — the result takes the divisor's sign, so `(% -1 2)` is `1`. |
-| | `pow` | `(pow x y)` |
+| **Math** | `+`, `-`, `*`, `/`, `%` | Basic arithmetic. `(- x)` negates and `(/ x)` is the reciprocal. `%` is floored modulo as in Lua — the result takes the divisor's sign, so `(% -1 2)` is `1`. |
+| | `pow` | `(pow x y)`; a negative base with a fractional exponent is NaN, as in IEEE. |
 | **Logic** | `=`, `!=` | Equality. Comparing values of different kinds is an error — cast first: `(= (string 1) "1")`. |
 | | `<`, `<=`, `>`, `>=` | Numeric comparison. |
 | | `not` | Boolean negation (`and`/`or` are special forms, see above). |
@@ -103,13 +103,13 @@ Note: `NewEngine()` includes the core math/logic/list/type builtins by default. 
 | **Lists** | `list` | Creates a list `(list 1 2 3)`. |
 | | `length` | List length. |
 | | `head`, `tail` | First element / rest of list. |
-| | `nth` | `(nth list index)` 0-based access. |
+| | `nth` | `(nth list index)` 0-based access; a fractional index is an error. |
 | | `list-append` | `(list-append list item)` Returns new list with item appended. |
 | | `list-concat` | `(list-concat l1 l2 ...)` |
 | | `map` | `(map fn list)` |
 | | `filter` | `(filter fn list)` Keeps elements for which `fn` returns `#t`. |
 | | `fold` | `(fold fn init list)` |
-| | `range` | `(range end)` → `0..end-1`; `(range start end)` → `start..end-1` (empty when non-increasing). |
+| | `range` | `(range end)` → `0..end-1`; `(range start end)` → `start..end-1` (empty when non-increasing). Bounds must be integers. |
 | | `reverse` | `(reverse list)` |
 | **Errors** | `error` | `(error "message")` Raises a script error with the message — for validation rules that must fail clearly. |
 
@@ -126,7 +126,7 @@ filostrings.RegisterBuiltins(eng)
 
 | Function | Description |
 |----------|-------------|
-| `str-fmt` | `(str-fmt format args...)` Safe `fmt.Sprintf`. |
+| `str-fmt` | `(str-fmt format args...)` Filo's own verbs: `%s` any value as text, `%v` any value as a Filo literal, `%d` an integral number, `%f` a number, `%%`; flags `-`, `0`, `+`, a width and `.precision` before the verb. An unknown verb, a fractional `%d`, or a mismatched argument count is an error. |
 | `str-concat` | Concatenates arguments. |
 | `str-join` | `(str-join sep list)` |
 | `str-split` | `(str-split sep str)` |
