@@ -90,9 +90,6 @@ static int via_host(filo_ctx *ctx, const char *name, double (*fn)(double), const
     if (one_num(ctx, name, args, n, &x) != FILO_OK) {
         return FILO_ERR;
     }
-    if (fn == NULL) {
-        return filo_fail2(ctx, name, " is not available on this host");
-    }
     *out = filo_num(fn(x));
     return FILO_OK;
 }
@@ -195,14 +192,37 @@ int filo_math_register(filo_ctx *ctx, const filo_math_fns *fns) {
     static const struct {
         const char *name;
         filo_builtin fn;
-    } table[] = {
-        {"abs", m_abs},      {"sqrt", m_sqrt},   {"floor", m_floor}, {"ceil", m_ceil},
-        {"round", m_round},  {"sin", m_sin},     {"cos", m_cos},     {"tan", m_tan},
-        {"log", m_log},      {"log10", m_log10}, {"exp", m_exp},     {"math-min", m_min},
-        {"math-max", m_max}, {"pi", m_pi},       {"e", m_e},         {"to-int", m_to_int},
+    } plain[] = {
+        {"abs", m_abs},      {"floor", m_floor},   {"ceil", m_ceil},
+        {"round", m_round},  {"to-int", m_to_int}, {"math-min", m_min},
+        {"math-max", m_max}, {"pi", m_pi},         {"e", m_e},
     };
-    for (size_t i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
-        if (filo_register_builtin(ctx, table[i].name, table[i].fn) != FILO_OK) {
+    for (size_t i = 0; i < sizeof(plain) / sizeof(plain[0]); i++) {
+        if (filo_register_builtin(ctx, plain[i].name, plain[i].fn) != FILO_OK) {
+            return FILO_ERR;
+        }
+    }
+    /* Only what the host actually supplies: a function it does not have
+       should be an undefined symbol when the script compiles, not a surprise
+       at the moment of the call. */
+    const struct {
+        const char *name;
+        filo_builtin fn;
+        const void *have;
+    } hosted[] = {
+        {"sqrt", m_sqrt, (const void *)host_fns.sqrt},
+        {"sin", m_sin, (const void *)host_fns.sin},
+        {"cos", m_cos, (const void *)host_fns.cos},
+        {"tan", m_tan, (const void *)host_fns.tan},
+        {"log", m_log, (const void *)host_fns.log},
+        {"log10", m_log10, (const void *)host_fns.log10},
+        {"exp", m_exp, (const void *)host_fns.exp},
+    };
+    for (size_t i = 0; i < sizeof(hosted) / sizeof(hosted[0]); i++) {
+        if (hosted[i].have == NULL) {
+            continue;
+        }
+        if (filo_register_builtin(ctx, hosted[i].name, hosted[i].fn) != FILO_OK) {
             return FILO_ERR;
         }
     }

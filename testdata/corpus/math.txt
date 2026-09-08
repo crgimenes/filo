@@ -1,11 +1,13 @@
 packs: math
 
 === sqrt
+needs host-math
 (sqrt 16)
 --- want
 4
 
 === sqrt negative
+needs host-math
 (sqrt -1)
 --- error
 
@@ -79,26 +81,31 @@ packs: math
 #t
 
 === exp and log round-trip
+needs host-math
 (round (log (exp 3)))
 --- want
 3
 
 === log10
+needs host-math
 (log10 1000)
 --- want
 3
 
 === sin zero
+needs host-math
 (sin 0)
 --- want
 0
 
 === cos zero
+needs host-math
 (cos 0)
 --- want
 1
 
 === tan zero
+needs host-math
 (tan 0)
 --- want
 0

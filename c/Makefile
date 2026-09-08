@@ -6,24 +6,44 @@ CFLAGS ?= -std=c11 -O2 $(WARN)
 CORE = filo.c
 PACKS = filo_math.c filo_strings.c
 HOST = filo_libc.c
-HDRS = filo.h filo_libc.h filo_math.h filo_strings.h
+NOLIBC = filo_nolibc.c
+HDRS = filo.h filo_libc.h filo_math.h filo_strings.h filo_nolibc.h
 CORPUS = ../testdata/corpus/*.txt
 
-.PHONY: all corpus fmt fmt-check tidy check qa clean freestanding fuzz bench
+.PHONY: all corpus corpus-nolibc api nolibc fmt fmt-check tidy check qa clean freestanding fuzz bench
 
 all: build/corpus_runner
 
-build/corpus_runner: $(CORE) $(PACKS) $(HOST) corpus_runner.c $(HDRS)
+build/corpus_runner: $(CORE) $(PACKS) $(HOST) $(NOLIBC) corpus_runner.c $(HDRS)
 	@mkdir -p build
-	$(CC) $(CFLAGS) -o $@ $(CORE) $(PACKS) $(HOST) corpus_runner.c -lm
+	$(CC) $(CFLAGS) -o $@ $(CORE) $(PACKS) $(HOST) $(NOLIBC) corpus_runner.c -lm
+
+# The libc-free number host against the libc one, on a machine with both.
+nolibc: $(CORE) $(PACKS) $(HOST) $(NOLIBC) nolibc_test.c $(HDRS)
+	@mkdir -p build
+	$(CC) -std=c11 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all $(WARN) \
+		-o build/nolibc_test $(CORE) $(PACKS) $(HOST) $(NOLIBC) nolibc_test.c -lm
+	./build/nolibc_test
+
+# Host API behavior the corpus cannot express, under the same sanitizers.
+api: $(CORE) $(PACKS) $(HOST) api_test.c $(HDRS)
+	@mkdir -p build
+	$(CC) -std=c11 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all $(WARN) \
+		-o build/api_test $(CORE) $(PACKS) $(HOST) api_test.c -lm
+	./build/api_test
 
 # The corpus under sanitizers: the C runtime must agree with the Go engine
 # on every case, and must do it without a single memory fault.
-corpus: $(CORE) $(PACKS) $(HOST) corpus_runner.c $(HDRS)
+corpus: $(CORE) $(PACKS) $(HOST) $(NOLIBC) corpus_runner.c $(HDRS)
 	@mkdir -p build
 	$(CC) -std=c11 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all $(WARN) \
-		-o build/corpus_runner_san $(CORE) $(PACKS) $(HOST) corpus_runner.c -lm
+		-o build/corpus_runner_san $(CORE) $(PACKS) $(HOST) $(NOLIBC) corpus_runner.c -lm
 	./build/corpus_runner_san $(CORPUS)
+
+# The same corpus with the libc-free host in place: a runtime that answers
+# differently depending on who formats its numbers would be two runtimes.
+corpus-nolibc: corpus
+	./build/corpus_runner_san --nolibc $(CORPUS)
 
 fmt:
 	$(LLVM)/clang-format -i *.c *.h
@@ -34,17 +54,19 @@ fmt-check:
 tidy:
 	$(LLVM)/clang-tidy --quiet --warnings-as-errors='*' \
 		--checks='bugprone-*,cert-*,clang-analyzer-*,readability-*,-readability-magic-numbers,-readability-function-cognitive-complexity,-readability-identifier-length,-readability-braces-around-statements,-bugprone-easily-swappable-parameters,-cert-err33-c,-readability-else-after-return,-readability-avoid-nested-conditional-operator,-readability-math-missing-parentheses,-cert-dcl03-c,-readability-uppercase-literal-suffix' \
-		$(CORE) $(PACKS) $(HOST) corpus_runner.c bench.c fuzz.c -- -std=c11
+		$(CORE) $(PACKS) $(HOST) $(NOLIBC) corpus_runner.c bench.c fuzz.c api_test.c \
+		nolibc_test.c -- -std=c11
 
 check:
 	cppcheck --enable=warning,style,performance,portability --inline-suppr \
-		--suppress=missingIncludeSystem --error-exitcode=1 $(CORE) $(PACKS) $(HOST) corpus_runner.c bench.c fuzz.c
+		--suppress=missingIncludeSystem --error-exitcode=1 $(CORE) $(PACKS) $(HOST) $(NOLIBC) corpus_runner.c bench.c fuzz.c \
+		api_test.c nolibc_test.c
 
 # Proves the core and the packs need nothing from libc but memcpy/memcmp/
 # strlen/strchr: the same freestanding wasm32 target the msh terminal uses.
-freestanding: $(CORE) $(PACKS) $(HDRS)
+freestanding: $(CORE) $(PACKS) $(NOLIBC) $(HDRS)
 	@mkdir -p build
-	@for f in $(CORE) $(PACKS); do \
+	@for f in $(CORE) $(PACKS) $(NOLIBC); do \
 		$(LLVM)/clang --target=wasm32 -ffreestanding -nostdlib -fno-builtin -c \
 			-std=c11 -O2 $(WARN) -Wno-unused-function -isystem ../../bbs/msh/host/wasm/include \
 			-o build/$${f%.c}_wasm.o $$f || exit 1; \
@@ -72,7 +94,7 @@ bench: $(CORE) $(PACKS) $(HOST) bench.c $(HDRS)
 	$(CC) $(CFLAGS) -o build/bench $(CORE) $(PACKS) $(HOST) bench.c -lm
 	./build/bench 2000
 
-qa: all fmt-check corpus tidy check freestanding fuzz
+qa: all fmt-check corpus corpus-nolibc api nolibc tidy check freestanding fuzz
 
 clean:
 	rm -rf build

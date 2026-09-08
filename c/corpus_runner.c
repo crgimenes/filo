@@ -10,6 +10,7 @@
 
 #include "filo.h"
 #include "filo_libc.h"
+#include "filo_nolibc.h"
 
 enum {
     MEM_PERSISTENT = 4U << 20U,
@@ -33,6 +34,8 @@ typedef struct {
     int nglobals;
     filo_limits limits;
     bool has_limits;
+    bool needs_pow;
+    bool needs_math;
     char script[TEXT_MAX];
     char want[TEXT_MAX];
     bool want_err;
@@ -45,13 +48,17 @@ static uint8_t run_mem[MEM_RUN];
 static bool want_math = false;
 static bool want_strings = false;
 
+/* The same corpus against the libc-free host: a runtime that answers
+   differently depending on who formats its numbers is two runtimes. */
+static bool use_nolibc = false;
+
 static void init_ctx(filo_ctx *ctx, void *p, size_t pcap, void *r, size_t rcap) {
-    filo_init(ctx, &filo_libc_host, p, pcap, r, rcap);
+    filo_init(ctx, use_nolibc ? &filo_nolibc_host : &filo_libc_host, p, pcap, r, rcap);
     if (want_math) {
-        (void)filo_math_register(ctx, &filo_libc_math);
+        (void)filo_math_register(ctx, use_nolibc ? NULL : &filo_libc_math);
     }
     if (want_strings) {
-        (void)filo_strings_register(ctx, &filo_libc_strings);
+        (void)filo_strings_register(ctx, use_nolibc ? &filo_nolibc_strings : &filo_libc_strings);
     }
 }
 
@@ -273,8 +280,15 @@ typedef enum { SEC_NONE, SEC_SCRIPT, SEC_WANT, SEC_GLOBALS } section;
 static int failures = 0;
 static int passed = 0;
 
+static int skipped = 0;
+
 static void finish_case(const char *file, corpus_case *c) {
     if (c->name[0] == '\0') {
+        return;
+    }
+    if (use_nolibc && (c->needs_pow || c->needs_math)) {
+        skipped++; /* this host cannot compute it, which is not a disagreement */
+        memset(c, 0, sizeof(*c));
         return;
     }
     rstrip(c->script);
@@ -361,6 +375,14 @@ static bool run_file(const char *path) {
                 c->ngiven++;
                 continue;
             }
+            if (c->script[0] == '\0' && strncmp(line, "needs ", 6) == 0) {
+                if (strcmp(line + 6, "host-pow") == 0) {
+                    c->needs_pow = true;
+                } else if (strcmp(line + 6, "host-math") == 0) {
+                    c->needs_math = true;
+                }
+                continue;
+            }
             if (c->script[0] == '\0' && strncmp(line, "limits ", 7) == 0) {
                 c->has_limits = parse_limits(line + 7, &c->limits);
                 continue;
@@ -394,12 +416,23 @@ static bool run_file(const char *path) {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        printf("usage: corpus_runner FILE...\n");
+        printf("usage: corpus_runner [--nolibc] FILE...\n");
         return 2;
     }
-    filo_libc_install();
-    for (int i = 1; i < argc; i++) {
+    int first = 1;
+    if (strcmp(argv[1], "--nolibc") == 0) {
+        use_nolibc = true;
+        first = 2;
+    } else {
+        filo_libc_install(); /* pow with a fractional exponent needs libm */
+    }
+    for (int i = first; i < argc; i++) {
         (void)run_file(argv[i]);
+    }
+    if (skipped > 0) {
+        printf("%d passed, %d failed, %d skipped (host cannot compute them)\n", passed, failures,
+               skipped);
+        return failures > 255 ? 255 : failures;
     }
     printf("%d passed, %d failed\n", passed, failures);
     return failures > 255 ? 255 : failures;

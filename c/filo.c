@@ -736,6 +736,18 @@ static int32_t symbol_id(filo_ctx *ctx, const uint8_t *ptr, uint32_t len) {
             return (int32_t)i;
         }
     }
+    if (ctx->sealed) {
+        char msg[FILO_ERROR_MAX];
+        size_t k = cstr_copy(msg, sizeof(msg), "undefined global: ");
+        size_t take = len;
+        if (take > sizeof(msg) - 1 - k) {
+            take = sizeof(msg) - 1 - k;
+        }
+        memcpy(msg + k, ptr, take);
+        msg[k + take] = '\0';
+        (void)filo_fail(ctx, msg);
+        return -1;
+    }
     if (ctx->nsymbols >= FILO_SYMBOLS_MAX) {
         (void)filo_fail(ctx, "too many globals");
         return -1;
@@ -2009,6 +2021,10 @@ int filo_set_global(filo_ctx *ctx, const char *name, filo_value v) {
     ctx->globals[id] = persisted;
     ctx->defined[id] = true;
     return FILO_OK;
+}
+
+void filo_seal_globals(filo_ctx *ctx) {
+    ctx->sealed = true;
 }
 
 bool filo_get_global(const filo_ctx *ctx, const char *name, filo_value *out) {

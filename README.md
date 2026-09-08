@@ -502,10 +502,19 @@ parsing for hosts that have a libc. The `math` and `strings` packs exist as
 one opt-in file each (`filo_math.c`, `filo_strings.c`), freestanding too:
 the transcendental functions and `%f` formatting come from the host through
 a small table (`filo_libc.c` fills it from libm), and everything else is
-self-contained. Case mapping covers ASCII and the Latin-1 letters. The QA
-gate also fuzzes the runtime with libFuzzer for a few seconds (`make -C c
-fuzz`, seeded from the corpus), since any byte string is a script and none
-may fault.
+self-contained. Case mapping covers ASCII and the Latin-1 letters. For a
+target with no C library at all, `filo_nolibc.c` supplies the number text the
+lexer and `(string n)` need; the whole corpus runs against it as well as
+against the libc host, and the only cases it skips are the ones asking for a
+power with a fractional exponent or the transcendental functions, which need
+libm to exist. The QA gate also fuzzes the runtime with libFuzzer for a few
+seconds (`make -C c fuzz`, seeded from the corpus), since any byte string is
+a script and none may fault.
+
+A C host may close the set of globals with `filo_seal_globals`, after which a
+script naming a global the host never created fails to compile instead of
+creating one silently. It is off unless asked for, and has no counterpart in
+the Go engine, which no host has needed it for.
 
 Both runtimes lower source to the instruction set in `docs/ir.md` and are
 held to the same behavior by `testdata/corpus`: plain-text cases pinning what

@@ -15,6 +15,7 @@ packs: math strings          # optional; builtin packs a runtime must register
 === case name                # unique within the file
 given x = (list 1 2)         # optional; an input global, as a Filo expression
 limits steps=100 recursion=5 # optional; evaluation limits (defaults otherwise)
+needs host-pow               # optional; a capability the host has to supply
 (script lines ...)
 --- want
 (expected value, as a Filo expression)
@@ -34,6 +35,13 @@ x = 42
   after it, only blank lines and `#` comments may appear until the next case.
 - `--- error` and `--- want` are mutually exclusive and one is required.
 - A runtime that does not implement a pack listed in `packs:` skips the file.
+- `needs` names something the runtime can only do when its host supplies it,
+  so a runtime running without it skips that case instead of counting as a
+  disagreement. The capabilities are `host-pow` (a power with a fractional
+  exponent, which needs libm) and `host-math` (square root, the logarithms
+  and the trigonometric functions of the `math` pack). The C runtime on a
+  target with no C library skips exactly these; everything else it answers
+  identically.
 
 ## What belongs here
 

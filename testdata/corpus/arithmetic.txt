@@ -130,6 +130,7 @@
 1024
 
 === pow fractional
+needs host-pow
 (pow 2 0.5)
 --- want
 1.4142135623730951

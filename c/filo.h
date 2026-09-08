@@ -133,6 +133,7 @@ struct filo_ctx {
     bool saved_defined[FILO_SYMBOLS_MAX];
 
     filo_limits limits;
+    bool sealed; /* no new globals: only what the host created may be used */
 
     /* per-run state */
     uint32_t steps;
@@ -172,6 +173,13 @@ int filo_set_global(filo_ctx *ctx, const char *name, filo_value v);
 
 /* Reads a global; false when it was never set. */
 bool filo_get_global(const filo_ctx *ctx, const char *name, filo_value *out);
+
+/* Closes the set of globals: from here on a script that names a global the
+   host did not create fails to compile, instead of silently creating one.
+   A host that runs several scripts against shared state seals once the state
+   is in place, so a typo in a later script is caught at load. One way: to
+   open it again, initialize a fresh context. */
+void filo_seal_globals(filo_ctx *ctx);
 
 /* ---- values ---- */
 

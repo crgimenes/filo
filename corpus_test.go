@@ -27,6 +27,7 @@ import (
 //	=== case name                 starts a case; the name is unique in the file
 //	given x = (list 1 2)          optional, input global (a Filo expression)
 //	limits steps=100 recursion=5  optional, evaluation limits
+//	needs host-pow                optional, a capability the host must supply
 //	<script lines>
 //	--- want                      the expected value, as a Filo expression
 //	<expression>
@@ -38,6 +39,7 @@ type corpusCase struct {
 	name    string
 	line    int
 	given   []binding
+	needs   []string
 	cfg     filo.EvalConfig
 	script  string
 	want    string
@@ -307,8 +309,19 @@ func (p *corpusParser) bodyLine(n int, line string) error {
 	return nil
 }
 
-// scriptLine handles the case header (given/limits lines come before any
-// script text) and then accumulates the script itself.
+// Capabilities a case may ask the host for. They exist because the runtime
+// runs on hosts that have no libm: a case that needs one is skipped there
+// instead of counting as a disagreement between runtimes.
+func knownCapability(name string) bool {
+	switch name {
+	case "host-pow", "host-math":
+		return true
+	}
+	return false
+}
+
+// scriptLine handles the case header (given/limits/needs lines come before
+// any script text) and then accumulates the script itself.
 func (p *corpusParser) scriptLine(n int, line string) error {
 	if len(p.script) == 0 && strings.HasPrefix(line, "given ") {
 		b, err := parseBinding(strings.TrimPrefix(line, "given "))
@@ -316,6 +329,14 @@ func (p *corpusParser) scriptLine(n int, line string) error {
 			return fmt.Errorf("line %d: %v", n, err)
 		}
 		p.cur.given = append(p.cur.given, b)
+		return nil
+	}
+	if len(p.script) == 0 && strings.HasPrefix(line, "needs ") {
+		want := strings.TrimSpace(strings.TrimPrefix(line, "needs "))
+		if !knownCapability(want) {
+			return fmt.Errorf("line %d: unknown capability %q", n, want)
+		}
+		p.cur.needs = append(p.cur.needs, want)
 		return nil
 	}
 	if len(p.script) == 0 && strings.HasPrefix(line, "limits ") {
@@ -455,6 +476,7 @@ func TestCorpusFormatRejects(t *testing.T) {
 		"bad given":              "=== a\ngiven x\n1\n--- want\n1\n",
 		"bad limit":              "=== a\nlimits steps=abc\n1\n--- want\n1\n",
 		"unknown limit":          "=== a\nlimits time=5\n1\n--- want\n1\n",
+		"unknown capability":     "=== a\nneeds host-gpu\n1\n--- want\n1\n",
 		"bad globals line":       "=== a\n1\n--- want\n1\n--- globals\nx\n",
 	}
 	for name, body := range bad {
