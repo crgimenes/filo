@@ -1,6 +1,6 @@
 module github.com/crgimenes/filo/conformance
 
-go 1.27
+go 1.27.1
 
 require (
 	github.com/crgimenes/filo v0.0.0
