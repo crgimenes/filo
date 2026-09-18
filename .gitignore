@@ -95,6 +95,3 @@ cmd/filofix/filofix
 /filo
 /bin/
 /filofix
-
-# C runtime build artifacts
-c/build/

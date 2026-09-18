@@ -1,10 +1,17 @@
 # Language corpus
 
 Plain-text cases that pin what a Filo script evaluates to. This directory is
-the behavioral contract of the language: every runtime (the Go engine here, the
-C port) runs the same files and must agree with them. Cases assert outcomes —
-the resulting value, the fact that an error occurred, the globals left behind —
-never the wording of an error message.
+the behavioral contract of the language: every runtime runs the same files and
+must agree with them. Cases assert outcomes — the resulting value, the fact
+that an error occurred, the globals left behind — never the wording of an error
+message.
+
+Because it is a contract between implementations that live in different
+repositories, this directory is duplicated and the two copies must stay
+identical: [filo](https://github.com/crgimenes/filo) runs it from
+`corpus_test.go`, [clang_filo](https://github.com/crgimenes/clang_filo) from
+`corpus_runner.c`. A case added or changed on either side belongs on both, and
+`diff -ru` between the two checkouts must come back empty.
 
 ## Format
 

@@ -1,12 +1,14 @@
 # Filo IR — the instruction set every runtime implements
 
 This document is the contract between the language and its runtimes. Today
-there are two: the Go engine in this repository and the C port under `c/`.
-Both lower the same source to the same instructions and evaluate them by the
-same rules, so a script's outcome — its value, whether it errors, the globals
-it leaves behind, the number of steps it takes — is identical on every
-runtime. The corpus under `testdata/corpus` and the Prolog conformance suite
-are the checks; this document is what they check against.
+there are two: the Go engine in [filo](https://github.com/crgimenes/filo) and
+the C runtime in [clang_filo](https://github.com/crgimenes/clang_filo). Both
+lower the same source to the same instructions and evaluate them by the same
+rules, so a script's outcome — its value, whether it errors, the globals it
+leaves behind, the number of steps it takes — is identical on every runtime.
+The corpus under `testdata/corpus` and the Prolog conformance suite are the
+checks; this document is what they check against. Like the corpus, it is
+duplicated in both repositories and the two copies must stay identical.
 
 The IR is a **tree of instructions**, not a linear byte stream. Each
 instruction has an opcode and typed operands, and its children are

@@ -492,38 +492,28 @@ if err != nil {
 
 ## C runtime
 
-`c/` holds the same language as a C library: `filo.h` and `filo.c`, no libc
-beyond `memcpy`/`memcmp`/`strlen`, and no allocation after init — the host
-hands over two memory blocks (a persistent arena for programs and globals, a
-run arena reset on every run) and a script that exhausts them fails with an
-error instead of corrupting anything. It compiles for a freestanding wasm32
-target and for microcontrollers; `filo_libc.c` adds number formatting and
-parsing for hosts that have a libc. The `math` and `strings` packs exist as
-one opt-in file each (`filo_math.c`, `filo_strings.c`), freestanding too:
-the transcendental functions and `%f` formatting come from the host through
-a small table (`filo_libc.c` fills it from libm), and everything else is
-self-contained. Case mapping covers ASCII and the Latin-1 letters. For a
-target with no C library at all, `filo_nolibc.c` supplies the number text the
-lexer and `(string n)` need; the whole corpus runs against it as well as
-against the libc host, and the only cases it skips are the ones asking for a
-power with a fractional exponent or the transcendental functions, which need
-libm to exist. The QA gate also fuzzes the runtime with libFuzzer for a few
-seconds (`make -C c fuzz`, seeded from the corpus), since any byte string is
-a script and none may fault.
+The same language also exists as a C library, in its own repository:
+[crgimenes/clang_filo](https://github.com/crgimenes/clang_filo). Two files of
+core (`filo.h`, `filo.c`), no libc beyond `memcpy`/`memcmp`/`strlen`, no
+allocation after init — the host hands over two arenas and a script that
+exhausts them fails with an error instead of corrupting anything. It builds for
+a freestanding wasm32 target and for microcontrollers.
 
-A C host may close the set of globals with `filo_seal_globals`, after which a
-script naming a global the host never created fails to compile instead of
-creating one silently. It is off unless asked for, and has no counterpart in
-the Go engine, which no host has needed it for.
+Both runtimes lower source to the instruction set in `docs/ir.md` and are held
+to the same behavior by `testdata/corpus`: plain-text cases pinning what a
+script evaluates to, run by `corpus_test.go` here and by the corpus runner
+there. Error messages are a Go-side promise; the corpus asserts outcomes.
 
-Both runtimes lower source to the instruction set in `docs/ir.md` and are
-held to the same behavior by `testdata/corpus`: plain-text cases pinning what
-a script evaluates to, run by `corpus_test.go` here and by `c/corpus_runner.c`
-there (`make -C c qa` runs it under ASan/UBSan together with clang-tidy and
-cppcheck). Error messages are a Go-side promise; the corpus asserts outcomes.
+The corpus is the contract between the two implementations, so it lives in both
+repositories and a case added or changed on either side belongs on both:
+
+```bash
+diff -ru testdata/corpus ../clang_filo/testdata/corpus
+```
 
 ## More of my projects
 
+- [clang_filo](https://github.com/crgimenes/clang_filo): this language as a C library, for wasm and microcontrollers.
 - [kutta](https://github.com/crgimenes/kutta): a 2D wind tunnel; watch air misbehave around an airfoil.
 - [glaze](https://github.com/crgimenes/glaze): WebView desktop apps in Go, cgo-free.
 - [compterm](https://github.com/crgimenes/compterm): share your terminal over the network.
