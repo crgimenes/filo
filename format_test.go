@@ -18,7 +18,8 @@ func TestFormatSimple(t *testing.T) {
 		{"bool false", "#f", "#f"},
 		{"empty list", "()", "()"},
 		{"simple add", "(+ 1 2)", "(+ 1 2)"},
-		{"nested", "((foo))", "(\n  (foo))"},
+		{"nested", "((foo))", "((foo))"},
+		{"fits on one line", "(print-at row (floor (/ (- W (text-width text)) 2)) text)", "(print-at row (floor (/ (- W (text-width text)) 2)) text)"},
 	}
 
 	for _, tt := range tests {
@@ -227,5 +228,105 @@ func TestMarshalIndentNested(t *testing.T) {
 	}
 	if !strings.Contains(result, "10") {
 		t.Errorf("missing '10' in result: %s", result)
+	}
+}
+
+// The layout rule, pinned: a form that fits stays on one line; one that
+// does not keeps its leading children while they fit and then gives every
+// child a line; the special forms keep their heads.
+func TestFormatLayout(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect string
+	}{
+		{
+			"short arithmetic stays inline",
+			"(centred\n  (+\n    (/ H 3) 2)\n  (str-fmt \"%d keys\" hits))",
+			"(centred (+ (/ H 3) 2) (str-fmt \"%d keys\" hits))",
+		},
+		{
+			"leading children stay, the first that does not fit breaks the rest",
+			"(print-at (- H 1) 1 (str-fmt \"crg.eti.br BBS %s · %dx%d · %s · %02d:%02d:%02d\" VERSION W H USER h mn sec))",
+			"(print-at (- H 1) 1\n  (str-fmt \"crg.eti.br BBS %s · %dx%d · %s · %02d:%02d:%02d\" VERSION W H USER h\n    mn\n    sec))",
+		},
+		{
+			"fn keeps its params, the body breaks",
+			"(def print-runs (fn (row col runs) (fold (fn (c run) (letv (colour text) run (do (fg colour) (+ c (print-at row c text))))) col runs)))",
+			"(def print-runs\n  (fn (row col runs)\n    (fold\n      (fn (c run)\n        (letv (colour text) run (do (fg colour) (+ c (print-at row c text)))))\n      col\n      runs)))",
+		},
+		{
+			"let bindings that do not fit stack under the first",
+			"(let ((big (>= W 69)) (art (if big banner small)) (wide (if big 67 33)) (nart (length art))) (fg 2) (attr A_BOLD))",
+			"(let ((big (>= W 69))\n      (art (if big banner small))\n      (wide (if big 67 33))\n      (nart (length art)))\n  (fg 2)\n  (attr A_BOLD))",
+		},
+		{
+			"cond puts every clause on its own line",
+			"(cond ((is-empty c) (set NOTE \"\")) ((chose c \"a\" \"articles\") (goto-screen \"area:/pub\" (list))) (else (set NOTE \"unknown choice (try ?)\")))",
+			"(cond\n  ((is-empty c) (set NOTE \"\"))\n  ((chose c \"a\" \"articles\") (goto-screen \"area:/pub\" (list)))\n  (else (set NOTE \"unknown choice (try ?)\")))",
+		},
+		{
+			"a list of long strings is a column",
+			"(def lines (list \"Type the letter of a menu entry and press Enter.\" \"In an area, type the item number to read it.\"))",
+			"(def lines\n  (list\n    \"Type the letter of a menu entry and press Enter.\"\n    \"In an area, type the item number to read it.\"))",
+		},
+		{
+			"a comment keeps its place and rules out packing",
+			"(do\n  ; first\n  (set x 1)\n  (set y 2))",
+			"(do\n  ; first\n  (set x 1)\n  (set y 2))",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Format(tt.input)
+			if err != nil {
+				t.Fatalf("Format error: %v", err)
+			}
+			got = strings.TrimRight(got, "\n")
+			if got != tt.expect {
+				t.Errorf("got:\n%s\nwant:\n%s", got, tt.expect)
+			}
+			again, err := Format(got)
+			if err != nil {
+				t.Fatalf("second Format error: %v", err)
+			}
+			if strings.TrimRight(again, "\n") != got {
+				t.Errorf("not idempotent:\n%s\n---\n%s", got, again)
+			}
+		})
+	}
+}
+
+// Formatting rearranges whitespace and nothing else: the program parsed
+// from the output is the program parsed from the input.
+func TestFormatKeepsProgram(t *testing.T) {
+	inputs := []string{
+		"(def centred (fn (row text) (print-at row (floor (/ (- W (text-width text)) 2)) text)))",
+		"(let ((c (str-lower (str-trim (input-text))))) (cond ((is-empty c) (set NOTE \"\")) (else (set NOTE \"unknown choice (try ?)\"))))",
+		"(def single (list \"┌\" \"─\" \"┐\" \"│\" \"┘\" \"─\" \"└\" \"│\"))",
+		"(if (>= W 69) banner small)\n\n(set s \"multi\nline\")",
+		"(fn (i) (letv (key label) (nth items i) (key-label (+ top nart 2 i) left key label)))",
+	}
+	for _, input := range inputs {
+		t.Run(input[:12], func(t *testing.T) {
+			formatted, err := Format(input)
+			if err != nil {
+				t.Fatalf("Format error: %v", err)
+			}
+			before, err := Parse(input)
+			if err != nil {
+				t.Fatalf("Parse input: %v", err)
+			}
+			after, err := Parse(formatted)
+			if err != nil {
+				t.Fatalf("Parse formatted: %v\n%s", err, formatted)
+			}
+			cfg := DefaultFormatConfig()
+			a, _ := FormatAST(before, cfg)
+			b, _ := FormatAST(after, cfg)
+			if a != b {
+				t.Errorf("program changed by formatting:\n%s\n---\n%s", a, b)
+			}
+		})
 	}
 }

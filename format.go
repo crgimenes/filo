@@ -11,6 +11,7 @@ package filo
 import (
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // FormatConfig controls formatting behavior.
@@ -186,73 +187,329 @@ func tokenize(src string) []token {
 	return tokens
 }
 
-func formatTokens(tokens []token, cfg FormatConfig) string {
-	var b strings.Builder
-	depth := 0
-	atLineStart := true
-	lastWasOpen := false
+// Layout in one rule: a form that fits on the rest of the line stays on one
+// line; one that does not keeps its leading children on the head line while
+// they fit, and from the first that does not, every child takes a line of
+// its own — so nothing ever trails behind a multi-line argument. Special
+// forms keep a fixed head instead (see headInline). Comments and blank
+// lines stay where they are and rule out packing the form around them.
+type frame struct {
+	head     string // symbol right after the paren, "" until seen
+	children int    // children laid out so far, the head not counted
+	broken   bool   // a child took a line of its own: the rest follow
+	align    int    // column the children of a broken frame start on
+	inline   int    // children the head line keeps; -1 for an ordinary call
+}
 
-	writeIndent := func() {
-		b.WriteString(strings.Repeat(cfg.Indent, depth))
+// headInline is how many children a form keeps on its head line once it has
+// to break: the params of fn, the bindings of let, the name of def, the
+// names and value of letv, the condition of if; none at all for the forms
+// that read as a column — cond clauses, do steps, the items of a list.
+// -1 is an ordinary call: leading children stay while they fit.
+func headInline(head string) int {
+	switch head {
+	case "fn", "let", "def", "if":
+		return 1
+	case "letv":
+		return 2
+	case "cond", "do", "list":
+		return 0
+	default:
+		return -1
 	}
+}
 
+// span describes the parenthesised group opened at a token.
+type span struct {
+	end     int    // index of the matching close, -1 if unbalanced
+	compact string // the group on one line, "" when it cannot be
+}
+
+func spans(tokens []token) []span {
+	out := make([]span, len(tokens))
+	var stack []int
 	for i, tok := range tokens {
-		// Handle blank lines before this token
-		if tok.blanksBefore > 0 && i > 0 {
-			if !atLineStart {
-				b.WriteString("\n")
-			}
-			// Collapse multiple consecutive blank lines into just one
-			b.WriteString("\n")
-			atLineStart = true
-		}
-
 		switch tok.typ {
-		case tokComment:
-			// Comments go on their own line
-			if !atLineStart {
-				b.WriteString("\n")
-			}
-			writeIndent()
-			b.WriteString(tok.value)
-			b.WriteString("\n")
-			atLineStart = true
-			lastWasOpen = false
-
 		case tokOpen:
-			// Before every ( break line (except at start)
-			if !atLineStart {
-				b.WriteString("\n")
-			}
-			writeIndent()
-			b.WriteString("(")
-			depth++
-			atLineStart = false
-			lastWasOpen = true
-
+			out[i].end = -1
+			stack = append(stack, i)
 		case tokClose:
-			// ) doesn't break line, just close
-			b.WriteString(")")
-			depth--
-			if depth < 0 {
-				depth = 0
+			if len(stack) > 0 {
+				open := stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+				out[open].end = i
+				out[open].compact = compactSpan(tokens, open, i)
 			}
-			atLineStart = false
-			lastWasOpen = false
+		case tokAtom, tokComment, tokBlank:
+		}
+	}
+	return out
+}
 
+// compactSpan writes tokens[open..close] on one line, or returns "" when a
+// comment, a blank line or a multi-line string inside forbids it.
+func compactSpan(tokens []token, open, close int) string {
+	var b strings.Builder
+	prevOpen := false
+	for i := open; i <= close; i++ {
+		tok := tokens[i]
+		if tok.blanksBefore > 0 && i > open {
+			return ""
+		}
+		switch tok.typ {
+		case tokComment, tokBlank:
+			return ""
+		case tokOpen:
+			if i > open && !prevOpen {
+				b.WriteString(" ")
+			}
+			b.WriteString("(")
+			prevOpen = true
+		case tokClose:
+			b.WriteString(")")
+			prevOpen = false
 		case tokAtom:
-			if atLineStart {
-				writeIndent()
-			} else if !lastWasOpen {
+			if strings.Contains(tok.value, "\n") {
+				return ""
+			}
+			if !prevOpen {
 				b.WriteString(" ")
 			}
 			b.WriteString(tok.value)
-			atLineStart = false
-			lastWasOpen = false
+			prevOpen = false
 		}
 	}
+	return b.String()
+}
 
-	result := strings.TrimRight(b.String(), "\n ")
+// fitsHere says whether something `width` runes wide goes on the current
+// line; -1 is a thing that cannot go on one line at all.
+func fitsHere(width, col int, space bool, cfg FormatConfig) bool {
+	if width < 0 {
+		return false
+	}
+	avail := cfg.MaxLineWidth - col
+	if space {
+		avail--
+	}
+	return width <= avail
+}
+
+// endsWithOpen reports whether the last byte written is an open paren, the
+// one place no space goes before the next token.
+func endsWithOpen(b *strings.Builder) bool {
+	s := b.String()
+	return len(s) > 0 && s[len(s)-1] == '('
+}
+
+// layout is the state of one formatting pass: the text so far, where the
+// cursor is on the line, and the stack of open forms.
+type layout struct {
+	b           strings.Builder
+	cfg         FormatConfig
+	tokens      []token
+	groups      []span
+	indentWidth int
+	col         int
+	atLineStart bool
+	fresh       bool // a line was just started: nothing goes before the token
+	stack       []frame
+}
+
+func (l *layout) write(s string) {
+	l.b.WriteString(s)
+	if nl := strings.LastIndexByte(s, '\n'); nl >= 0 {
+		l.col = utf8.RuneCountInString(s[nl+1:])
+	} else {
+		l.col += utf8.RuneCountInString(s)
+	}
+	l.atLineStart = false
+	l.fresh = false
+}
+
+func (l *layout) newline(indent int) {
+	if !l.atLineStart {
+		l.b.WriteString("\n")
+	}
+	l.b.WriteString(strings.Repeat(" ", indent))
+	l.col = indent
+	l.atLineStart = false
+	l.fresh = true
+}
+
+// blankLine ends the current line and leaves one empty one.
+func (l *layout) blankLine() {
+	if !l.atLineStart {
+		l.b.WriteString("\n")
+	}
+	l.b.WriteString("\n")
+	l.col = 0
+	l.atLineStart = true
+	if p := l.parent(); p != nil {
+		p.broken = true
+	}
+}
+
+func (l *layout) needSpace() bool {
+	return !l.atLineStart && !l.fresh && !endsWithOpen(&l.b)
+}
+
+func (l *layout) parent() *frame {
+	if len(l.stack) == 0 {
+		return nil
+	}
+	return &l.stack[len(l.stack)-1]
+}
+
+func (l *layout) childIndent() int {
+	p := l.parent()
+	if p == nil {
+		return 0
+	}
+	return p.align
+}
+
+// stays says whether the next child of p, `width` runes wide, may go on the
+// current line: always in the head slot of a special form, and in an
+// ordinary call while nothing has broken yet and it fits.
+func (l *layout) stays(p *frame, width int) bool {
+	if p.inline >= 0 {
+		return p.children < p.inline
+	}
+	return !p.broken && fitsHere(width, l.col, l.needSpace(), l.cfg)
+}
+
+// place puts the next child of p on the current line or on one of its own.
+func (l *layout) place(p *frame, width int) {
+	if p == nil {
+		if !l.atLineStart {
+			l.newline(0) // top-level forms never share a line
+		}
+		return
+	}
+	if !l.stays(p, width) {
+		l.newline(l.childIndent())
+		p.broken = true
+	}
+}
+
+func (l *layout) comment(tok token) {
+	l.newline(l.childIndent())
+	l.write(tok.value)
+	l.b.WriteString("\n")
+	l.col = 0
+	l.atLineStart = true
+	if p := l.parent(); p != nil {
+		p.broken = true
+	}
+}
+
+// open lays out the group starting at token i and returns the index of the
+// first token after what it consumed: the whole group when it fit on the
+// line, only the paren when it has to break inside.
+func (l *layout) open(i int) int {
+	p := l.parent()
+	g := l.groups[i]
+	width := -1
+	if g.compact != "" && g.end >= 0 {
+		width = utf8.RuneCountInString(g.compact)
+	}
+	headSlot := p != nil && p.inline >= 0 && p.children < p.inline
+	l.place(p, width)
+	if fitsHere(width, l.col, l.needSpace(), l.cfg) {
+		if l.needSpace() {
+			l.write(" ")
+		}
+		l.write(g.compact)
+		if p != nil {
+			p.children++
+		}
+		return g.end + 1
+	}
+	if l.needSpace() {
+		l.write(" ")
+	}
+	f := frame{align: (len(l.stack) + 1) * l.indentWidth, inline: -1}
+	if headSlot {
+		// bindings and params open on the head line and stack their own
+		// children under the first one
+		f.align = l.col + 1
+		if p.head == "let" || p.head == "letv" {
+			f.inline = 1
+		}
+	}
+	l.write("(")
+	if p != nil {
+		p.children++
+	}
+	l.stack = append(l.stack, f)
+	return i + 1
+}
+
+func (l *layout) close() {
+	l.write(")")
+	if len(l.stack) > 0 {
+		l.stack = l.stack[:len(l.stack)-1]
+	}
+}
+
+func (l *layout) atom(tok token) {
+	p := l.parent()
+	if p != nil && p.head == "" && p.children == 0 && endsWithOpen(&l.b) {
+		l.write(tok.value)
+		p.head = tok.value
+		p.inline = headInline(tok.value)
+		return
+	}
+	width := utf8.RuneCountInString(tok.value)
+	if strings.Contains(tok.value, "\n") {
+		width = -1
+	}
+	if p != nil {
+		l.place(p, width)
+	} else if l.atLineStart {
+		l.newline(0)
+	}
+	if l.needSpace() {
+		l.write(" ")
+	}
+	l.write(tok.value)
+	if p != nil {
+		p.children++
+	}
+}
+
+func formatTokens(tokens []token, cfg FormatConfig) string {
+	l := layout{
+		cfg:         cfg,
+		tokens:      tokens,
+		groups:      spans(tokens),
+		indentWidth: utf8.RuneCountInString(cfg.Indent),
+		atLineStart: true,
+	}
+	i := 0
+	for i < len(tokens) {
+		tok := tokens[i]
+		if tok.blanksBefore > 0 && i > 0 {
+			l.blankLine()
+		}
+		switch tok.typ {
+		case tokComment:
+			l.comment(tok)
+			i++
+		case tokOpen:
+			i = l.open(i)
+		case tokClose:
+			l.close()
+			i++
+		case tokAtom:
+			l.atom(tok)
+			i++
+		case tokBlank:
+			i++
+		}
+	}
+	result := strings.TrimRight(l.b.String(), "\n ")
 	if result != "" {
 		result += "\n"
 	}
