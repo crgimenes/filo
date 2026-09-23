@@ -76,7 +76,8 @@ const (
 type token struct {
 	typ          tokenType
 	value        string
-	blanksBefore int // number of blank lines before this token
+	blanksBefore int  // number of blank lines before this token
+	trailing     bool // a comment on the same line as the code before it
 }
 
 func tokenize(src string) []token {
@@ -120,6 +121,7 @@ func tokenize(src string) []token {
 				typ:          tokComment,
 				value:        src[start:i],
 				blanksBefore: blankCount,
+				trailing:     codeBefore(src, start),
 			})
 			blankCount = 0
 			continue
@@ -185,6 +187,17 @@ func tokenize(src string) []token {
 	}
 
 	return tokens
+}
+
+// codeBefore reports whether something other than blanks precedes position
+// i on its line. A comment there belongs to that code: `(def x 1) ; why`
+// moved to a line of its own would read as the comment of the next form.
+func codeBefore(src string, i int) bool {
+	j := i - 1
+	for j >= 0 && (src[j] == ' ' || src[j] == '\t' || src[j] == '\r') {
+		j--
+	}
+	return j >= 0 && src[j] != '\n'
 }
 
 // Layout in one rule: a form that fits on the rest of the line stays on one
@@ -394,8 +407,12 @@ func (l *layout) place(p *frame, width int) {
 }
 
 func (l *layout) comment(tok token) {
-	l.newline(l.childIndent())
-	l.write(tok.value)
+	sep := " "
+	if !tok.trailing || l.atLineStart {
+		l.newline(l.childIndent())
+		sep = ""
+	}
+	l.write(sep + tok.value)
 	l.b.WriteString("\n")
 	l.col = 0
 	l.atLineStart = true

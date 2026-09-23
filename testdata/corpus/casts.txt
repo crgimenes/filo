@@ -187,3 +187,58 @@
 === type-of arity
 (type-of)
 --- error
+
+# Number text is exact both ways for every double, in every runtime and host:
+# the shortest digits that read back, and reading rounds correctly however
+# many digits there are. A host without a C library once held only to 15
+# digits between 1e-8 and 1e22.
+
+=== string of a 17-digit result
+(string (+ 0.1 0.2))
+--- want
+"0.30000000000000004"
+
+=== string of a huge number
+(string 1e300)
+--- want
+"1e+300"
+
+=== string of the smallest subnormal
+(string 5e-324)
+--- want
+"5e-324"
+
+=== string of the largest double
+(string 1.7976931348623157e308)
+--- want
+"1.7976931348623157e+308"
+
+=== string of the smallest normal
+(string 2.2250738585072014e-308)
+--- want
+"2.2250738585072014e-308"
+
+=== a 17-digit literal reads as the nearest double
+(= 9.9999999999999995e-08 1e-7)
+--- want
+#t
+
+=== number reads past twenty zeros after the point
+(= (number "0.0000000000000000000001") 1e-22)
+--- want
+#t
+
+=== number underflows to zero
+(number "1e-400")
+--- want
+0
+
+=== number rounds just above half the smallest subnormal up
+(= (number "2.4703282292062328e-324") 5e-324)
+--- want
+#t
+
+=== number of thirty digits
+(string (number "123456789012345678901234567890"))
+--- want
+"1.2345678901234568e+29"

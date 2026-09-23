@@ -124,6 +124,41 @@
 (% 1 0)
 --- error
 
+# The operands below are built from powers of two, which every runtime and
+# host computes exactly: a literal like 1e300 is outside what a host without
+# a C library promises to read to the last bit, and the case would be about
+# number text instead of modulo.
+
+=== mod is exact however large the quotient
+(% (pow 2 1000) 7)
+--- want
+2
+
+=== mod of a huge negative dividend is floored
+(% (- (pow 2 1000)) 7)
+--- want
+5
+
+=== mod by a tiny divisor
+(% 7 (* 3 (pow 2 -1000)))
+--- want
+(pow 2 -1000)
+
+=== mod by infinity gives the dividend back
+(% 5 (pow 2 2000))
+--- want
+5
+
+=== mod by infinity is floored like any other
+(% -5 (pow 2 2000))
+--- want
+(pow 2 2000)
+
+=== mod of infinity is NaN
+(% (pow 2 2000) 3)
+--- want
+(- (pow 2 2000) (pow 2 2000))
+
 === pow
 (pow 2 10)
 --- want

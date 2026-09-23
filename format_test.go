@@ -275,6 +275,18 @@ func TestFormatLayout(t *testing.T) {
 			"(do\n  ; first\n  (set x 1)\n  (set y 2))",
 			"(do\n  ; first\n  (set x 1)\n  (set y 2))",
 		},
+		{
+			// moved to the next line it would read as the comment of the
+			// form below it
+			"a comment after code stays on that line",
+			"(def FOOD 9608) ; the code point of the food\n(def EMPTY 32)",
+			"(def FOOD 9608) ; the code point of the food\n(def EMPTY 32)",
+		},
+		{
+			"a trailing comment inside a form stays with its child",
+			"(list 1 ; one\n  2)",
+			"(list\n  1 ; one\n  2)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

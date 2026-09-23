@@ -82,6 +82,10 @@ func fmtVerb(spec string, verb byte, arg filo.Value) (string, error) {
 	if !specShape(spec) {
 		return "", fmt.Errorf("bad verb %%%s%c", spec, verb)
 	}
+	width, prec := specNumbers(spec)
+	if width > strFmtMax || prec > strFmtMax {
+		return "", fmt.Errorf("width and precision stop at %d: %%%s%c", strFmtMax, spec, verb)
+	}
 	switch verb {
 	case 's':
 		text := arg.String()
@@ -96,7 +100,8 @@ func fmtVerb(spec string, verb byte, arg filo.Value) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if n != math.Trunc(n) || math.IsInf(n, 0) {
+		// past int64 the conversion below is implementation-dependent in Go
+		if n != math.Trunc(n) || n < -(1<<63) || n >= 1<<63 {
 			return "", fmt.Errorf("%%d expects an integer, got %s", arg)
 		}
 		return fmt.Sprintf("%"+spec+"d", int64(n)), nil
@@ -108,6 +113,37 @@ func fmtVerb(spec string, verb byte, arg filo.Value) (string, error) {
 		return fmt.Sprintf("%"+spec+"f", n), nil
 	}
 	return "", fmt.Errorf("unknown verb %%%s%c", spec, verb)
+}
+
+// strFmtMax is the widest width or precision str-fmt accepts. Go's fmt stops
+// honoring one at 10,000,010 and writes %!(NOVERB) into the result instead,
+// which no script means; the ceiling makes that an error, the same in every
+// runtime, and caps what one call can allocate at about ten megabytes.
+const strFmtMax = 10_000_000
+
+// specNumbers returns the width and precision of a spec that passed
+// specShape, saturating just past strFmtMax so no digit string overflows.
+func specNumbers(spec string) (width, prec int) {
+	i := 0
+	for i < len(spec) && strings.IndexByte("-+0", spec[i]) >= 0 {
+		i++
+	}
+	width, i = specNumber(spec, i)
+	if i < len(spec) && spec[i] == '.' {
+		prec, _ = specNumber(spec, i+1)
+	}
+	return width, prec
+}
+
+func specNumber(spec string, i int) (int, int) {
+	n := 0
+	for i < len(spec) && spec[i] >= '0' && spec[i] <= '9' {
+		if n <= strFmtMax {
+			n = n*10 + int(spec[i]-'0')
+		}
+		i++
+	}
+	return n, i
 }
 
 // specShape is [-+0]*digits*(.digits*)?: what fmt renders without a BADWIDTH

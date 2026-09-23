@@ -227,6 +227,26 @@
 (range)
 --- error
 
+=== a range kept in a list is an ordinary list
+(list (range 3) -1)
+--- want
+(list (list 0 1 2) -1)
+
+=== a range appended to a list
+(list-append (list 1) (range 2))
+--- want
+(list 1 (list 0 1))
+
+=== ranges returned by map
+(map (fn (n) (range n)) (list 2 1))
+--- want
+(list (list 0 1) (list 0))
+
+=== a range inside a tuple
+(tuple (range 2) 5)
+--- want
+(tuple (list 0 1) 5)
+
 === reverse
 (reverse (list 1 2 3))
 --- want

@@ -307,3 +307,76 @@ packs: strings
 === str-fmt bad verb shape is an error
 (str-fmt "%1-d" 1)
 --- error
+
+# Width and precision stop at ten million. Go's fmt stops honoring either at
+# 10,000,010 and writes %!(NOVERB) into the result; both runtimes refuse
+# instead, which also caps one call at about ten megabytes.
+
+=== str-fmt width past the ceiling is an error
+(str-fmt "%10000001s" "x")
+--- error
+
+=== str-fmt precision past the ceiling is an error
+(str-fmt "%.10000001f" 1)
+--- error
+
+=== str-fmt an absurd width is an error, not garbage
+(str-fmt "%719925474099s!" "ii")
+--- error
+
+=== str-fmt a long precision on %d keeps every digit
+(str-fmt "%.70d" 5)
+--- want
+"0000000000000000000000000000000000000000000000000000000000000000000005"
+
+=== str-fmt %.0d of zero prints only the padding
+(str-fmt "[%3.0d]" 0)
+--- want
+"[   ]"
+
+=== str-fmt %d holds exactly int64
+(str-fmt "%d" (- (pow 2 63)))
+--- want
+"-9223372036854775808"
+
+=== str-fmt %d refuses what int64 cannot hold
+(str-fmt "%d" (pow 2 63))
+--- error
+
+=== str-fmt %f spells infinity and NaN as Go does
+(str-fmt "%f|%f|%5f|%+f" (pow 2 2000) (- (pow 2 2000)) (- (pow 2 2000) (pow 2 2000)) (- (pow 2 2000) (pow 2 2000)))
+--- want
+"+Inf|-Inf|  NaN|+NaN"
+
+# %f works on the exact decimal expansion of the double in every runtime and
+# host, rounding half to even as Go and printf do.
+
+=== str-fmt %f past seventeen decimals is exact
+(str-fmt "%.20f" 0.1)
+--- want
+"0.10000000000000000555"
+
+=== str-fmt %f of a large integer
+(str-fmt "%f" 9007199254740992)
+--- want
+"9007199254740992.000000"
+
+=== str-fmt %f past 1e19
+(str-fmt "%.2f" 1e22)
+--- want
+"10000000000000000000000.00"
+
+=== str-fmt %f keeps the sign of a value that rounds to zero
+(str-fmt "%.2f" -0.001)
+--- want
+"-0.00"
+
+=== str-fmt %f rounds exact halves to even
+(str-fmt "%.0f|%.0f|%.0f|%.1f" 0.5 1.5 2.5 0.25)
+--- want
+"0|2|2|0.2"
+
+=== str-fmt %f rounds the double, not its decimal spelling
+(str-fmt "%.3f" 9.9995)
+--- want
+"9.999"
