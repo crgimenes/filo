@@ -536,6 +536,27 @@ repositories and a case added or changed on either side belongs on both:
 diff -ru testdata/corpus ../clang_filo/testdata/corpus
 ```
 
+### Running bytecode
+
+The C runtime also compiles programs to bytecode (`docs/bytecode.md`): a unit
+(`.fbc`) of entry points sharing one set of globals, or a bundle (`.fbb`) of
+named units. This engine does not compile to it, but it runs it:
+
+```go
+unit, err := engine.LoadBundle(data, "edt") // or engine.LoadUnit(data)
+if missing := unit.Missing(globals); len(missing) > 0 {
+	return fmt.Errorf("cannot run here: %v", missing)
+}
+result, newGlobals, err := unit.Run(ctx, "main", globals, cfg)
+```
+
+A unit names the builtins it calls; `Missing` lists those this engine lacks
+(and the globals it reads that are neither given nor builtins), so a host can
+refuse a program before running it. The machine checks everything it reads,
+since a unit is untrusted input, and an error it places is a
+`*filo.PositionError`. The C runtime's units run here with the same result,
+error and place (`make govm` there, over the whole corpus).
+
 ## More of my projects
 
 - [clang_filo](https://github.com/crgimenes/clang_filo): this language as a C library, for wasm and microcontrollers.

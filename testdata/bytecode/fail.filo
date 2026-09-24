@@ -1,0 +1,3 @@
+(def half (fn (n)
+  (/ n 2)))
+(half "four")

@@ -22,6 +22,7 @@ type evaluator struct {
 	// failedAt is the pos of the innermost instruction that failed, the
 	// first one recorded; 0 while nothing failed or where it is not known.
 	failedAt int32
+	bc       *bcRun // made on the first call into a unit
 }
 
 func newEvaluator(ctx context.Context, cfg EvalConfig, global *GlobalEnv, builtins map[string]builtinFunc) *evaluator {
@@ -214,6 +215,13 @@ func (ev *evaluator) evalArgs(instrs []*Instr) ([]Value, error) {
 // callFuncInstrs calls fn with unevaluated arguments, evaluating them straight
 // into the new frame's slots.
 func (ev *evaluator) callFuncInstrs(fn *Func, argInstrs []*Instr) (Value, error) {
+	if fn.bc != nil {
+		args, err := ev.evalArgs(argInstrs)
+		if err != nil {
+			return Value{}, wrapIn("call arguments", err)
+		}
+		return ev.callFunc(ev.ctx, fn, args)
+	}
 	if fn.builtin == nil && len(fn.Params) != len(argInstrs) {
 		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(argInstrs))
 	}
@@ -252,8 +260,12 @@ func (ev *evaluator) callFuncInstrs(fn *Func, argInstrs []*Instr) (Value, error)
 // the function's own frame, so the caller may reuse args for its next call.
 func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Value, error) {
 	_ = ctx // the evaluator's own context governs cancellation
-	if fn.builtin == nil && len(args) != len(fn.Params) {
-		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(args))
+	want := len(fn.Params)
+	if fn.bc != nil {
+		want = fn.bc.nparams
+	}
+	if fn.builtin == nil && len(args) != want {
+		return Value{}, fmt.Errorf("function expects %d arguments, got %d", want, len(args))
 	}
 	ev.recursion++
 	if ev.cfg.RecursionLimit > 0 && ev.recursion > ev.cfg.RecursionLimit {
@@ -263,6 +275,9 @@ func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Valu
 	if fn.builtin != nil {
 		// a copy: the caller may reuse args, and the builtin may keep them
 		return ev.callBuiltinValue(fn, append([]Value(nil), args...))
+	}
+	if fn.bc != nil {
+		return ev.callBC(fn, args)
 	}
 	frame := ev.takeFrame(len(args), fn.Frame)
 	copy(frame.slots, args)

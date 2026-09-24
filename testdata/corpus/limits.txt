@@ -44,3 +44,7 @@ limits steps=100000
 === range with a huge negative start is an error
 (range -1e18 0)
 --- error
+
+=== range with bounds past the integers a number holds is an error
+(range -9e18 9e18)
+--- error

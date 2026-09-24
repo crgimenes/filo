@@ -26,6 +26,7 @@ type Func struct {
 	// the same value everywhere it is named (so (= floor floor) is true)
 	builtin builtinFunc
 	name    string
+	bc      *bcFunc // a function of a unit of bytecode
 }
 
 type Value struct {

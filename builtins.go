@@ -577,7 +577,10 @@ func defaultBuiltins() map[string]builtinFunc {
 			}
 			start, end = s, e
 		}
-		if start != math.Trunc(start) || end != math.Trunc(end) {
+		// integers a number holds exactly, as the C runtime takes them: past
+		// 2^53 the conversion to int is not defined and hi-lo can overflow
+		const exact = 1 << 53
+		if start != math.Trunc(start) || end != math.Trunc(end) || math.Abs(start) > exact || math.Abs(end) > exact {
 			return Value{}, fmt.Errorf("range expects integer bounds, got %s and %s", VNum(start), VNum(end))
 		}
 		lo, hi := int(start), int(end)
