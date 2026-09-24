@@ -7,6 +7,88 @@ type Frame struct {
 	parent *Frame
 }
 
+// newFrame returns a frame of n slots whose parent is parent. Up to four
+// slots share the frame's allocation: one allocation per call and per let
+// instead of two, and no bigger than the two were.
+func newFrame(n int, parent *Frame) *Frame {
+	switch n {
+	case 0:
+		return &Frame{parent: parent}
+	case 1:
+		f := &struct {
+			Frame
+			s [1]Value
+		}{}
+		f.slots, f.parent = f.s[:], parent
+		return &f.Frame
+	case 2:
+		f := &struct {
+			Frame
+			s [2]Value
+		}{}
+		f.slots, f.parent = f.s[:], parent
+		return &f.Frame
+	case 3:
+		f := &struct {
+			Frame
+			s [3]Value
+		}{}
+		f.slots, f.parent = f.s[:], parent
+		return &f.Frame
+	case 4:
+		f := &struct {
+			Frame
+			s [4]Value
+		}{}
+		f.slots, f.parent = f.s[:], parent
+		return &f.Frame
+	}
+	return &Frame{slots: make([]Value, n), parent: parent}
+}
+
+// framesKept bounds the spare frames an evaluator keeps of each size: enough
+// for the depth a loop of calls reaches, never a whole recursion.
+const framesKept = 32
+
+// frameSpares holds an evaluator's spare frames by number of slots, up to
+// four. A run that never calls a function never makes one.
+type frameSpares [5][]*Frame
+
+// takeFrame is newFrame, from the evaluator's spares when it has one of
+// that size: a frame no closure captured is reused instead of left to the
+// collector.
+func (ev *evaluator) takeFrame(n int, parent *Frame) *Frame {
+	if ev.spare != nil && n < len(ev.spare) {
+		kept := ev.spare[n]
+		if k := len(kept); k > 0 {
+			f := kept[k-1]
+			ev.spare[n] = kept[:k-1]
+			f.parent = parent
+			return f
+		}
+	}
+	return newFrame(n, parent)
+}
+
+// dropFrame gives f back when no closure was made since escapes was read:
+// only a closure can hold a frame, so nothing else can reach it. Its slots
+// are cleared so a spare keeps nothing alive.
+func (ev *evaluator) dropFrame(f *Frame, escapes uint64) {
+	n := len(f.slots)
+	if ev.escapes != escapes || n >= len(frameSpares{}) {
+		return
+	}
+	if ev.spare == nil {
+		ev.spare = &frameSpares{}
+	}
+	if len(ev.spare[n]) >= framesKept {
+		return
+	}
+	clear(f.slots)
+	f.parent = nil
+	ev.spare[n] = append(ev.spare[n], f)
+}
+
 // GlobalEnv represents the global environment (map-based).
 // Unresolved symbols (globals) are looked up here.
 // GlobalEnv represents the global environment using a SymbolTable and array storage.

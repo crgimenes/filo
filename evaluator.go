@@ -15,6 +15,10 @@ type evaluator struct {
 	global    *GlobalEnv
 	frame     *Frame // current local scope; nil at top level
 	startedAt time.Time
+	// escapes counts the closures made: a frame that saw none made while it
+	// was in use cannot be held by anything, and goes back to spare.
+	escapes uint64
+	spare   *frameSpares // made on the first frame given back
 }
 
 func newEvaluator(ctx context.Context, cfg EvalConfig, global *GlobalEnv, builtins map[string]builtinFunc) *evaluator {
@@ -193,20 +197,22 @@ func (ev *evaluator) callFuncInstrs(fn *Func, argInstrs []*Instr) (Value, error)
 		ev.recursion--
 		return Value{}, fmt.Errorf("recursion limit exceeded")
 	}
-	slots := make([]Value, len(fn.Params))
+	frame := ev.takeFrame(len(fn.Params), fn.Frame)
 	for i, in := range argInstrs {
 		val, err := ev.eval(in)
 		if err != nil {
 			ev.recursion--
+			ev.dropFrame(frame, ev.escapes) // never active: nothing saw it
 			return Value{}, wrapf(err, "in call arguments: argument %d", i)
 		}
-		slots[i] = val
+		frame.slots[i] = val
 	}
-	return ev.runFunc(fn, slots)
+	return ev.runFunc(fn, frame)
 }
 
 // callFunc calls fn with already evaluated arguments; builtins such as map and
-// fold use it to run the closures they receive.
+// fold use it to run the closures they receive. The arguments are copied into
+// the function's own frame, so the caller may reuse args for its next call.
 func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Value, error) {
 	_ = ctx // the evaluator's own context governs cancellation
 	if len(args) != len(fn.Params) {
@@ -217,24 +223,24 @@ func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Valu
 		ev.recursion--
 		return Value{}, fmt.Errorf("recursion limit exceeded")
 	}
-	return ev.runFunc(fn, args)
+	frame := ev.takeFrame(len(args), fn.Frame)
+	copy(frame.slots, args)
+	return ev.runFunc(fn, frame)
 }
 
-// runFunc runs a function body in a frame of slots whose parent is the frame
-// the closure captured. The recursion counter was already incremented by the
-// caller and is released here. A return signal becomes the function's value.
-func (ev *evaluator) runFunc(fn *Func, slots []Value) (Value, error) {
-	newFrame := &Frame{
-		slots:  slots,
-		parent: fn.Frame,
-	}
+// runFunc runs a function body in frame, whose parent is the frame the closure
+// captured. The recursion counter was already incremented by the caller and
+// is released here. A return signal becomes the function's value.
+func (ev *evaluator) runFunc(fn *Func, frame *Frame) (Value, error) {
+	escapes := ev.escapes // after the arguments: a closure made there holds the caller's frame
 	oldFrame := ev.frame
-	ev.frame = newFrame
+	ev.frame = frame
 
 	result, err := ev.evalBody(fn.Body)
 
 	ev.frame = oldFrame
 	ev.recursion--
+	ev.dropFrame(frame, escapes)
 
 	if err != nil {
 		ret, ok := err.(*returnSignal)
@@ -354,22 +360,22 @@ func (ev *evaluator) evalLet(in *Instr) (Value, error) {
 	if len(in.Args) <= n {
 		return Value{}, fmt.Errorf("let expects bindings and body")
 	}
-	newFrame := &Frame{
-		slots:  make([]Value, n),
-		parent: ev.frame,
-	}
+	escapes := ev.escapes // the bindings already see the new frame
+	frame := ev.takeFrame(n, ev.frame)
 	oldFrame := ev.frame
-	ev.frame = newFrame
+	ev.frame = frame
 	for i := range n {
 		val, err := ev.eval(in.Args[i])
 		if err != nil {
 			ev.frame = oldFrame
+			ev.dropFrame(frame, escapes)
 			return Value{}, err
 		}
-		newFrame.slots[i] = val
+		frame.slots[i] = val
 	}
 	res, err := ev.evalBody(in.Args[n:])
 	ev.frame = oldFrame
+	ev.dropFrame(frame, escapes)
 	return res, err
 }
 
@@ -389,16 +395,14 @@ func (ev *evaluator) evalLetv(in *Instr) (Value, error) {
 	}
 	// The slots must NOT alias the tuple: a later (set var ...) writes into
 	// the frame, and sharing would mutate a tuple still reachable elsewhere.
-	slots := make([]Value, len(elements))
-	copy(slots, elements)
-	newFrame := &Frame{
-		slots:  slots,
-		parent: ev.frame,
-	}
+	escapes := ev.escapes
+	frame := ev.takeFrame(len(elements), ev.frame)
+	copy(frame.slots, elements)
 	oldFrame := ev.frame
-	ev.frame = newFrame
+	ev.frame = frame
 	res, err := ev.evalBody(in.Args[1:])
 	ev.frame = oldFrame
+	ev.dropFrame(frame, escapes)
 	return res, err
 }
 
@@ -435,6 +439,7 @@ func (ev *evaluator) evalFn(in *Instr) (Value, error) {
 		return Value{}, fmt.Errorf("fn expects parameters and body")
 	}
 	fn := &Func{Params: in.Names, Body: in.Args, Frame: ev.frame}
+	ev.escapes++ // it holds ev.frame and every frame above it
 	return VFunc(fn), nil
 }
 

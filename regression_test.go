@@ -322,3 +322,31 @@ func TestErrorBuiltin(t *testing.T) {
 		t.Fatal("(error 42) must error: message must be a string")
 	}
 }
+
+// TestFramesReusedOnlyWhenNoClosureHoldsThem guards the frame reuse of the
+// evaluator: a frame goes back to the spares only when no closure was made
+// while it was in use. Each case keeps a closure over a frame of a call, a
+// let or a letv made in a loop, and reads it after later calls have run —
+// a frame reused too early would show the later values.
+func TestFramesReusedOnlyWhenNoClosureHoldsThem(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"(def mk (fn (x) (fn () x))) (map (fn (f) (f)) (map mk (list 1 2 3)))", "(list 1 2 3)"},
+		{"(map (fn (f) (f)) (map (fn (x) (let ((y (* x 10))) (fn () y))) (list 1 2 3)))", "(list 10 20 30)"},
+		{"(map (fn (f) (f)) (map (fn (x) (letv (a b) (tuple x (+ x 1)) (fn () (+ a b)))) (list 1 2 3)))", "(list 3 5 7)"},
+		// the closure is made in a binding, while the let frame is new
+		{"(map (fn (f) (f)) (map (fn (x) (let ((g (fn () x))) g)) (list 4 5 6)))", "(list 4 5 6)"},
+		// a closure made by a nested call holds the callee's frame, and the
+		// caller's is reused: both must stay right
+		{"(def keep (fn (v) (fn () v))) (def f (fn (x) (let ((k (keep (* x 2)))) (+ x (k))))) (map f (list 1 2 3))", "(list 3 6 9)"},
+		// set on a slot of a frame a closure holds, seen through the closure
+		{"(def counter (fn () (let ((n 0)) (fn () (set n (+ n 1)))))) (def c (counter)) (c) (c) (map (fn (x) x) (list 7 8)) (c)", "3"},
+		// deep recursion past the spares kept
+		{"(def sum (fn (n) (if (= n 0) 0 (+ n (sum (- n 1)))))) (sum 60)", "1830"},
+	}
+	for _, c := range cases {
+		got := eval(t, c.src).String()
+		if got != c.want {
+			t.Errorf("%s\n  got %s, want %s", c.src, got, c.want)
+		}
+	}
+}

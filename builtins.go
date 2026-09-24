@@ -457,12 +457,14 @@ func defaultBuiltins() map[string]builtinFunc {
 			return Value{}, err
 		}
 		result := make([]Value, len(list))
+		var arg [1]Value // callFunc copies it: one buffer for every call
 		for i, el := range list {
 			err := checkContext(ctx)
 			if err != nil {
 				return Value{}, err
 			}
-			val, callErr := ev.callFunc(ctx, fn.Fn, []Value{el})
+			arg[0] = el
+			val, callErr := ev.callFunc(ctx, fn.Fn, arg[:])
 			if callErr != nil {
 				return Value{}, callErr
 			}
@@ -485,12 +487,14 @@ func defaultBuiltins() map[string]builtinFunc {
 			return Value{}, err
 		}
 		current := acc
+		var pair [2]Value // callFunc copies it: one buffer for every call
 		for _, el := range list {
 			err := checkContext(ctx)
 			if err != nil {
 				return Value{}, err
 			}
-			val, callErr := ev.callFunc(ctx, fn.Fn, []Value{current, el})
+			pair[0], pair[1] = current, el
+			val, callErr := ev.callFunc(ctx, fn.Fn, pair[:])
 			if callErr != nil {
 				return Value{}, callErr
 			}
@@ -512,12 +516,14 @@ func defaultBuiltins() map[string]builtinFunc {
 			return Value{}, err
 		}
 		result := make([]Value, 0, len(list))
+		var arg [1]Value // callFunc copies it: one buffer for every call
 		for _, el := range list {
 			err := checkContext(ctx)
 			if err != nil {
 				return Value{}, err
 			}
-			v, callErr := ev.callFunc(ctx, fn.Fn, []Value{el})
+			arg[0] = el
+			v, callErr := ev.callFunc(ctx, fn.Fn, arg[:])
 			if callErr != nil {
 				return Value{}, callErr
 			}
