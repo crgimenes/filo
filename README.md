@@ -86,6 +86,11 @@ Literals and lexical rules:
 
 ### Core builtins
 
+A builtin is a function value like any other: `(map - (list 1 2))`,
+`(fold + 0 xs)` and `(def add +)` work, and the same builtin is always the
+same value, so `(= + +)` is `#t`. Called as a value it checks its own
+arguments, as a call by its name does.
+
 Note: `NewEngine()` includes the core math/logic/list/type builtins by default. Some sets are intentionally **opt-in** and must be registered explicitly.
 
 | Category | Function | Description |

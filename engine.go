@@ -12,6 +12,10 @@ type Engine struct {
 	builtins map[string]builtinFunc
 	symbols  *SymbolTable
 	envPool  sync.Pool
+	// each builtin as a value, made when a script first names one outside a
+	// call: one per builtin, so every use of it is the same function
+	valuesMu sync.Mutex
+	values   map[string]*Func
 }
 
 type EvalConfig struct {
@@ -119,6 +123,22 @@ func (e *Engine) compile(ast Node, source *sourceMap) (*Program, error) {
 	return &Program{ir: ir, eng: e, source: source}, nil
 }
 
+// builtinValue is the builtin name as a function value, the same one every
+// time it is asked for.
+func (e *Engine) builtinValue(name string) *Func {
+	e.valuesMu.Lock()
+	defer e.valuesMu.Unlock()
+	fn, ok := e.values[name]
+	if !ok {
+		if e.values == nil {
+			e.values = map[string]*Func{}
+		}
+		fn = &Func{builtin: e.builtins[name], name: name}
+		e.values[name] = fn
+	}
+	return fn
+}
+
 // lower turns a parse tree into IR bound to this engine's builtins and
 // symbol table.
 func (e *Engine) lower(ast Node) (*Instr, error) {
@@ -126,7 +146,7 @@ func (e *Engine) lower(ast Node) (*Instr, error) {
 }
 
 func (e *Engine) lowerSource(ast Node, source *sourceMap) (*Instr, error) {
-	compiled, err := compileSource(ast, e.builtins, e.symbols, source)
+	compiled, err := compileSource(ast, e.builtins, e.symbols, source, e.builtinValue)
 	if err != nil {
 		return nil, err
 	}

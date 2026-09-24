@@ -105,7 +105,7 @@ counted, and may have had side effects).
 | `LOCAL` | *depth*, *index*, *name* | The slot *index* of the frame *depth* levels up. |
 | `GLOBAL` | *id*, *name* | The global *id*. Errors `undefined global: <name>` when unset. |
 | `DYNAMIC` | *name* | The global named *name*, looked up by name. Errors `undefined symbol: <name>` when unset. Only produced when lowering without a symbol table. |
-| `BUILTIN` | *name* | Always errors `builtin "<name>" cannot be used as value`. A builtin is callable, never a value. |
+| `BUILTIN` | *name* | Yields the builtin as a function value: the same value every time it is named, so `(= + +)` is `#t` and `(= + -)` is `#f`. It is called wherever a function is — `(f x)`, `map`, `fold`, `filter` — and checks its own arguments, as a call by its name does (no arity from parameters); a failure reads `in builtin "<name>": ...`. `type-of` says `"func"`. |
 | `EMPTY` | — | Always errors `empty list expression`. |
 | `INVALID` | *ctx*, *message* | Always errors `in <ctx>: <message>`. |
 | `IF` | args… | Errors `if expects 2 or 3 arguments (condition then [else])` unless 2 or 3 args. Evaluates args[0]; it must be a bool (`expected bool, got <kind>`). True: evaluates args[1]. False: evaluates args[2], or yields the empty list with 2 args. Context `if`. |

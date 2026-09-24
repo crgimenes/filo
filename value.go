@@ -22,6 +22,10 @@ type Func struct {
 	Params []string
 	Body   []*Instr
 	Frame  *Frame
+	// a builtin used as a value: it takes what its own checks take, and is
+	// the same value everywhere it is named (so (= floor floor) is true)
+	builtin builtinFunc
+	name    string
 }
 
 type Value struct {

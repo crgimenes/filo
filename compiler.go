@@ -43,9 +43,10 @@ type compiler struct {
 	scope    *Scope
 	builtins map[string]builtinFunc
 	symbols  *SymbolTable
-	source   *sourceMap // nil for a tree with no source
-	pos      int32      // the position in effect: 1 + offset of the node being lowered
-	failedAt int32      // where the first lowering error was, the node it was about
+	source   *sourceMap              // nil for a tree with no source
+	value    func(name string) *Func // a builtin as a value; nil: one per use
+	pos      int32                   // the position in effect: 1 + offset of the node being lowered
+	failedAt int32                   // where the first lowering error was, the node it was about
 }
 
 // Compile lowers a parse tree to the IR described in docs/ir.md and returns
@@ -55,17 +56,18 @@ type compiler struct {
 // form's own error when it is evaluated, never earlier; only the four shape
 // errors named in the spec are reported here.
 func Compile(node Node, builtins map[string]builtinFunc, symbols *SymbolTable) (Node, error) {
-	return compileSource(node, builtins, symbols, nil)
+	return compileSource(node, builtins, symbols, nil, nil)
 }
 
 // compileSource is Compile marking each instruction with where its node
 // starts in source, for an error to say where it happened.
-func compileSource(node Node, builtins map[string]builtinFunc, symbols *SymbolTable, source *sourceMap) (Node, error) {
+func compileSource(node Node, builtins map[string]builtinFunc, symbols *SymbolTable, source *sourceMap, value func(string) *Func) (Node, error) {
 	c := &compiler{
 		scope:    newScope(nil),
 		builtins: builtins,
 		symbols:  symbols,
 		source:   source,
+		value:    value,
 	}
 	in, err := c.lower(node)
 	if err != nil && source != nil && c.failedAt > 0 {
@@ -121,9 +123,13 @@ func (c *compiler) symbol(name string) *Instr {
 		return &Instr{Op: OpLocal, A: depth, B: index, Name: name}
 	}
 	if c.builtins != nil {
-		_, ok := c.builtins[name]
+		fn, ok := c.builtins[name]
 		if ok {
-			return &Instr{Op: OpBuiltin, Name: name}
+			value := &Func{builtin: fn, name: name}
+			if c.value != nil {
+				value = c.value(name)
+			}
+			return &Instr{Op: OpBuiltin, Name: name, Val: VFunc(value)}
 		}
 	}
 	if c.symbols != nil {

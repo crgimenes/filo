@@ -81,7 +81,7 @@ func (ev *evaluator) eval(in *Instr) (Value, error) {
 		}
 		return v, nil
 	case OpBuiltin:
-		return ev.at(in, Value{}, fmt.Errorf("builtin %q cannot be used as value", in.Name))
+		return in.Val, nil // the builtin as a function value
 	case OpEmpty:
 		return ev.at(in, Value{}, fmt.Errorf("empty list expression"))
 	case OpInvalid:
@@ -214,13 +214,25 @@ func (ev *evaluator) evalArgs(instrs []*Instr) ([]Value, error) {
 // callFuncInstrs calls fn with unevaluated arguments, evaluating them straight
 // into the new frame's slots.
 func (ev *evaluator) callFuncInstrs(fn *Func, argInstrs []*Instr) (Value, error) {
-	if len(fn.Params) != len(argInstrs) {
+	if fn.builtin == nil && len(fn.Params) != len(argInstrs) {
 		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(argInstrs))
 	}
 	ev.recursion++
 	if ev.cfg.RecursionLimit > 0 && ev.recursion > ev.cfg.RecursionLimit {
 		ev.recursion--
 		return Value{}, fmt.Errorf("recursion limit exceeded")
+	}
+	if fn.builtin != nil {
+		args := make([]Value, len(argInstrs)) // the builtin may keep them: list does
+		for i, in := range argInstrs {
+			val, err := ev.eval(in)
+			if err != nil {
+				ev.recursion--
+				return Value{}, wrapf(err, "in call arguments: argument %d", i)
+			}
+			args[i] = val
+		}
+		return ev.callBuiltinValue(fn, args)
 	}
 	frame := ev.takeFrame(len(fn.Params), fn.Frame)
 	for i, in := range argInstrs {
@@ -240,7 +252,7 @@ func (ev *evaluator) callFuncInstrs(fn *Func, argInstrs []*Instr) (Value, error)
 // the function's own frame, so the caller may reuse args for its next call.
 func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Value, error) {
 	_ = ctx // the evaluator's own context governs cancellation
-	if len(args) != len(fn.Params) {
+	if fn.builtin == nil && len(args) != len(fn.Params) {
 		return Value{}, fmt.Errorf("function expects %d arguments, got %d", len(fn.Params), len(args))
 	}
 	ev.recursion++
@@ -248,9 +260,25 @@ func (ev *evaluator) callFunc(ctx context.Context, fn *Func, args []Value) (Valu
 		ev.recursion--
 		return Value{}, fmt.Errorf("recursion limit exceeded")
 	}
+	if fn.builtin != nil {
+		// a copy: the caller may reuse args, and the builtin may keep them
+		return ev.callBuiltinValue(fn, append([]Value(nil), args...))
+	}
 	frame := ev.takeFrame(len(args), fn.Frame)
 	copy(frame.slots, args)
 	return ev.runFunc(fn, frame)
+}
+
+// callBuiltinValue calls a builtin reached as a value, as a call by its name
+// would; the recursion counter was incremented by the caller and is
+// released here, as runFunc releases it.
+func (ev *evaluator) callBuiltinValue(fn *Func, args []Value) (Value, error) {
+	v, err := fn.builtin(ev.ctx, ev, args)
+	ev.recursion--
+	if err != nil {
+		return Value{}, wrapf(err, "in builtin %q", fn.name)
+	}
+	return v, nil
 }
 
 // runFunc runs a function body in frame, whose parent is the frame the closure

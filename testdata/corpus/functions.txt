@@ -51,17 +51,49 @@
 ()
 --- error
 
-=== builtin is not a value
-+
---- error
-
-=== builtin cannot be passed as an argument
-(fold + 0 (list 1 2))
---- error
-
-=== builtin cannot be inspected as a value
+=== builtin is a function value
 (type-of +)
+--- want
+"func"
+
+=== builtin passed as an argument
+(fold + 0 (list 1 2))
+--- want
+3
+
+=== builtin mapped over a list
+(map - (list 1 2))
+--- want
+(list -1 -2)
+
+=== builtin as a value is the same value every time
+(= + +)
+--- want
+#t
+
+=== builtin as a value differs from another builtin
+(= + -)
+--- want
+#f
+
+=== builtin stored in a global and called
+(do (def add +) (add 2 3))
+--- want
+5
+
+=== builtin chosen by an expression and called
+((if #t + -) 5 2)
+--- want
+7
+
+=== builtin called as a value fails as the builtin
+((if #t + -) 1 "a")
 --- error
+
+=== builtin as a value keeps each call's arguments apart
+(map list (list 1 2))
+--- want
+(list (list 1) (list 2))
 
 === function is a value
 (type-of (fn (x) x))
