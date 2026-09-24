@@ -60,15 +60,44 @@ type lexer struct {
 	src   string
 	i     int
 	depth int
+	at    map[Node]int // where each node read starts
+}
+
+// sourceMap is where each node of a parse tree starts in its source, for an
+// error to say where it happened.
+type sourceMap struct {
+	src string
+	at  map[Node]int // byte offset of the node's first byte
+}
+
+// lineCol turns 1 + a byte offset into a line and a column, both from 1, the
+// column counted in bytes.
+func (m *sourceMap) lineCol(pos int32) (int, int) {
+	line, col := 1, 1
+	for i := 0; i < int(pos)-1 && i < len(m.src); i++ {
+		if m.src[i] == '\n' {
+			line++
+			col = 1
+		} else {
+			col++
+		}
+	}
+	return line, col
 }
 
 // Parse parses the input string and returns the AST (List of expressions).
 func Parse(input string) (Node, error) {
+	node, _, err := parseSource(input)
+	return node, err
+}
+
+// parseSource is Parse, keeping where each node starts.
+func parseSource(input string) (Node, *sourceMap, error) {
 	// Strip a leading UTF-8 BOM: an editor or shell may prepend one, and it must
 	// not become part of the first token.
 	input = strings.TrimPrefix(input, "\ufeff")
 
-	lx := &lexer{src: input}
+	lx := &lexer{src: input, at: map[Node]int{}}
 	var nodes []Node
 
 	// Read all top-level expressions
@@ -79,24 +108,27 @@ func Parse(input string) (Node, error) {
 		}
 		node, err := lx.readNode()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		nodes = append(nodes, node)
 	}
 
 	// If no nodes, return error
 	if len(nodes) == 0 {
-		return nil, &ParseError{Pos: 0, Near: snippetNear(input, 0), Message: "empty script"}
+		return nil, nil, &ParseError{Pos: 0, Near: snippetNear(input, 0), Message: "empty script"}
 	}
 
 	// If single node, return it directly
+	m := &sourceMap{src: input, at: lx.at}
 	if len(nodes) == 1 {
-		return nodes[0], nil
+		return nodes[0], m, nil
 	}
 
 	// Multiple nodes: wrap in implicit (let () ...) block
 	// This allows sequential evaluation with the last value returned
-	return &List{Elems: append([]Node{&Symbol{Name: "let"}, &List{Elems: []Node{}}}, nodes...)}, nil
+	wrapper := &List{Elems: append([]Node{&Symbol{Name: "let"}, &List{Elems: []Node{}}}, nodes...)}
+	m.at[wrapper] = lx.at[nodes[0]] // the implicit let is where the program starts
+	return wrapper, m, nil
 }
 
 func (l *lexer) readNode() (Node, error) {
@@ -104,7 +136,15 @@ func (l *lexer) readNode() (Node, error) {
 	if l.i >= len(l.src) {
 		return nil, l.errAt(l.i, "unexpected end of input")
 	}
+	start := l.i
+	node, err := l.readToken()
+	if err == nil {
+		l.at[node] = start
+	}
+	return node, err
+}
 
+func (l *lexer) readToken() (Node, error) {
 	c := l.src[l.i]
 	switch c {
 	case '(':

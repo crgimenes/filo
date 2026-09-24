@@ -61,6 +61,9 @@ type Instr struct {
 	Args    []*Instr
 	Clauses []Clause
 	Fn      builtinFunc
+	// pos is 1 + the byte offset in the source of the node the instruction
+	// came from, 0 when it came from no source (a tree built by hand).
+	pos int32
 }
 
 // Clause is one arm of a cond. Exactly one of Invalid, Else or Test applies:

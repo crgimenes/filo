@@ -200,6 +200,26 @@ API:
 
 Pre-parsing eliminates parsing overhead, roughly 1.5x faster for repeated executions (see the `BenchmarkRunScript` vs `BenchmarkPreParsed` benchmarks).
 
+### Where an error happened
+
+A script compiled from source (`Engine.Compile`, `RunScript`, `ParseScript`)
+that fails to run, or a form of the wrong shape that fails to compile, returns
+a `*filo.PositionError` with the line and column (both from 1, the column in
+bytes) of the innermost expression that failed. Its message is the one the
+error always had, and `Unwrap` reaches it:
+
+```go
+_, _, err := engine.RunScript(ctx, "(let ((x 1))\n  (+ x \"a\"))", nil, cfg)
+var at *filo.PositionError
+if errors.As(err, &at) {
+	fmt.Printf("%d:%d: %v\n", at.Line, at.Col, err) // 2:3: in let: in builtin "+": ...
+}
+```
+
+The C runtime reports the same place for the same program (`filo_error_at`).
+A tree built by hand and run with `ExecuteAST` has no source, so its errors
+come as before. Parse errors keep their own type, `*filo.ParseError`.
+
 Compilation also folds constant subexpressions (`(* 2 60)` becomes `120` at
 compile time). Folding is semantics-preserving — a call is only replaced when
 evaluating it with constant arguments succeeds — so there is no switch to turn

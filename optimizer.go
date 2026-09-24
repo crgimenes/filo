@@ -14,6 +14,25 @@ import (
 //   - If true, replace with folded 'then'.
 //   - If false, replace with folded 'else' (or empty if missing).
 func FoldConstants(node Node) (Node, bool) {
+	return foldNode(node, nil)
+}
+
+// foldNode is FoldConstants keeping m right: a node folding makes starts
+// where the one it replaces did.
+func foldNode(node Node, m *sourceMap) (Node, bool) {
+	out, changed := foldOnce(node, m)
+	if changed && m != nil {
+		if _, list := out.([]Node); !list {
+			p, known := m.at[node]
+			if _, has := m.at[out]; known && !has {
+				m.at[out] = p
+			}
+		}
+	}
+	return out, changed
+}
+
+func foldOnce(node Node, m *sourceMap) (Node, bool) {
 	changed := false
 
 	switch n := node.(type) {
@@ -22,7 +41,7 @@ func FoldConstants(node Node) (Node, bool) {
 		newElems := make([]Node, len(n))
 		nodesChanged := false
 		for i, elem := range n {
-			folded, c := FoldConstants(elem)
+			folded, c := foldNode(elem, m)
 			newElems[i] = folded
 			if c {
 				nodesChanged = true
@@ -38,7 +57,7 @@ func FoldConstants(node Node) (Node, bool) {
 		newElems := make([]Node, len(n.Elems))
 		nodesChanged := false
 		for i, elem := range n.Elems {
-			folded, c := FoldConstants(elem)
+			folded, c := foldNode(elem, m)
 			newElems[i] = folded
 			if c {
 				nodesChanged = true

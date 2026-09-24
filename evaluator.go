@@ -19,10 +19,31 @@ type evaluator struct {
 	// was in use cannot be held by anything, and goes back to spare.
 	escapes uint64
 	spare   *frameSpares // made on the first frame given back
+	// failedAt is the pos of the innermost instruction that failed, the
+	// first one recorded; 0 while nothing failed or where it is not known.
+	failedAt int32
 }
 
 func newEvaluator(ctx context.Context, cfg EvalConfig, global *GlobalEnv, builtins map[string]builtinFunc) *evaluator {
 	return &evaluator{ctx: ctx, cfg: cfg, builtins: builtins, global: global, startedAt: time.Now()}
+}
+
+// at passes a result of in on, and when it failed and nothing inside failed
+// first, records in as where the error happened: the ones around it only add
+// their "in ..." on the way out. A signal is not a failure. Small enough to
+// be inlined: eval's returns go through it without another call.
+func (ev *evaluator) at(in *Instr, v Value, err error) (Value, error) {
+	if err != nil && ev.failedAt == 0 {
+		ev.failedAt = failurePos(in, err)
+	}
+	return v, err
+}
+
+func failurePos(in *Instr, err error) int32 {
+	if isSignal(err) {
+		return 0
+	}
+	return in.pos
 }
 
 // eval runs one instruction. Every instruction costs one step, counted before
@@ -31,11 +52,11 @@ func newEvaluator(ctx context.Context, cfg EvalConfig, global *GlobalEnv, builti
 func (ev *evaluator) eval(in *Instr) (Value, error) {
 	err := ev.tick()
 	if err != nil {
-		return Value{}, err
+		return ev.at(in, Value{}, err)
 	}
 	ev.steps++
 	if ev.cfg.StepLimit > 0 && ev.steps > ev.cfg.StepLimit {
-		return Value{}, fmt.Errorf("step limit exceeded")
+		return ev.at(in, Value{}, fmt.Errorf("step limit exceeded"))
 	}
 
 	switch in.Op {
@@ -50,67 +71,71 @@ func (ev *evaluator) eval(in *Instr) (Value, error) {
 	case OpGlobal:
 		v, ok := ev.global.GetByID(in.A)
 		if !ok {
-			return Value{}, fmt.Errorf("undefined global: %s", in.Name)
+			return ev.at(in, Value{}, fmt.Errorf("undefined global: %s", in.Name))
 		}
 		return v, nil
 	case OpDynamic:
 		v, ok := ev.global.Get(in.Name)
 		if !ok {
-			return Value{}, fmt.Errorf("undefined symbol: %s", in.Name)
+			return ev.at(in, Value{}, fmt.Errorf("undefined symbol: %s", in.Name))
 		}
 		return v, nil
 	case OpBuiltin:
-		return Value{}, fmt.Errorf("builtin %q cannot be used as value", in.Name)
+		return ev.at(in, Value{}, fmt.Errorf("builtin %q cannot be used as value", in.Name))
 	case OpEmpty:
-		return Value{}, fmt.Errorf("empty list expression")
+		return ev.at(in, Value{}, fmt.Errorf("empty list expression"))
 	case OpInvalid:
-		return Value{}, fmt.Errorf("in %s: %s", in.Name, in.Msg)
+		return ev.at(in, Value{}, fmt.Errorf("in %s: %s", in.Name, in.Msg))
 	case OpIf:
 		v, err := ev.evalIf(in.Args)
-		return v, wrapIn("if", err)
+		return ev.at(in, v, wrapIn("if", err))
 	case OpCond:
 		v, err := ev.evalCond(in.Clauses)
-		return v, wrapIn("cond", err)
+		return ev.at(in, v, wrapIn("cond", err))
 	case OpDo:
 		v, err := ev.evalDo(in.Args)
-		return v, wrapIn("do", err)
+		return ev.at(in, v, wrapIn("do", err))
 	case OpAnd:
 		v, err := ev.evalAnd(in.Args)
-		return v, wrapIn("and", err)
+		return ev.at(in, v, wrapIn("and", err))
 	case OpOr:
 		v, err := ev.evalOr(in.Args)
-		return v, wrapIn("or", err)
+		return ev.at(in, v, wrapIn("or", err))
 	case OpLet:
 		v, err := ev.evalLet(in)
-		return v, wrapIn("let", err)
+		return ev.at(in, v, wrapIn("let", err))
 	case OpLetv:
 		v, err := ev.evalLetv(in)
-		return v, wrapIn("letv", err)
+		return ev.at(in, v, wrapIn("letv", err))
 	case OpSet:
 		v, err := ev.evalSet(in.Args)
-		return v, wrapIn("set", err)
+		return ev.at(in, v, wrapIn("set", err))
 	case OpFn:
 		v, err := ev.evalFn(in)
-		return v, wrapIn("fn", err)
+		return ev.at(in, v, wrapIn("fn", err))
 	case OpDef:
 		v, err := ev.evalDef(in)
-		return v, wrapIn("def", err)
+		return ev.at(in, v, wrapIn("def", err))
 	case OpTuple:
 		vals, err := ev.evalArgs(in.Args)
 		if err != nil {
-			return Value{}, wrapIn(in.Name, err)
+			return ev.at(in, Value{}, wrapIn(in.Name, err))
 		}
 		return VTuple(vals), nil
 	case OpExit:
-		return ev.evalSignal(in.Args, "exit")
+		v, err := ev.evalSignal(in.Args, "exit")
+		return ev.at(in, v, err)
 	case OpReturn:
-		return ev.evalSignal(in.Args, "return")
+		v, err := ev.evalSignal(in.Args, "return")
+		return ev.at(in, v, err)
 	case OpCallB:
-		return ev.callBuiltin(in.Name, in.Fn, in.Args)
+		v, err := ev.callBuiltin(in.Name, in.Fn, in.Args)
+		return ev.at(in, v, err)
 	case OpCall:
-		return ev.evalCall(in.Args)
+		v, err := ev.evalCall(in.Args)
+		return ev.at(in, v, err)
 	default:
-		return Value{}, fmt.Errorf("unknown instruction: %d", in.Op)
+		return ev.at(in, Value{}, fmt.Errorf("unknown instruction: %d", in.Op))
 	}
 }
 

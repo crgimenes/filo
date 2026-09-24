@@ -14,8 +14,9 @@ import (
 // with different globals. This is similar to Go's html/template pattern.
 type Script struct {
 	name    string
-	rawAST  Node     // Original AST (unbound)
-	program *Program // Cached bound program (optimized)
+	rawAST  Node       // Original AST (unbound)
+	source  *sourceMap // where each node of rawAST starts
+	program *Program   // Cached bound program (optimized)
 }
 
 // newScript creates a new named Script. The script must be parsed before execution.
@@ -31,11 +32,12 @@ func (s *Script) Name() string {
 // Parse parses the source code and stores the AST in the Script.
 // Returns the Script for method chaining.
 func (s *Script) Parse(src string) (*Script, error) {
-	ast, err := Parse(src)
+	ast, source, err := parseSource(src)
 	if err != nil {
 		return nil, err
 	}
 	s.rawAST = ast
+	s.source = source
 	s.program = nil // Invalidate cache
 	return s, nil
 }
@@ -51,7 +53,7 @@ func (s *Script) Execute(ctx context.Context, eng *Engine, globals map[string]Va
 	// NOTE: We assume Script is typically used with a single Engine instance.
 	// If switched, we re-compile. This is safe but incurs a one-time cost per engine.
 	if s.program == nil || s.program.eng != eng {
-		prog, err := eng.CompileAST(s.rawAST)
+		prog, err := eng.compile(s.rawAST, s.source)
 		if err != nil {
 			return Value{}, nil, fmt.Errorf("jit compile error: %w", err)
 		}

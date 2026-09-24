@@ -2,6 +2,7 @@ package filo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -82,17 +83,18 @@ func (e *Engine) MustRegisterBuiltin(name string, fn Builtin) {
 
 // Program represents a compiled Filo script bound to an Engine instance.
 type Program struct {
-	ir  *Instr
-	eng *Engine
+	ir     *Instr
+	eng    *Engine
+	source *sourceMap // where it came from, for an error to say where; nil for a tree
 }
 
 // Compile parses and compiles the source code into a reuseable Program.
 func (e *Engine) Compile(src string) (*Program, error) {
-	ast, err := Parse(src)
+	ast, source, err := parseSource(src)
 	if err != nil {
 		return nil, err
 	}
-	return e.CompileAST(ast)
+	return e.compile(ast, source)
 }
 
 // CompileAST compiles a parsed AST into a reusable Program bound to this Engine.
@@ -100,18 +102,31 @@ func (e *Engine) Compile(src string) (*Program, error) {
 // only replaces a call when evaluating it with constant arguments succeeds), so
 // there is no knob to turn it off.
 func (e *Engine) CompileAST(ast Node) (*Program, error) {
-	folded, _ := FoldConstants(ast)
-	ir, err := e.lower(folded)
+	return e.compile(ast, nil)
+}
+
+// compile is CompileAST keeping where each part came from in source, when
+// the tree was parsed from one.
+func (e *Engine) compile(ast Node, source *sourceMap) (*Program, error) {
+	folded, _ := foldNode(ast, source)
+	ir, err := e.lowerSource(folded, source)
 	if err != nil {
+		if at, ok := errors.AsType[*PositionError](err); ok {
+			return nil, &PositionError{Line: at.Line, Col: at.Col, Err: fmt.Errorf("compile error: %w", at.Err)}
+		}
 		return nil, fmt.Errorf("compile error: %w", err)
 	}
-	return &Program{ir: ir, eng: e}, nil
+	return &Program{ir: ir, eng: e, source: source}, nil
 }
 
 // lower turns a parse tree into IR bound to this engine's builtins and
 // symbol table.
 func (e *Engine) lower(ast Node) (*Instr, error) {
-	compiled, err := Compile(ast, e.builtins, e.symbols)
+	return e.lowerSource(ast, nil)
+}
+
+func (e *Engine) lowerSource(ast Node, source *sourceMap) (*Instr, error) {
+	compiled, err := compileSource(ast, e.builtins, e.symbols, source)
 	if err != nil {
 		return nil, err
 	}
@@ -122,9 +137,15 @@ func (e *Engine) lower(ast Node) (*Instr, error) {
 	return ir, nil
 }
 
-// Execute runs the compiled program.
+// Execute runs the compiled program. When one compiled from source fails,
+// the error is a *PositionError saying where; its message is the same.
 func (p *Program) Execute(ctx context.Context, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
-	return p.eng.ExecuteAST(ctx, p.ir, globals, cfg)
+	result, newGlobals, at, err := p.eng.run(ctx, p.ir, globals, cfg)
+	if err != nil && at > 0 && p.source != nil {
+		line, col := p.source.lineCol(at)
+		err = &PositionError{Line: line, Col: col, Err: err}
+	}
+	return result, newGlobals, err
 }
 
 func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
@@ -140,11 +161,18 @@ func (e *Engine) RunScript(ctx context.Context, src string, globals map[string]V
 // constant folding). This is the core execution method used by both RunScript
 // and Script.Execute.
 func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
+	result, newGlobals, _, err = e.run(ctx, ast, globals, cfg)
+	return result, newGlobals, err
+}
+
+// run is ExecuteAST, also saying where it failed: the pos of the innermost
+// instruction that did, 0 when not known.
+func (e *Engine) run(ctx context.Context, ast Node, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, failedAt int32, err error) {
 	ir, ok := ast.(*Instr)
 	if !ok {
 		ir, err = e.lower(ast)
 		if err != nil {
-			return Value{}, nil, fmt.Errorf("compile error: %w", err)
+			return Value{}, nil, 0, fmt.Errorf("compile error: %w", err)
 		}
 	}
 	defer func() {
@@ -152,6 +180,7 @@ func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Va
 		if r != nil {
 			result = Value{}
 			newGlobals = nil
+			failedAt = 0
 			err = fmt.Errorf("panic in script: %v", r)
 		}
 	}()
@@ -189,10 +218,10 @@ func (e *Engine) ExecuteAST(ctx context.Context, ast Node, globals map[string]Va
 			result = sig.Value
 			err = nil
 		default:
-			return Value{}, nil, err
+			return Value{}, nil, ev.failedAt, err
 		}
 	}
 
 	newGlobals = root.ToMap()
-	return result, newGlobals, nil
+	return result, newGlobals, 0, nil
 }

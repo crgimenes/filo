@@ -19,3 +19,21 @@ type returnSignal struct {
 func (r *returnSignal) Error() string {
 	return "return"
 }
+
+// PositionError is an error of a script compiled from source, and where it
+// happened: the line and the column (both from 1, the column in bytes) of the
+// innermost expression that failed to run, or that did not compile. The
+// message is the one the error always had, and Unwrap reaches it.
+type PositionError struct {
+	Line int
+	Col  int
+	Err  error
+}
+
+func (e *PositionError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *PositionError) Unwrap() error {
+	return e.Err
+}

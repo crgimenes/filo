@@ -2,6 +2,7 @@ package filo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -348,5 +349,69 @@ func TestFramesReusedOnlyWhenNoClosureHoldsThem(t *testing.T) {
 		if got != c.want {
 			t.Errorf("%s\n  got %s, want %s", c.src, got, c.want)
 		}
+	}
+}
+
+// TestErrorsSayWhere: a script compiled from source that fails says
+// where, as the C runtime does for the same program — the line and column
+// (from 1, bytes) of the innermost expression that failed — without the
+// message changing.
+func TestErrorsSayWhere(t *testing.T) {
+	cases := []struct {
+		src       string
+		line, col int
+	}{
+		{"(let ((x 1))\n  (+ x \"a\"))", 2, 3},         // the C runtime's own case
+		{"(+ 1\n   wdith)", 2, 4},                      // an undefined global
+		{"(def f (fn (n) (/ n \"x\")))\n(f 2)", 1, 16}, // inside the function called
+		{"(list 1 (+ 2 3) (* 4 \"b\"))", 1, 17},        // after a folded argument
+		{"\n\n  (nth (list) 5)", 3, 3},
+	}
+	for _, c := range cases {
+		eng := NewEngine()
+		_, _, err := eng.RunScript(context.Background(), c.src, nil, EvalConfig{})
+		var re *PositionError
+		if !errors.As(err, &re) {
+			t.Errorf("%q: got %v (%T), want a *PositionError", c.src, err, err)
+			continue
+		}
+		if re.Line != c.line || re.Col != c.col {
+			t.Errorf("%q: at %d:%d, want %d:%d (%v)", c.src, re.Line, re.Col, c.line, c.col, err)
+		}
+		if err.Error() != re.Err.Error() || strings.Contains(err.Error(), "line") {
+			t.Errorf("%q: the message changed: %v", c.src, err)
+		}
+	}
+
+	// the same failure through a tree built by hand has no place to say
+	ast, err := Parse("(+ 1 \"a\")")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = NewEngine().ExecuteAST(context.Background(), ast, nil, EvalConfig{})
+	var re *PositionError
+	if err == nil || errors.As(err, &re) {
+		t.Errorf("ExecuteAST of a tree: got %v, want the plain error", err)
+	}
+
+	// a Script parsed from source says where too
+	s, err := ParseScript("s", "(do\n  (+ 1 \"a\"))")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = s.Execute(context.Background(), NewEngine(), nil, EvalConfig{})
+	if !errors.As(err, &re) || re.Line != 2 || re.Col != 3 {
+		t.Errorf("Script: got %v, want a *PositionError at 2:3", err)
+	}
+
+	// a form of the wrong shape fails to compile, and says where too
+	_, _, err = NewEngine().RunScript(context.Background(), "(do 1\n  (let (x) x))", nil, EvalConfig{})
+	if !errors.As(err, &re) || re.Line != 2 || re.Col != 3 || err.Error() != "compile error: invalid let binding" {
+		t.Errorf("compile: got %v, want \"compile error: invalid let binding\" at 2:3", err)
+	}
+
+	// exit is not an error, and a run that works has none
+	if _, _, err := NewEngine().RunScript(context.Background(), "(do (exit 1) (+ 1 \"a\"))", nil, EvalConfig{}); err != nil {
+		t.Errorf("exit: %v", err)
 	}
 }

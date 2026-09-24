@@ -2,6 +2,7 @@ package filo
 
 import (
 	"fmt"
+	"math"
 )
 
 // Scope is a lexical scope during lowering: which names are bound here and
@@ -42,6 +43,9 @@ type compiler struct {
 	scope    *Scope
 	builtins map[string]builtinFunc
 	symbols  *SymbolTable
+	source   *sourceMap // nil for a tree with no source
+	pos      int32      // the position in effect: 1 + offset of the node being lowered
+	failedAt int32      // where the first lowering error was, the node it was about
 }
 
 // Compile lowers a parse tree to the IR described in docs/ir.md and returns
@@ -51,15 +55,50 @@ type compiler struct {
 // form's own error when it is evaluated, never earlier; only the four shape
 // errors named in the spec are reported here.
 func Compile(node Node, builtins map[string]builtinFunc, symbols *SymbolTable) (Node, error) {
+	return compileSource(node, builtins, symbols, nil)
+}
+
+// compileSource is Compile marking each instruction with where its node
+// starts in source, for an error to say where it happened.
+func compileSource(node Node, builtins map[string]builtinFunc, symbols *SymbolTable, source *sourceMap) (Node, error) {
 	c := &compiler{
 		scope:    newScope(nil),
 		builtins: builtins,
 		symbols:  symbols,
+		source:   source,
 	}
-	return c.lower(node)
+	in, err := c.lower(node)
+	if err != nil && source != nil && c.failedAt > 0 {
+		line, col := source.lineCol(c.failedAt)
+		return in, &PositionError{Line: line, Col: col, Err: err}
+	}
+	return in, err
 }
 
+// lower lowers node with its position in effect, so what is made for it
+// carries it, and puts the enclosing one back.
 func (c *compiler) lower(node Node) (*Instr, error) {
+	outer := c.pos
+	if c.source != nil {
+		if _, list := node.([]Node); !list {
+			at, ok := c.source.at[node]
+			if ok && at < math.MaxInt32 { // past 2 GB of source, the place is not kept
+				c.pos = int32(at) + 1 // #nosec G115 -- at < math.MaxInt32, checked above
+			}
+		}
+	}
+	in, err := c.lowerNode(node)
+	if in != nil && in.pos == 0 {
+		in.pos = c.pos
+	}
+	if err != nil && c.failedAt == 0 {
+		c.failedAt = c.pos
+	}
+	c.pos = outer
+	return in, err
+}
+
+func (c *compiler) lowerNode(node Node) (*Instr, error) {
 	switch n := node.(type) {
 	case *NumberLit:
 		return &Instr{Op: OpConst, Val: VNum(n.Value)}, nil
