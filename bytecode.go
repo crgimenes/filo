@@ -67,6 +67,7 @@ type bcImport struct {
 
 type bcFunc struct {
 	unit     *Unit
+	index    int // in the unit's function table, as a listing numbers them
 	off      int
 	length   int
 	nparams  int
@@ -333,7 +334,7 @@ func (u *Unit) readFns(r *bcReader) bool {
 	u.fns = make([]bcFunc, n)
 	for i := range u.fns {
 		f := &u.fns[i]
-		f.unit = u
+		f.unit, f.index = u, i
 		f.off, f.length, f.nparams, f.nslots, f.maxstack = r.uleb(), r.uleb(), r.uleb(), r.uleb(), r.uleb()
 		if r.bad || f.off > len(u.code) || f.length > len(u.code)-f.off || f.nparams > f.nslots ||
 			f.nslots > 0xFFFF || f.maxstack > bcStackMax {

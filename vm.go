@@ -64,22 +64,9 @@ type bcAct struct {
 // an extern that is missing fails when it is read. A failure the unit's
 // debug section places is a *PositionError.
 func (u *Unit) Run(ctx context.Context, entry string, globals map[string]Value, cfg EvalConfig) (result Value, newGlobals map[string]Value, err error) {
-	fn := u.export(entry)
-	if fn == nil {
-		return Value{}, nil, fmt.Errorf("bytecode: no entry point named %s", entry)
-	}
-	if fn.nparams != 0 {
-		return Value{}, nil, fmt.Errorf("bytecode: an entry point takes no arguments")
-	}
-	var lack []string
-	for _, imp := range u.imports {
-		v, ok := globals[imp.name]
-		if imp.builtin == nil && (!ok || v.Kind != KFunc) {
-			lack = append(lack, imp.name)
-		}
-	}
-	if len(lack) > 0 {
-		return Value{}, nil, fmt.Errorf("missing (%d): %s", len(lack), strings.Join(lack, " "))
+	fn, err := u.entry(entry, globals)
+	if err != nil {
+		return Value{}, nil, err
 	}
 	defer func() {
 		r := recover()
@@ -90,20 +77,8 @@ func (u *Unit) Run(ctx context.Context, entry string, globals map[string]Value, 
 
 	e := u.eng
 	root := e.envPool.Get().(*GlobalEnv)
-	root.Reset(e.symbols)
 	defer e.envPool.Put(root)
-	for k, v := range globals {
-		root.Define(k, v)
-	}
-	// an extern the host did not give that is a builtin here is that builtin,
-	// as a unit compiled without it reads it
-	for _, g := range u.externs {
-		_, held := root.GetByID(u.globals[g])
-		_, builtin := e.builtins[u.names[g]]
-		if !held && builtin {
-			root.DefineID(u.globals[g], VFunc(e.builtinValue(u.names[g])))
-		}
-	}
+	u.globalsFor(root, globals)
 
 	cfg = cfg.withDefaults()
 	runCtx := ctx
@@ -128,6 +103,48 @@ func (u *Unit) Run(ctx context.Context, entry string, globals map[string]Value, 
 		}
 	}
 	return result, root.ToMap(), nil
+}
+
+// entry is the function the entry point named runs, when it can run with
+// globals: an import that is neither a builtin nor a function among them
+// refuses it, as the C runtime refuses the load.
+func (u *Unit) entry(name string, globals map[string]Value) (*bcFunc, error) {
+	fn := u.export(name)
+	if fn == nil {
+		return nil, fmt.Errorf("bytecode: no entry point named %s", name)
+	}
+	if fn.nparams != 0 {
+		return nil, fmt.Errorf("bytecode: an entry point takes no arguments")
+	}
+	var lack []string
+	for _, imp := range u.imports {
+		v, ok := globals[imp.name]
+		if imp.builtin == nil && (!ok || v.Kind != KFunc) {
+			lack = append(lack, imp.name)
+		}
+	}
+	if len(lack) > 0 {
+		return nil, fmt.Errorf("missing (%d): %s", len(lack), strings.Join(lack, " "))
+	}
+	return fn, nil
+}
+
+// globalsFor sets root up for a run with globals: an extern the host did not
+// give that is a builtin here is that builtin, as a unit compiled without it
+// reads it.
+func (u *Unit) globalsFor(root *GlobalEnv, globals map[string]Value) {
+	e := u.eng
+	root.Reset(e.symbols)
+	for k, v := range globals {
+		root.Define(k, v)
+	}
+	for _, g := range u.externs {
+		_, held := root.GetByID(u.globals[g])
+		_, builtin := e.builtins[u.names[g]]
+		if !held && builtin {
+			root.DefineID(u.globals[g], VFunc(e.builtinValue(u.names[g])))
+		}
+	}
 }
 
 func (u *Unit) export(name string) *bcFunc {

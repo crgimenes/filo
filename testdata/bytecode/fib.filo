@@ -1,0 +1,4 @@
+; Fibonacci, the way a first recursion is taught: fib calls itself twice,
+; and each call is a frame of its own.
+(def fib (fn (n) (if (< n 2) n (+ (fib (- n 1)) (fib (- n 2))))))
+(fib 10)

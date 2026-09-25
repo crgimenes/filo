@@ -572,6 +572,32 @@ C runtime's `filo dump` byte for byte. The command is `cmd/filo`:
 go run ./cmd/filo dump testdata/bytecode/prog.fbc
 ```
 
+A debugger steps a unit with `Unit.Start`: each `Step` runs one instruction
+and `State` says where the run stopped — its calls, each with its locals and
+operand stack, and the line and column of the next instruction. A builtin
+runs whole within the step that calls it, even one that calls back into the
+unit, as the C runtime's paused runs do. The machine is deterministic, so
+going back a step is starting again and stepping one fewer. A run stepped to
+its end gives what `Run` gives, on every unit the corpus compiles to.
+
+`filo debug` steps a unit on the terminal, in the edt's colours: the source on
+the left with the line and column the run is at, the function's instructions
+on the right, the calls below with their locals and operand stacks. The keys
+are gdb's: `s` a line into calls, `n` a line over them, `i` one instruction,
+`c` to the next breakpoint (or the end), `b` back (undoes the last movement),
+`r` restart, `q` quit. The arrows move a cursor in the source, and space sets
+or clears a breakpoint on its line: `c` stops where the run enters it — from
+another line, or a call starting there, so a recursive function stops once
+per call.
+The source of the entry `main` is `main.filo`, beside the unit or in `-src`,
+and `-g NAME=EXPR` (repeatable) gives the run a global, the expression in
+Filo — a value, or a function the unit imports and the VM lacks:
+
+```bash
+go run ./cmd/filo debug testdata/bytecode/fib.fbc
+go run ./cmd/filo debug -g base=5 testdata/bytecode/prog.fbc
+```
+
 ## More of my projects
 
 - [clang_filo](https://github.com/crgimenes/clang_filo): this language as a C library, for wasm and microcontrollers.

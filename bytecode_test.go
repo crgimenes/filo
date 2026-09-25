@@ -15,6 +15,8 @@ import (
 //	filo build -o prog.fbc main.filo fail.filo
 //	filo build -o upper.fbc upper.filo
 //	filo bundle -o demo.fbb prog.fbc upper.fbc
+//	filo build -o fib.fbc fib.filo
+//	filo build --strip -o stripped.fbc main.filo
 
 func loadUnit(t *testing.T, e *Engine, name string) *Unit {
 	t.Helper()

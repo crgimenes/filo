@@ -263,7 +263,9 @@ and sharing no code with the loader: a second reading of the format, held to
 the loader on every unit the corpus and the oracle compile to. The Go engine
 has its own, the package `fbc` (and `filo dump` in its `cmd/filo`), also
 written from this document alone; its listing is the C one byte for byte,
-on every unit the corpus compiles to (`make govm`). The trace is
+on every unit the corpus compiles to (`make govm`), where each unit also
+runs stepped one instruction at a time (`Unit.Start`, for a debugger) and
+must end as the whole run does. The trace is
 the `trace` hook of `filo_host`, which sees each instruction before it runs:
 its offset in the code section, the operand stack and how many calls deep
 the run is; the host decodes the instruction from the unit's bytes. It costs
