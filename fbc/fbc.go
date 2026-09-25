@@ -78,6 +78,17 @@ type Fn struct {
 	Stack  int
 }
 
+// Section is an entry of the section table: its kind and where it lies.
+type Section struct {
+	Kind int
+	Span
+}
+
+// SectionNames are the kinds the spec defines, by number; a kind past them
+// is one this reader does not know.
+var SectionNames = []string{"", "imports", "globals", "constants", "functions", "code",
+	"exports", "debug", "externs"}
+
 // Export is an entry point: a name and the function it runs.
 type Export struct {
 	Name string
@@ -92,6 +103,8 @@ type Unit struct {
 	ChecksumOK  bool
 	WidestStack int
 	WidestFrame int
+	HeaderSize  int       // the fixed header and the section table
+	Sections    []Section // as the table lists them
 	Imports     []string
 	Globals     []string
 	Externs     map[int]bool // globals read and never written: the VM's to provide
@@ -329,6 +342,7 @@ func Read(data []byte) (*Unit, error) {
 	if hsize < header || hsize > len(data) || nsec > (hsize-header)/section {
 		return nil, errors.New("the header does not fit the file")
 	}
+	u.HeaderSize = hsize
 	u.ChecksumOK = checksum(data) == u.Checksum
 	var seen [8]bool
 	for i := range nsec {
@@ -344,9 +358,11 @@ func Read(data []byte) (*Unit, error) {
 			}
 			seen[kind] = true
 		}
-		if !u.readSection(kind, Span{Off: int(off), Len: int(n)}) { // #nosec G115 -- both within len(data), checked above
+		s := Span{Off: int(off), Len: int(n)} // #nosec G115 -- both within len(data), checked above
+		if !u.readSection(kind, s) {
 			return nil, errors.New("a section does not read as the spec says")
 		}
+		u.Sections = append(u.Sections, Section{Kind: kind, Span: s})
 	}
 	// negative only where an int has 32 bits: a value the C reader takes
 	// as past 2^31, and so past the code, as here

@@ -1,7 +1,7 @@
 // Command filo is the Filo toolchain on the desktop, the C runtime's filo
 // command in Go: build and bundle write the bytes the C ones write, dump
-// lists what the C one lists, and debug steps an entry point on the
-// terminal.
+// lists what the C one lists, check and size look at what a unit asks for
+// and weighs, and debug steps an entry point on the terminal.
 package main
 
 import (
@@ -18,6 +18,8 @@ import (
 const usage = `usage: filo build [--strip] -o OUT FILE...
        filo bundle -o OUT UNIT...
        filo dump [FILE]
+       filo check [-vm PROFILE] [FILE]
+       filo size [FILE]
        filo debug [-src DIR] [-g NAME=EXPR]... FILE [MEMBER] [ENTRY]
 
 build compiles programs into one unit of bytecode (docs/bytecode.md), each
@@ -31,6 +33,16 @@ docs/bytecode.md describes it — the header, the names it imports and the
 globals it uses (the extern ones marked), its constants and entry points,
 and every function, each instruction with its bytes and the line:column it
 came from. FILE is read from standard input when absent or "-".
+
+check says of each unit (a bundle's members, each) whether a VM gives what
+it asks for: the functions it imports and the extern globals it reads. The
+VM is this command's (the core, math and strings), or the one PROFILE lists:
+the names it gives, one a line, "#" for a comment (msh's build writes the
+BBS's). A line a unit: "NAME  runs: ..." or "NAME  lacks N: a, b"; the exit
+status is 1 when one lacks something.
+
+size says where the bytes go: each unit's header and sections, in the
+order the file has them.
 
 debug steps an entry point of a unit, a bundle or a source (compiled as
 build compiles it): ENTRY, else main, else the first — of MEMBER, chosen the
@@ -47,6 +59,8 @@ expression in Filo: a value, or a function a unit imports and the VM lacks.
 Examples:
   filo build -o prog.fbc main.filo fail.filo
   filo dump lib/msh/edt.fbb | less
+  filo check -vm bin.vm mine.fbb
+  filo size screens.fbb
   filo debug fib.filo
   filo debug prog.fbc fail
   filo debug -g base=5 -g 'xs=(list 1 2 3)' prog.fbc
@@ -69,6 +83,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return cmdBuild(args[1:], stderr)
 		case "bundle":
 			return cmdBundle(args[1:], stderr)
+		case "check":
+			return cmdCheck(args[1:], stdin, stdout, stderr)
+		case "size":
+			return cmdSize(args[1:], stdin, stdout, stderr)
 		}
 	}
 	if len(args) < 1 || args[0] != "dump" || len(args) > 2 {

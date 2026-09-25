@@ -584,6 +584,18 @@ C runtime's `filo dump` byte for byte. The command is `cmd/filo`:
 go run ./cmd/filo dump testdata/bytecode/prog.fbc
 ```
 
+`filo check` says whether a VM gives what a unit asks for (a bundle's
+members, each): the functions it imports and the extern globals it reads,
+against this command's VM or a profile — the names a VM gives, one a line,
+which a host writes from its context (msh's build writes the BBS's). The
+exit status is 1 when something lacks. `filo size` says where a unit's bytes
+go, section by section:
+
+```bash
+go run ./cmd/filo check -vm bin.vm mine.fbb
+go run ./cmd/filo size testdata/bytecode/demo.fbb
+```
+
 A debugger steps a unit with `Unit.Start`: each `Step` runs one instruction
 and `State` says where the run stopped — its calls, each with its locals and
 operand stack, and the line and column of the next instruction. A function
