@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"runtime"
 	"testing"
+	"time"
 )
 
 // stepAll steps s to the end and returns how many Steps it took.
@@ -109,4 +111,91 @@ func frameShape(st StepState) []string {
 			VList(f.Slots).String()+" "+VList(f.Operands).String())
 	}
 	return out
+}
+
+// buildUnit compiles src into a unit whose one entry is "main".
+func buildUnit(t *testing.T, src string) *Unit {
+	t.Helper()
+	e := NewEngine()
+	p, err := e.Compile(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := e.Build([]BuildEntry{{Name: "main", Program: p}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := e.LoadUnit(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+// A function map calls back runs a Step at a time too, as a call above the
+// one that called map, which says so.
+func TestSteppingIntoWhatABuiltinCalls(t *testing.T) {
+	u := buildUnit(t, "(fold (fn (a x) (+ a x))\n  0\n  (map (fn (x) (* x 2)) (range 3)))")
+	s, err := u.Start("main", nil, EvalConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var vias []string
+	seen := map[string]bool{}
+	for !s.Done() {
+		st := s.State()
+		top := st.Frames[len(st.Frames)-1]
+		if len(st.Frames) == 2 && !seen[top.Via+" "+VList(top.Slots).String()] {
+			seen[top.Via+" "+VList(top.Slots).String()] = true
+			vias = append(vias, top.Via+" "+VList(top.Slots).String())
+			if st.Line != 3 && top.Via == "map" || st.Line != 1 && top.Via == "fold" {
+				t.Fatalf("%s at line %d", top.Via, st.Line)
+			}
+		}
+		_ = s.Step(context.Background())
+	}
+	want := []string{"map (list 0)", "map (list 1)", "map (list 2)",
+		"fold (list 0 0)", "fold (list 0 2)", "fold (list 2 4)"}
+	if !reflect.DeepEqual(vias, want) {
+		t.Fatalf("calls back: %q, want %q", vias, want)
+	}
+	got, _, err := s.Result()
+	if err != nil || got.String() != "6" {
+		t.Fatalf("got %s (%v)", got, err)
+	}
+}
+
+// Close ends a run in the middle, a callback's included, and a Stepper
+// dropped without it is closed when collected: no run is left parked.
+func TestClosingARunInTheMiddle(t *testing.T) {
+	u := buildUnit(t, "(map (fn (x) (* x 2)) (range 100))")
+	before := runtime.NumGoroutine()
+	for range 50 {
+		s, err := u.Start("main", nil, EvalConfig{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for range 20 {
+			_ = s.Step(context.Background())
+		}
+		s.Close()
+		if !s.Done() || s.Step(context.Background()) == nil || len(s.State().Frames) != 0 {
+			t.Fatal("a closed run goes on")
+		}
+	}
+	for range 50 {
+		s, err := u.Start("main", nil, EvalConfig{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = s.Step(context.Background())
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for runtime.NumGoroutine() > before+5 {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d goroutines, %d before", runtime.NumGoroutine(), before)
+		}
+		runtime.GC()
+		time.Sleep(10 * time.Millisecond)
+	}
 }

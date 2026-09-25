@@ -207,6 +207,9 @@ func drawStack(s *session, scr *screen, st filo.StepState, top, rows int) {
 		if name != "" {
 			label += ` "` + name + `"`
 		}
+		if f.Via != "" {
+			label += " via " + f.Via
+		}
 		scr.color(colDim, colorDefault)
 		n := scr.print(row, 1, label+"  "+s.place(st.Frames, i)+"  ")
 		scr.color(colorDefault, colorDefault)

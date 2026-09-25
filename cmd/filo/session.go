@@ -178,6 +178,9 @@ func (s *session) restart() error {
 	if err != nil {
 		return err
 	}
+	if s.run != nil {
+		s.run.Close()
+	}
 	s.run, s.steps, s.msg = run, 0, ""
 	s.follow()
 	return nil

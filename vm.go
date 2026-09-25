@@ -46,6 +46,8 @@ type bcRun struct {
 	stack     []Value
 	calls     []bcAct
 	line, col int
+	pause     func() // a Stepper's: called before every instruction, nil otherwise
+	via       string // the builtin running, for the calls it makes back into the unit
 }
 
 // bcAct is a call running: its operands are ev.bc.stack[base:].
@@ -55,7 +57,8 @@ type bcAct struct {
 	pc      int
 	base    int
 	escapes uint64
-	root    bool // the call a loop runs until it returns: from a builtin, or the entry
+	root    bool   // the call a loop runs until it returns: from a builtin, or the entry
+	via     string // the builtin that made it (map, fold); "" for the unit's own
 }
 
 // Run runs the entry point named entry, with globals, and returns its value
@@ -174,7 +177,7 @@ func (ev *evaluator) runBC(fn *bcFunc, parent *Frame, args []Value) (Value, erro
 	copy(f.slots, args)
 	escapes := ev.escapes
 	base := len(ev.bc.stack)
-	v, err := ev.vmLoop(bcAct{fn: fn, f: f, pc: fn.off, base: base, root: true})
+	v, err := ev.vmLoop(bcAct{fn: fn, f: f, pc: fn.off, base: base, root: true, via: ev.bc.via})
 	ev.bc.stack = ev.bc.stack[:base]
 	if err == nil {
 		ev.dropFrame(f, escapes)
@@ -245,6 +248,9 @@ var errTruncated = errors.New("bytecode: a truncated operand")
 // vmStep runs one instruction of a, the call on top. When a root call
 // returns, its value goes to out.
 func (ev *evaluator) vmStep(a *bcAct, out *Value) error {
+	if ev.bc.pause != nil {
+		ev.bc.pause()
+	}
 	err := ev.tick()
 	if err != nil {
 		return err
@@ -435,7 +441,10 @@ func (ev *evaluator) vmInvoke(a *bcAct, fnv Value, argc, drop int) error {
 	top := len(ev.bc.stack)
 	args := ev.bc.stack[top-argc : top]
 	if fn.bc == nil {
+		via := ev.bc.via
+		ev.bc.via = fn.name
 		v, err := ev.callFunc(ev.ctx, fn, args)
+		ev.bc.via = via
 		if err != nil {
 			return err
 		}
@@ -478,7 +487,10 @@ func (ev *evaluator) vmCallB(a *bcAct, argc, end int) error {
 	}
 	top := len(ev.bc.stack)
 	args := append([]Value(nil), ev.bc.stack[top-argc:]...) // the builtin may keep them: list does
+	via := ev.bc.via
+	ev.bc.via = imp.name
 	v, err := imp.builtin(ev.ctx, ev, args)
+	ev.bc.via = via
 	if err != nil {
 		return wrapf(err, "in builtin %q", imp.name)
 	}

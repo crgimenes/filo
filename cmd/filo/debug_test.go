@@ -304,3 +304,57 @@ func TestDebugFromSource(t *testing.T) {
 		t.Fatalf("%q", s.msg)
 	}
 }
+
+// s goes into the function map calls back, a line at a time, and the stack
+// says map made the call; n goes over it, as over any call.
+func TestStepIntoACallback(t *testing.T) {
+	dir := t.TempDir()
+	src := "(def sq (fn (x)\n  (* x x)))\n(map sq\n  (list 1 2 3))\n"
+	err := os.WriteFile(dir+"/sq.filo", []byte(src), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit, err := compileFiles([]string{dir + "/sq.filo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := newSession(unit, "", "", dir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 10 {
+		s.line(false)
+		st := s.run.State()
+		if len(st.Frames) == 2 {
+			break
+		}
+	}
+	st := s.run.State()
+	if len(st.Frames) != 2 || st.Frames[1].Via != "map" || st.Line != 2 || s.file() != "sq.filo" {
+		t.Fatalf("not inside sq: %+v", st)
+	}
+	scr := &screen{}
+	scr.resize(100, 24)
+	draw(s, scr)
+	var all strings.Builder
+	for row := 0; row < scr.h; row++ {
+		for col := 0; col < scr.w; col++ {
+			all.WriteRune(scr.at(row, col).r)
+		}
+		all.WriteByte('\n')
+	}
+	if !strings.Contains(all.String(), "via map") {
+		t.Fatalf("the stack does not say map called:\n%s", all.String())
+	}
+
+	s.startOver()
+	for !s.run.Done() {
+		s.line(true)
+		if len(s.run.State().Frames) > 1 {
+			t.Fatal("n went into the callback")
+		}
+	}
+	if s.msg != "returned (list 1 4 9)" {
+		t.Fatalf("%q", s.msg)
+	}
+}

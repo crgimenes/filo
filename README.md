@@ -586,16 +586,19 @@ go run ./cmd/filo dump testdata/bytecode/prog.fbc
 
 A debugger steps a unit with `Unit.Start`: each `Step` runs one instruction
 and `State` says where the run stopped — its calls, each with its locals and
-operand stack, and the line and column of the next instruction. A builtin
-runs whole within the step that calls it, even one that calls back into the
-unit, as the C runtime's paused runs do. The machine is deterministic, so
-going back a step is starting again and stepping one fewer. A run stepped to
-its end gives what `Run` gives, on every unit the corpus compiles to.
+operand stack, and the line and column of the next instruction. A function
+a builtin calls back (`map`, `fold`) is stepped too, as a call above the one
+that called the builtin, which the frame names (`Via`). The machine is
+deterministic, so going back a step is starting again and stepping one
+fewer. A run stepped to its end gives what `Run` gives, on every unit the
+corpus compiles to. The run waits between steps as a coroutine: `Close` ends
+one left in the middle.
 
 `filo debug` steps a unit on the terminal, in the edt's colours: the source on
 the left with the line and column the run is at, the function's instructions
-on the right, the calls below with their locals and operand stacks. The keys
-are gdb's: `s` a line into calls, `n` a line over them, `i` one instruction,
+on the right, the calls below with their locals and operand stacks (and
+"via map" on the one `map` called). The keys are gdb's: `s` a line into
+calls, those a builtin makes included, `n` a line over them, `i` one instruction,
 `c` to the next breakpoint (or the end), `b` back (undoes the last movement),
 `r` restart, `q` quit. The arrows move a cursor in the source, and space sets
 or clears a breakpoint on its line: `c` stops where the run enters it — from
