@@ -557,6 +557,15 @@ since a unit is untrusted input, and an error it places is a
 `*filo.PositionError`. The C runtime's units run here with the same result,
 error and place (`make govm` there, over the whole corpus).
 
+The package `fbc` lists them: a reader of its own, written from
+`docs/bytecode.md` alone, with each instruction as data (`Unit.Insn`), where
+it came from (`Unit.Position`) and the whole listing (`Dump`), which is the
+C runtime's `filo dump` byte for byte. The command is `cmd/filo`:
+
+```bash
+go run ./cmd/filo dump testdata/bytecode/prog.fbc
+```
+
 ## More of my projects
 
 - [clang_filo](https://github.com/crgimenes/clang_filo): this language as a C library, for wasm and microcontrollers.

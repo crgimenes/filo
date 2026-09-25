@@ -1,0 +1,105 @@
+bundle: 615 bytes, format 1, checksum ee5be2b7 ok
+widest stack 6, widest frame 2
+members (2)
+  prog                399 bytes at 56
+  upper               159 bytes at 456
+
+== prog
+unit: 399 bytes, format 1, checksum c20b1c8b ok
+widest stack 6, widest frame 2
+debug: line and column of each instruction
+
+imports (6): functions the loading VM must provide
+     0  list
+     1  map
+     2  fold
+     3  +
+     4  *
+     5  /
+globals (4): the extern ones, read and never written, the VM provides
+     0  square
+     1  total
+     2  base  extern
+     3  half
+constants (5)
+     0  0
+     1  1
+     2  2
+     3  3
+     4  "four"
+exports (2)
+  main -> fn 0
+  fail -> fn 1
+
+fn 0 (entry "main"): params 0, slots 2, stack 6, 30 bytes
+  0000  62              1:13   CLOSURE  2         fn 2
+  0001  10              1:1    STORE_G  0         square
+  0002  39                     POP      1
+  0003  63              2:18   CLOSURE  3         fn 3
+  0004  00              2:41   PUSH_K   0         0
+  0005  08              2:48   PUSH_G   0         square
+  0006  01              2:61   PUSH_K   1         1
+  0007  02              2:63   PUSH_K   2         2
+  0008  03              2:65   PUSH_K   3         3
+  0009  53 00           2:55   CALLB    3 0       list
+  0011  52 01           2:43   CALLB    2 1       map
+  0013  53 02           2:12   CALLB    3 2       fold
+  0015  11              2:1    STORE_G  1         total
+  0016  39              1:1    POP      1
+  0017  09              3:20   PUSH_G   1         total
+  0018  0a              3:26   PUSH_G   2         base
+  0019  6a              3:13   TUPLE    2
+  0020  72              3:1    UNPACK   2
+  0021  21                     STORE_L  1         slot 1
+  0022  39                     POP      1
+  0023  20                     STORE_L  0         slot 0
+  0024  39                     POP      1
+  0025  18              4:6    PUSH_L   0         slot 0
+  0026  19              4:8    PUSH_L   1         slot 1
+  0027  52 03           4:3    CALLB    2 3       +
+  0029  58                     RET      0         return
+
+fn 1 (entry "fail"): params 0, slots 0, stack 2, 7 bytes
+  0030  64              1:11   CLOSURE  4         fn 4
+  0031  13              1:1    STORE_G  3         half
+  0032  39                     POP      1
+  0033  0b              3:2    PUSH_G   3         half
+  0034  04              3:7    PUSH_K   4         "four"
+  0035  49              3:1    CALL     1
+  0036  58                     RET      0         return
+
+fn 2: params 1, slots 1, stack 2, 5 bytes
+  0037  18              1:24   PUSH_L   0         slot 0
+  0038  18              1:26   PUSH_L   0         slot 0
+  0039  52 04           1:21   CALLB    2 4       *
+  0041  58                     RET      0         return
+
+fn 3: params 2, slots 2, stack 2, 5 bytes
+  0042  18              2:33   PUSH_L   0         slot 0
+  0043  19              2:37   PUSH_L   1         slot 1
+  0044  52 03           2:30   CALLB    2 3       +
+  0046  58                     RET      0         return
+
+fn 4: params 1, slots 1, stack 2, 5 bytes
+  0047  18              2:6    PUSH_L   0         slot 0
+  0048  02              2:8    PUSH_K   2         2
+  0049  52 05           2:3    CALLB    2 5       /
+  0051  58                     RET      0         return
+
+== upper
+unit: 159 bytes, format 1, checksum 7fde3b33 ok
+widest stack 1, widest frame 0
+debug: line and column of each instruction
+
+imports (1): functions the loading VM must provide
+     0  str-upper
+globals (0)
+constants (1)
+     0  "ola"
+exports (1)
+  upper -> fn 0
+
+fn 0 (entry "upper"): params 0, slots 0, stack 1, 4 bytes
+  0000  00              1:12   PUSH_K   0         "ola"
+  0001  51 00           1:1    CALLB    1 0       str-upper
+  0003  58                     RET      0         return

@@ -1,0 +1,61 @@
+unit: 244 bytes, format 1, checksum 6748fcbe ok
+widest stack 6, widest frame 2
+debug: none (stripped)
+
+imports (5): functions the loading VM must provide
+     0  list
+     1  map
+     2  fold
+     3  +
+     4  *
+globals (3): the extern ones, read and never written, the VM provides
+     0  square
+     1  total
+     2  base  extern
+constants (4)
+     0  0
+     1  1
+     2  2
+     3  3
+exports (1)
+  main -> fn 0
+
+fn 0 (entry "main"): params 0, slots 2, stack 6, 30 bytes
+  0000  61                     CLOSURE  1         fn 1
+  0001  10                     STORE_G  0         square
+  0002  39                     POP      1
+  0003  62                     CLOSURE  2         fn 2
+  0004  00                     PUSH_K   0         0
+  0005  08                     PUSH_G   0         square
+  0006  01                     PUSH_K   1         1
+  0007  02                     PUSH_K   2         2
+  0008  03                     PUSH_K   3         3
+  0009  53 00                  CALLB    3 0       list
+  0011  52 01                  CALLB    2 1       map
+  0013  53 02                  CALLB    3 2       fold
+  0015  11                     STORE_G  1         total
+  0016  39                     POP      1
+  0017  09                     PUSH_G   1         total
+  0018  0a                     PUSH_G   2         base
+  0019  6a                     TUPLE    2
+  0020  72                     UNPACK   2
+  0021  21                     STORE_L  1         slot 1
+  0022  39                     POP      1
+  0023  20                     STORE_L  0         slot 0
+  0024  39                     POP      1
+  0025  18                     PUSH_L   0         slot 0
+  0026  19                     PUSH_L   1         slot 1
+  0027  52 03                  CALLB    2 3       +
+  0029  58                     RET      0         return
+
+fn 1: params 1, slots 1, stack 2, 5 bytes
+  0030  18                     PUSH_L   0         slot 0
+  0031  18                     PUSH_L   0         slot 0
+  0032  52 04                  CALLB    2 4       *
+  0034  58                     RET      0         return
+
+fn 2: params 2, slots 2, stack 2, 5 bytes
+  0035  18                     PUSH_L   0         slot 0
+  0036  19                     PUSH_L   1         slot 1
+  0037  52 03                  CALLB    2 3       +
+  0039  58                     RET      0         return
