@@ -152,15 +152,13 @@ func defaultBuiltins() map[string]builtinFunc {
 		if err != nil {
 			return Value{}, err
 		}
-		for _, a := range args {
-			err = a.Walkable()
-			if err != nil {
-				return Value{}, err
-			}
-		}
-		first := args[0]
 		for i := 1; i < len(args); i++ {
-			if !valueEqual(first, args[i]) {
+			parts := 0
+			eq, werr := equalWalk(args[0], args[i], 1, &parts)
+			if werr != nil {
+				return Value{}, werr
+			}
+			if !eq {
 				return VBool(false), nil
 			}
 		}
@@ -626,40 +624,46 @@ func defaultBuiltins() map[string]builtinFunc {
 	return bi
 }
 
-func valueEqual(a, b Value) bool {
+// equalWalk is deep, exact equality, walking both values together and
+// stopping at the walk ceilings (Walkable's) on the parts it compares: a
+// comparison settled early costs what it walked, whatever the size of the
+// rest. The C runtime counts the same parts in the same order.
+func equalWalk(a, b Value, level int, parts *int) (bool, error) {
+	*parts++
+	if *parts > walkPartsMax {
+		return false, fmt.Errorf("value too large: more than %d parts", walkPartsMax)
+	}
 	if a.Kind != b.Kind {
-		return false
+		return false, nil
 	}
 	switch a.Kind {
 	case KNumber:
-		return a.Num == b.Num
+		return a.Num == b.Num, nil
 	case KBool:
-		return a.Bool == b.Bool
+		return a.Bool == b.Bool, nil
 	case KString:
-		return a.Str == b.Str
-	case KList:
-		if len(a.List) != len(b.List) {
-			return false
-		}
-		for i := range a.List {
-			if !valueEqual(a.List[i], b.List[i]) {
-				return false
-			}
-		}
-		return true
-	case KTuple:
-		if len(a.Tup) != len(b.Tup) {
-			return false
-		}
-		for i := range a.Tup {
-			if !valueEqual(a.Tup[i], b.Tup[i]) {
-				return false
-			}
-		}
-		return true
+		return a.Str == b.Str, nil
 	case KFunc:
-		return a.Fn == b.Fn
+		return a.Fn == b.Fn, nil
+	case KList, KTuple:
 	default:
-		return false
+		return false, nil
 	}
+	x, y := a.List, b.List
+	if a.Kind == KTuple {
+		x, y = a.Tup, b.Tup
+	}
+	if len(x) != len(y) {
+		return false, nil
+	}
+	if level > walkLevelsMax {
+		return false, fmt.Errorf("value too deep: more than %d levels", walkLevelsMax)
+	}
+	for i := range x {
+		eq, err := equalWalk(x[i], y[i], level+1, parts)
+		if err != nil || !eq {
+			return false, err
+		}
+	}
+	return true, nil
 }

@@ -36,7 +36,8 @@ The runtime ships with explicit constraints from day one:
 - `recover()` around the executor -- no script can cause a `panic` on the host.
 - Walk ceilings -- a list may hold the same value many times, so a value made
   in a few steps can be far larger to walk than it is in memory. Writing one
-  (`string`, `str-fmt`, `print`), comparing one (`=`) and converting one
+  (`string`, `str-fmt`, `print`), comparing one (`=`, counting only the parts
+  it compares) and converting one
   (`UnmarshalFromValue`, `json-marshal`) stop at 4,194,304 parts and 512
   levels with an error, and `Value.String()` writes the reason instead. Code of
   your own that walks a value calls `Value.Walkable()` first.

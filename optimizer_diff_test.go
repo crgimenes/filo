@@ -65,7 +65,9 @@ func TestFoldingMatchesInterpreter(t *testing.T) {
 		if rawErr != nil {
 			continue
 		}
-		if !valueEqual(rawVal, foldVal) {
+		parts := 0
+		eq, _ := equalWalk(rawVal, foldVal, 1, &parts)
+		if !eq {
 			t.Errorf("%q: value divergence: raw=%v folded=%v", src, rawVal, foldVal)
 		}
 	}

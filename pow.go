@@ -22,18 +22,18 @@ func powInt(a, b float64) float64 {
 		return a
 	}
 	neg := b < 0
-	n := math.Abs(b)
-	odd := n < 1<<53 && math.Mod(n, 2) == 1 // past 2^53 every double is even
-	if n > 1<<62 {
-		n = 1 << 62 // as large and even: the result is 0, 1 or +Inf all the same
+	n := uint64(1) << 62 // as large and even: the result is 0, 1 or +Inf all the same
+	if math.Abs(b) < 1<<62 {
+		n = uint64(math.Abs(b))
 	}
+	odd := n&1 != 0 // past 2^53 every double is even
 	if a == 0 || math.IsInf(a, 0) {
 		return powEdge(a, neg, odd)
 	}
 	m, k := frexp(math.Abs(a)) // |a| = m·2^k, m in [0.5, 1)
 	rh, rl, rE := 1.0, 0.0, 0
 	bh, bl, bE := m, 0.0, k
-	for e := uint64(n); ; {
+	for e := n; ; {
 		if e&1 != 0 {
 			rh, rl = ddMul(rh, rl, bh, bl)
 			rh, rl, rE = ddNorm(rh, rl, rE+bE)
@@ -94,27 +94,22 @@ func ddRecip(h, l float64) (float64, float64) {
 	return twoSum(q, rem/h)
 }
 
-// ddNorm brings h into [0.5, 1), l with it, and E by as much.
+// ddNorm brings h into [0.5, 1), l with it, and E by as much. h is a
+// product or a quotient of mantissas, never subnormal: frexp without that
+// case, small enough to inline. Scaling l by a power of two is exact, fused
+// or not.
 func ddNorm(h, l float64, e int) (float64, float64, int) {
-	f, k := frexp(h)
-	return f, float64(l * pow2(-k)), e + k
+	bits := math.Float64bits(h)
+	k := int(bits>>52&0x7FF) - 1022
+	return math.Float64frombits(bits&^(0x7FF<<52) | 1022<<52), l * pow2(-k), e + k
 }
 
-// twoProd is a*b rounded, and what the rounding lost (Dekker's, without an
-// fma). The operands here are mantissas, near 1: nothing overflows.
+// twoProd is a*b rounded, and what the rounding lost, exactly: the C
+// runtime finds the same two doubles by Dekker's splitting, without an fma.
+// The operands here are mantissas, near 1: nothing overflows or underflows.
 func twoProd(a, b float64) (float64, float64) {
 	p := float64(a * b)
-	ah, al := split(a)
-	bh, bl := split(b)
-	e := ((float64(ah*bh) - p) + float64(ah*bl) + float64(al*bh)) + float64(al*bl)
-	return p, e
-}
-
-// split is a as two halves of 26 bits, whose products are exact.
-func split(a float64) (float64, float64) {
-	c := float64(134217729 * a) // 2^27 + 1
-	h := c - (c - a)
-	return h, a - h
+	return p, math.FMA(a, b, -p)
 }
 
 // twoSum is a+b rounded, and what the rounding lost.

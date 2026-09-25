@@ -119,10 +119,11 @@ func (v Value) describe() string {
 
 // A list or a tuple may hold the same value more than once, so a value
 // made in a few steps, (fold (fn (a x) (tuple a a)) 0 (range 60)), is small
-// in memory and 2^60 parts to walk. Whatever walks a value — writing it,
-// comparing it, converting it — first checks it is walkable: at most
+// in memory and 2^60 parts to walk. Whatever walks a value stops at
 // walkPartsMax parts and walkLevelsMax levels, the same ceilings as the C
-// runtime, checked in the same order, so both fail on the same value.
+// runtime, checked in the same order, so both fail on the same value:
+// writing it and converting it check first (Walkable), comparing it counts
+// as it goes (equalWalk).
 const (
 	walkPartsMax  = 1 << 22
 	walkLevelsMax = 512 // the C runtime's evaluation depth: its stack

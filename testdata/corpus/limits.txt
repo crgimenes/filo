@@ -78,6 +78,12 @@ limits steps=100000
 --- error
 --- at 2:3
 
+=== a comparison settled early walks no further
+(let ((v (fold (fn (a x) (tuple a a)) 0 (range 30))))
+  (list (= v (tuple)) (= v (tuple 0 0)) (!= v (tuple 1))))
+--- want
+(list #f #f #t)
+
 === a shared value under the ceiling compares
 (let ((v (fold (fn (a x) (tuple a a)) 0 (range 10))))
   (= v v))
