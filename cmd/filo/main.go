@@ -1,7 +1,7 @@
-// Command filo is the Filo toolchain on the desktop. It has what the C
-// runtime's filo command has, as the Go side gets it: dump, the listing of a
-// unit (.fbc) or a bundle (.fbb), which is the C one byte for byte; and
-// debug, which steps a unit's entry point on the terminal.
+// Command filo is the Filo toolchain on the desktop, the C runtime's filo
+// command in Go: build and bundle write the bytes the C ones write, dump
+// lists what the C one lists, and debug steps an entry point on the
+// terminal.
 package main
 
 import (
@@ -15,8 +15,16 @@ import (
 	"github.com/crgimenes/filo/fbc"
 )
 
-const usage = `usage: filo dump [FILE]
+const usage = `usage: filo build [--strip] -o OUT FILE...
+       filo bundle -o OUT UNIT...
+       filo dump [FILE]
        filo debug [-src DIR] [-g NAME=EXPR]... FILE [MEMBER] [ENTRY]
+
+build compiles programs into one unit of bytecode (docs/bytecode.md), each
+an entry named by its file (lib/ola.filo is the entry "ola"): the same bytes
+the C runtime's filo build writes. --strip leaves out the debug section (the
+lines and columns errors say). bundle puts units into one bundle, each a
+member named by its file.
 
 dump lists Filo bytecode: a unit (.fbc) or a bundle (.fbb), as
 docs/bytecode.md describes it — the header, the names it imports and the
@@ -24,8 +32,9 @@ globals it uses (the extern ones marked), its constants and entry points,
 and every function, each instruction with its bytes and the line:column it
 came from. FILE is read from standard input when absent or "-".
 
-debug steps an entry point (ENTRY, else main, else the first; for a bundle,
-of MEMBER, chosen the same way) on the terminal, in the edt's colours: the
+debug steps an entry point of a unit, a bundle or a source (compiled as
+build compiles it): ENTRY, else main, else the first — of MEMBER, chosen the
+same way, for a bundle. It runs on the terminal, in the edt's colours: the
 source on the left, the function's instructions on the right, the calls
 with their locals and operands below. Keys, as gdb's: s step a line (into
 calls), n next line (over calls), i one instruction, c continue (to a
@@ -35,10 +44,10 @@ sets or clears a breakpoint on its line. The source of the entry "main" is
 main.filo, beside FILE or in -src DIR. -g gives the run a global, the
 expression in Filo: a value, or a function a unit imports and the VM lacks.
 
-Compiling is the C runtime's filo, for now (filo build -o x.fbc x.filo).
-
 Examples:
+  filo build -o prog.fbc main.filo fail.filo
   filo dump lib/msh/edt.fbb | less
+  filo debug fib.filo
   filo debug prog.fbc fail
   filo debug -g base=5 -g 'xs=(list 1 2 3)' prog.fbc
 `
@@ -52,8 +61,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		_, _ = io.WriteString(stdout, usage)
 		return 0
 	}
-	if len(args) > 0 && args[0] == "debug" {
-		return debug(args[1:], stderr)
+	if len(args) > 0 {
+		switch args[0] {
+		case "debug":
+			return debug(args[1:], stderr)
+		case "build":
+			return cmdBuild(args[1:], stderr)
+		case "bundle":
+			return cmdBundle(args[1:], stderr)
+		}
 	}
 	if len(args) < 1 || args[0] != "dump" || len(args) > 2 {
 		_, _ = io.WriteString(stderr, usage)
@@ -100,7 +116,7 @@ func dump(data []byte, stdout, stderr io.Writer) int {
 		}
 		return 0
 	}
-	return complain(stderr, fmt.Errorf("not a unit or a bundle (to list source, build it first with the C runtime's filo)"))
+	return complain(stderr, fmt.Errorf("not a unit or a bundle (filo build makes one from source)"))
 }
 
 func debug(args []string, stderr io.Writer) int {
@@ -118,6 +134,12 @@ func debug(args []string, stderr io.Writer) int {
 	data, err := os.ReadFile(path) // #nosec G304 G703 -- the file the command was given
 	if err != nil {
 		return complain(stderr, err)
+	}
+	if fbc.Kind(data) == 0 { // a source: compiled as build compiles it
+		data, err = compileFiles([]string{path})
+		if err != nil {
+			return complain(stderr, err)
+		}
 	}
 	member, entry := "", fs.Arg(1)
 	if fbc.Kind(data) == fbc.KindBundle {

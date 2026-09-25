@@ -140,7 +140,9 @@ func stepsOf(script string) (int, bool) {
 // compiler to it; whole, and stepped one instruction at a time as a
 // debugger steps it. Where dump_test kept a unit's listing (NNNNN.dump), the
 // Go listing (package fbc) must be the same, byte for byte: two readers of
-// the format written apart.
+// the format written apart. Where corpus_runner kept the source a unit was
+// compiled from (NNNNN.filo, with its packs in NNNNN.packs), the Go
+// compiler must write the same unit from it, byte for byte: two compilers.
 //
 //	FILO_C_UNITS=/path/to/clang_filo/build/units go test -run TestCUnits -count=1 .
 func TestCUnits(t *testing.T) {
@@ -157,6 +159,9 @@ func TestCUnits(t *testing.T) {
 		why := unitCase(dir, no, string(expect))
 		if why == "" {
 			why = sameListing(dir, no)
+		}
+		if why == "" {
+			why = sameBuild(dir, no)
 		}
 		if why == "" {
 			passed++
@@ -258,6 +263,56 @@ func firstDifference(got, want string) string {
 		}
 	}
 	return fmt.Sprintf("%d lines, want %d", len(g), len(w))
+}
+
+// sameBuild is "" when the Go compiler writes, from the source the C one
+// compiled, the unit it wrote — and the units of the given values — or
+// when no source was kept.
+func sameBuild(dir string, no int) string {
+	packs, _ := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d.packs", no))) // #nosec G304 -- a file of the directory the test was given
+	for k := -1; ; k++ {
+		suffix := ""
+		if k >= 0 {
+			suffix = fmt.Sprintf(".g%d", k)
+		}
+		src, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d%s.filo", no, suffix))) // #nosec G304 -- a source of the directory the test was given
+		if err != nil {
+			return ""
+		}
+		want, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d%s.fbc", no, suffix))) // #nosec G304 -- a unit of the directory the test was given
+		if err != nil {
+			return err.Error()
+		}
+		e := filo.NewEngine()
+		for _, p := range strings.Fields(string(packs)) {
+			switch p {
+			case "math":
+				filomath.RegisterBuiltins(e)
+			case "strings":
+				filostrings.RegisterBuiltins(e)
+			}
+		}
+		p, err := e.Compile(string(src))
+		if err != nil {
+			return fmt.Sprintf("build%s: %v", suffix, err)
+		}
+		got, err := e.Build([]filo.BuildEntry{{Name: "main", Program: p}})
+		if err != nil {
+			return fmt.Sprintf("build%s: %v", suffix, err)
+		}
+		if !bytes.Equal(got, want) {
+			return fmt.Sprintf("build%s: the Go compiler wrote %d bytes, the C one %d; they differ at byte %d", suffix, len(got), len(want), firstByte(got, want))
+		}
+	}
+}
+
+func firstByte(a, b []byte) int {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		if a[i] != b[i] {
+			return i
+		}
+	}
+	return min(len(a), len(b))
 }
 
 // unitEngine has what the C runner registers: the core and the math and

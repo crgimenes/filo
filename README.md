@@ -102,12 +102,12 @@ Note: `NewEngine()` includes the core math/logic/list/type builtins by default. 
 | Category | Function | Description |
 |----------|----------|-------------|
 | **Math** | `+`, `-`, `*`, `/`, `%` | Basic arithmetic. `(- x)` negates and `(/ x)` is the reciprocal. `%` is floored modulo as in Lua — the result takes the divisor's sign, so `(% -1 2)` is `1`. |
-| | `pow` | `(pow x y)`; a negative base with a fractional exponent is NaN, as in IEEE. |
+| | `pow` | `(pow x y)`; with a whole exponent, the double nearest the exact power — the same on every machine and in the C runtime; a negative base with a fractional exponent is NaN, as in IEEE. |
 | **Logic** | `=`, `!=` | Equality. Comparing values of different kinds is an error — cast first: `(= (string 1) "1")`. |
 | | `<`, `<=`, `>`, `>=` | Numeric comparison. |
 | | `not` | Boolean negation (`and`/`or` are special forms, see above). |
 | **Casts** | `string` | `(string x)` renders any value as text (`42` → `"42"`, `#t` → `"#t"`; strings pass through unchanged). |
-| | `number` | `(number s)` parses a numeric string (`"1.5"` → `1.5`); a non-numeric string is an error. |
+| | `number` | `(number s)` parses a numeric string (`"1.5"` → `1.5`); one past the doubles is ±Inf (as a literal is), one below them 0; a non-numeric string is an error. |
 | **Types** | `type-of` | Returns "number", "string", "list", etc. |
 | | `is-empty` | True for `""` or empty list. |
 | | `is-nil` | True for an empty list (closest thing to nil in the current runtime). |
@@ -542,11 +542,22 @@ repositories and a case added or changed on either side belongs on both:
 diff -ru testdata/corpus ../clang_filo/testdata/corpus
 ```
 
-### Running bytecode
+### Bytecode
 
-The C runtime also compiles programs to bytecode (`docs/bytecode.md`): a unit
-(`.fbc`) of entry points sharing one set of globals, or a bundle (`.fbb`) of
-named units. This engine does not compile to it, but it runs it:
+Programs compile to bytecode (`docs/bytecode.md`): a unit (`.fbc`) of entry
+points sharing one set of globals, or a bundle (`.fbb`) of named units. This
+engine and the C runtime write the same bytes for the same programs — held to
+each other on every program the corpus compiles to — and either runs what the
+other wrote:
+
+```go
+p, err := engine.Compile(src)
+unit, err := engine.Build([]filo.BuildEntry{{Name: "main", Program: p}})
+stripped, err := filo.StripDebug(unit) // without the lines and columns errors say
+bundle, err := filo.BuildBundle([]filo.BundleMember{{Name: "app", Unit: unit}})
+```
+
+Running one:
 
 ```go
 unit, err := engine.LoadBundle(data, "edt") // or engine.LoadUnit(data)

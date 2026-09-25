@@ -1,6 +1,7 @@
 package filo
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -297,7 +298,9 @@ done:
 	}
 	if numberShape(text) {
 		num, err := strconv.ParseFloat(text, 64)
-		if err == nil {
+		// a number past the doubles is ±Inf, as the arithmetic makes it
+		// ((pow 2 2000)) and the C runtime reads it
+		if err == nil || errors.Is(err, strconv.ErrRange) {
 			return &NumberLit{Value: num}, nil
 		}
 	}

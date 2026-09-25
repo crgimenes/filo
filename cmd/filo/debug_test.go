@@ -283,3 +283,24 @@ func TestGlobalsGiven(t *testing.T) {
 		t.Fatalf("upper: %q", u.msg)
 	}
 }
+
+// debug of a source compiles it as build does: the unit is the C
+// compiler's, and the session runs it.
+func TestDebugFromSource(t *testing.T) {
+	unit, err := compileFiles([]string{"../../testdata/bytecode/fib.filo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.ReadFile("../../testdata/bytecode/fib.fbc")
+	if err != nil || !bytes.Equal(unit, want) {
+		t.Fatalf("the unit is not the C compiler's: %v", err)
+	}
+	s, err := newSession(unit, "", "", "../../testdata/bytecode", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.finish()
+	if s.msg != "returned 55" {
+		t.Fatalf("%q", s.msg)
+	}
+}

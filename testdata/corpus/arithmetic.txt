@@ -226,3 +226,49 @@ needs host-pow
 (/ 0)
 --- error
 --- at 1:1
+
+# pow with an integral exponent is the double nearest the exact power, the
+# same on every machine; testdata/pow.txt holds three thousand more.
+
+=== pow with an integral exponent is the nearest double
+(pow 99 82)
+--- want
+4.3861750180991106e+163
+
+=== pow with a negative exponent is the nearest double
+(pow 7.095952287042602 -360)
+--- want
+4.32666036856489e-307
+
+=== pow of a negative base keeps the odd power's sign past the doubles
+(string (pow -2 -1075))
+--- want
+"-0"
+
+=== the floored modulo of a huge power is exact
+(% (- (pow 52 44)) 7)
+--- want
+0
+
+# A number past the doubles is infinite, as the arithmetic makes it; one
+# below them is zero.
+
+=== a literal past the doubles is infinite
+1e999
+--- want
+(pow 2 2000)
+
+=== a negative literal past the doubles is minus infinity
+-1e999
+--- want
+(- (pow 2 2000))
+
+=== number of a string past the doubles is infinite
+(number "1e999")
+--- want
+(pow 2 2000)
+
+=== a literal below the doubles is zero
+1e-400
+--- want
+0

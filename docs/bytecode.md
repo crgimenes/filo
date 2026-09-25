@@ -9,14 +9,17 @@ machine, and a VM runs the stream in place, from wherever it is stored
 (flash, a file, a browser's storage). The machine that runs a program needs
 the VM and the builtins the program imports; it never needs the parser.
 
-Only the C runtime compiles to bytecode; both runtimes run it. The Go
-engine loads a unit (`Engine.LoadUnit`, `Engine.LoadBundle`) and runs its
-entries (`Unit.Run`) on a machine of its own, and the language does not
-change: a program compiled here gives the same value, the same error or
-success and the same globals as the IR evaluated by either runtime. The
-corpus and the Prolog oracle run through the VM to hold it to that, and
-the units they compile to run again on the Go machine (`make govm` in the
-C repository), held to the same result, error and place.
+Both runtimes compile to bytecode and run it. The Go engine compiles
+(`Engine.Build`, `StripDebug`, `BuildBundle`) to the same bytes the C
+compiler writes for the same program, loads a unit (`Engine.LoadUnit`,
+`Engine.LoadBundle`) and runs its entries (`Unit.Run`) on a machine of its
+own, and the language does not change: a program compiled here gives the
+same value, the same error or success and the same globals as the IR
+evaluated by either runtime. The corpus and the Prolog oracle run through
+the VM to hold it to that, and every unit they compile to is compiled
+again by the Go engine from the same source and must be the same bytes,
+and runs again on the Go machine, held to the same result, error and place
+(`make govm` in the C repository).
 
 ## What differs from the IR
 
@@ -114,7 +117,10 @@ Sections, each at most once; unknown kinds are skipped:
 | 8 | externs | count, then indices into the globals, rising: the ones the unit reads and never writes; optional |
 
 Constant tags: 1 number (8 bytes, IEEE 754 double), 2 string (length,
-bytes), 3 true, 4 false, 5 empty list.
+bytes), 3 true, 4 false, 5 empty list. A NaN is written as
+0x7FF8000000000000 whatever NaN the compiler's arithmetic gave (the C
+library's differs between machines, Go's differs from it), so the same
+program is the same bytes everywhere.
 
 A function's code runs from its offset for its length inside the code
 section; a jump or a fall-through that leaves that range is an error. Frame

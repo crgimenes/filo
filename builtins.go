@@ -138,6 +138,9 @@ func defaultBuiltins() map[string]builtinFunc {
 		if err != nil {
 			return Value{}, err
 		}
+		if integral(b) {
+			return VNum(powInt(a, b)), nil // the same double everywhere
+		}
 		return VNum(math.Pow(a, b)), nil
 	}
 
@@ -287,7 +290,7 @@ func defaultBuiltins() map[string]builtinFunc {
 			return args[0], nil
 		case KString:
 			n, err := strconv.ParseFloat(strings.TrimSpace(args[0].Str), 64)
-			if err != nil {
+			if err != nil && !errors.Is(err, strconv.ErrRange) { // past the doubles is ±Inf
 				return Value{}, fmt.Errorf("number: cannot parse %q", args[0].Str)
 			}
 			return VNum(n), nil

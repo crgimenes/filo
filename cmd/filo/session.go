@@ -52,7 +52,7 @@ func newSession(data []byte, member, entry, srcDir string, globals map[string]fi
 	case fbc.KindUnit:
 		u, err = e.LoadUnit(data)
 	default:
-		return nil, errors.New("not a unit or a bundle (build the source first with the C runtime's filo)")
+		return nil, errors.New("not a unit or a bundle (filo build makes one from source)")
 	}
 	if err != nil {
 		return nil, err
