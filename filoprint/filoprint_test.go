@@ -1,7 +1,10 @@
 package filoprint
 
 import (
+	"bytes"
 	"context"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/crgimenes/filo"
@@ -131,5 +134,17 @@ func TestRegisterBuiltins(t *testing.T) {
 	_, _, err = eng.RunScript(context.Background(), `(printf "test %d" 42)`, globals, cfg)
 	if err != nil {
 		t.Errorf("RunScript with printf failed: %v", err)
+	}
+}
+
+func TestPrintRefusesAValueTooLargeToWalk(t *testing.T) {
+	eng := filo.NewEngine()
+	RegisterBuiltins(eng)
+	var out bytes.Buffer
+	SetOutput(&out)
+	defer SetOutput(os.Stdout)
+	_, _, err := eng.RunScript(context.Background(), `(println (fold (fn (a x) (tuple a a)) 0 (range 40)))`, nil, filo.EvalConfig{})
+	if err == nil || !strings.Contains(err.Error(), "too large") || out.Len() != 0 {
+		t.Fatalf("got %v, printed %d bytes", err, out.Len())
 	}
 }

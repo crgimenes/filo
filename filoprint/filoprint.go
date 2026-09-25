@@ -42,6 +42,10 @@ func builtinPrint(ctx context.Context, args []filo.Value) (filo.Value, error) {
 		return filo.Value{}, fmt.Errorf("print expects at least 1 argument")
 	}
 
+	err := walkable(args)
+	if err != nil {
+		return filo.Value{}, fmt.Errorf("print: %w", err)
+	}
 	parts := make([]string, len(args))
 	for i, arg := range args {
 		parts[i] = valueToString(arg)
@@ -58,6 +62,10 @@ func builtinPrintln(ctx context.Context, args []filo.Value) (filo.Value, error) 
 		return filo.Value{}, fmt.Errorf("println expects at least 1 argument")
 	}
 
+	err := walkable(args)
+	if err != nil {
+		return filo.Value{}, fmt.Errorf("println: %w", err)
+	}
 	parts := make([]string, len(args))
 	for i, arg := range args {
 		parts[i] = valueToString(arg)
@@ -79,6 +87,10 @@ func builtinPrintf(ctx context.Context, args []filo.Value) (filo.Value, error) {
 	format, err := args[0].AsString()
 	if err != nil {
 		return filo.Value{}, fmt.Errorf("printf: first argument must be string: %w", err)
+	}
+	err = walkable(args[1:])
+	if err != nil {
+		return filo.Value{}, fmt.Errorf("printf: %w", err)
 	}
 
 	result := formatWithFiloTypes(format, args[1:])
@@ -143,6 +155,17 @@ func formatWithFiloTypes(format string, args []filo.Value) string {
 	}
 
 	return result.String()
+}
+
+// walkable is the first error of an argument too large to walk.
+func walkable(args []filo.Value) error {
+	for _, a := range args {
+		err := a.Walkable()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // valueToString converts a Filo value to a readable string.

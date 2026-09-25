@@ -86,6 +86,10 @@ func fmtVerb(spec string, verb byte, arg filo.Value) (string, error) {
 	if width > strFmtMax || prec > strFmtMax {
 		return "", fmt.Errorf("width and precision stop at %d: %%%s%c", strFmtMax, spec, verb)
 	}
+	err := arg.Walkable()
+	if err != nil {
+		return "", err
+	}
 	switch verb {
 	case 's':
 		text := arg.String()

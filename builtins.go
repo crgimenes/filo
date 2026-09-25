@@ -149,6 +149,12 @@ func defaultBuiltins() map[string]builtinFunc {
 		if err != nil {
 			return Value{}, err
 		}
+		for _, a := range args {
+			err = a.Walkable()
+			if err != nil {
+				return Value{}, err
+			}
+		}
 		first := args[0]
 		for i := 1; i < len(args); i++ {
 			if !valueEqual(first, args[i]) {

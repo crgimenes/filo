@@ -34,6 +34,12 @@ The runtime ships with explicit constraints from day one:
 - `Timeout` -- execution gets cancelled.
 - `context.Context` -- natural integration with Go cancellation.
 - `recover()` around the executor -- no script can cause a `panic` on the host.
+- Walk ceilings -- a list may hold the same value many times, so a value made
+  in a few steps can be far larger to walk than it is in memory. Writing one
+  (`string`, `str-fmt`, `print`), comparing one (`=`) and converting one
+  (`UnmarshalFromValue`, `json-marshal`) stop at 4,194,304 parts and 512
+  levels with an error, and `Value.String()` writes the reason instead. Code of
+  your own that walks a value calls `Value.Walkable()` first.
 
 There is no file access, no network access, no syscall, no "dangerous" calls of any kind. The only things scripts can touch are the Go functions the host explicitly registers as builtins.
 

@@ -117,7 +117,62 @@ func (v Value) describe() string {
 	}
 }
 
+// A list or a tuple may hold the same value more than once, so a value
+// made in a few steps, (fold (fn (a x) (tuple a a)) 0 (range 60)), is small
+// in memory and 2^60 parts to walk. Whatever walks a value — writing it,
+// comparing it, converting it — first checks it is walkable: at most
+// walkPartsMax parts and walkLevelsMax levels, the same ceilings as the C
+// runtime, checked in the same order, so both fail on the same value.
+const (
+	walkPartsMax  = 1 << 22
+	walkLevelsMax = 512 // the C runtime's evaluation depth: its stack
+)
+
+// Walkable says whether v can be walked: nil when it has at most 4,194,304
+// parts (every value in it, itself included) and 512 levels of lists and
+// tuples, or the error saying which ceiling it passed. Counting stops at the
+// ceiling, so this costs at most that much. Code outside the engine that
+// walks a value (a marshaler, a printer) calls it first.
+func (v Value) Walkable() error {
+	parts := 0
+	return walk(v, 1, &parts)
+}
+
+func walk(v Value, level int, parts *int) error {
+	*parts++
+	if *parts > walkPartsMax {
+		return fmt.Errorf("value too large: more than %d parts", walkPartsMax)
+	}
+	items := v.List
+	if v.Kind == KTuple {
+		items = v.Tup
+	}
+	if v.Kind != KList && v.Kind != KTuple {
+		return nil
+	}
+	if level > walkLevelsMax {
+		return fmt.Errorf("value too deep: more than %d levels", walkLevelsMax)
+	}
+	for _, item := range items {
+		err := walk(item, level+1, parts)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// String writes v as Filo reads it back; a value too large to walk is
+// written as the reason, in angle brackets.
 func (v Value) String() string {
+	err := v.Walkable()
+	if err != nil {
+		return "<" + err.Error() + ">"
+	}
+	return v.text()
+}
+
+func (v Value) text() string {
 	switch v.Kind {
 	case KNumber:
 		return strconv.FormatFloat(v.Num, 'g', -1, 64)
@@ -133,7 +188,7 @@ func (v Value) String() string {
 		b.WriteString("(list")
 		for _, e := range v.List {
 			b.WriteByte(' ')
-			b.WriteString(e.String())
+			b.WriteString(e.text())
 		}
 		b.WriteByte(')')
 		return b.String()
@@ -142,7 +197,7 @@ func (v Value) String() string {
 		b.WriteString("(tuple")
 		for _, e := range v.Tup {
 			b.WriteByte(' ')
-			b.WriteString(e.String())
+			b.WriteString(e.text())
 		}
 		b.WriteByte(')')
 		return b.String()
@@ -163,7 +218,11 @@ func valueToText(v Value) (string, error) {
 	case KFunc:
 		return "", errors.New("string: cannot convert a function")
 	}
-	return v.String(), nil
+	err := v.Walkable()
+	if err != nil {
+		return "", err
+	}
+	return v.text(), nil
 }
 
 func ensureSameKind(values []Value) error {

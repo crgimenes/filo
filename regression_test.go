@@ -415,3 +415,34 @@ func TestErrorsSayWhere(t *testing.T) {
 		t.Errorf("exit: %v", err)
 	}
 }
+
+// A list or a tuple may hold the same value many times: (tuple a a), folded,
+// is small in memory and 2^n parts to walk. Nothing that walks a value may
+// run past the ceilings — not a builtin, not the host writing or converting
+// what a script returned.
+func TestValuesTooLargeToWalkAreRefused(t *testing.T) {
+	eng := NewEngine()
+	shared, _, err := eng.RunScript(context.Background(), "(fold (fn (a x) (tuple a a)) 0 (range 40))", nil, EvalConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deep, _, err := eng.RunScript(context.Background(), "(fold (fn (a x) (list a)) 0 (range 600))", nil, EvalConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(shared.Walkable().Error(), "too large") || !strings.Contains(deep.Walkable().Error(), "too deep") {
+		t.Fatalf("got %v and %v", shared.Walkable(), deep.Walkable())
+	}
+	if shared.String() != "<value too large: more than 4194304 parts>" {
+		t.Fatalf("String() = %.60q", shared.String())
+	}
+	var into []any
+	err = UnmarshalFromValue(shared, &into)
+	if err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("UnmarshalFromValue: %v", err)
+	}
+	small, _, err := eng.RunScript(context.Background(), "(fold (fn (a x) (tuple a a)) 0 (range 3))", nil, EvalConfig{})
+	if err != nil || small.Walkable() != nil || small.String() != "(tuple (tuple (tuple 0 0) (tuple 0 0)) (tuple (tuple 0 0) (tuple 0 0)))" {
+		t.Fatalf("under the ceiling: %s, %v", small, err)
+	}
+}

@@ -2,6 +2,7 @@ package filojson
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/crgimenes/filo"
@@ -103,5 +104,14 @@ func TestRoundTrip(t *testing.T) {
 	// Key order may vary; accept both sorted and non-sorted depending on map marshal order
 	if s != "{\"a\":1,\"b\":null,\"c\":[1,2]}" && s != "{\"a\":1,\"c\":[1,2],\"b\":null}" && s != "{\"b\":null,\"a\":1,\"c\":[1,2]}" {
 		t.Fatalf("unexpected roundtrip json: %q", s)
+	}
+}
+
+func TestMarshalRefusesAValueTooLargeToWalk(t *testing.T) {
+	eng := filo.NewEngine()
+	RegisterBuiltins(eng)
+	_, _, err := eng.RunScript(context.Background(), `(json-marshal (fold (fn (a x) (list a a)) 0 (range 40)))`, nil, filo.EvalConfig{})
+	if err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("got %v", err)
 	}
 }

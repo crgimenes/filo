@@ -52,6 +52,10 @@ func builtinJSONMarshal(_ context.Context, args []filo.Value) (filo.Value, error
 	if len(args) != 1 {
 		return filo.Value{}, fmt.Errorf("json-marshal expects 1 argument (value)")
 	}
+	err := args[0].Walkable()
+	if err != nil {
+		return filo.Value{}, fmt.Errorf("json-marshal: %w", err)
+	}
 	goVal, err := toGoForMarshal(args[0])
 	if err != nil {
 		return filo.Value{}, fmt.Errorf("json-marshal: %w", err)

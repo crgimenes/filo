@@ -606,6 +606,14 @@ func registerPackage(engine *filo.Engine, pkg string) error {
 }
 
 func formatResult(v filo.Value) string {
+	err := v.Walkable()
+	if err != nil {
+		return "<" + err.Error() + ">"
+	}
+	return formatWalkable(v)
+}
+
+func formatWalkable(v filo.Value) string {
 	switch v.Kind {
 	case filo.KNumber:
 		return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%f", v.Num), "0"), ".")
@@ -619,13 +627,13 @@ func formatResult(v filo.Value) string {
 	case filo.KList:
 		var items []string
 		for _, item := range v.List {
-			items = append(items, formatResult(item))
+			items = append(items, formatWalkable(item))
 		}
 		return "(" + strings.Join(items, " ") + ")"
 	case filo.KTuple:
 		var items []string
 		for _, item := range v.Tup {
-			items = append(items, formatResult(item))
+			items = append(items, formatWalkable(item))
 		}
 		return "(values " + strings.Join(items, " ") + ")"
 	case filo.KFunc:

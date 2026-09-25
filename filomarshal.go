@@ -301,6 +301,10 @@ func UnmarshalFromValue(val Value, target any) error {
 	if rv.Kind() != reflect.Pointer || rv.IsNil() {
 		return errors.New("unmarshal: target must be a non-nil pointer")
 	}
+	err := val.Walkable()
+	if err != nil {
+		return fmt.Errorf("unmarshal: %w", err)
+	}
 	return unmarshalValue(val, rv.Elem())
 }
 

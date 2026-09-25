@@ -2,6 +2,7 @@ package filostrings
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -314,5 +315,14 @@ func TestStringBuiltinsIntegration(t *testing.T) {
 	}
 	if result2.String() != "#t" {
 		t.Errorf("got %s, want #t", result2.String())
+	}
+}
+
+func TestFmtRefusesAValueTooLargeToWalk(t *testing.T) {
+	eng := filo.NewEngine()
+	RegisterBuiltins(eng)
+	_, _, err := eng.RunScript(context.Background(), `(str-fmt "%v" (fold (fn (a x) (tuple a a)) 0 (range 40)))`, nil, filo.EvalConfig{})
+	if err == nil || !strings.Contains(err.Error(), "too large") {
+		t.Fatalf("got %v", err)
 	}
 }

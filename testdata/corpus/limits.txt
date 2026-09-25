@@ -55,3 +55,31 @@ limits steps=100000
 (range -9e18 9e18)
 --- error
 --- at 1:1
+
+# A list or a tuple may hold the same value more than once: a value made in
+# a few steps can be small in memory and far too large to walk. Writing it
+# and comparing it stop at 4194304 parts and 512 levels, in every runtime.
+
+=== a shared value too large to write is an error
+(let ((v (fold (fn (a x) (tuple a a)) 0 (range 30))))
+  (string v))
+--- error
+--- at 2:3
+
+=== a shared value too large to compare is an error
+(let ((v (fold (fn (a x) (tuple a a)) 0 (range 30))))
+  (= v v))
+--- error
+--- at 2:3
+
+=== a value too deep to compare is an error
+(let ((v (fold (fn (a x) (list a)) 0 (range 600))))
+  (= v v))
+--- error
+--- at 2:3
+
+=== a shared value under the ceiling compares
+(let ((v (fold (fn (a x) (tuple a a)) 0 (range 10))))
+  (= v v))
+--- want
+#t
