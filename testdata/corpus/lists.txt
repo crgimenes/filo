@@ -28,6 +28,7 @@
 === length of a string is an error
 (length "abc")
 --- error
+--- at 1:1
 
 === head
 (head (list 10 20 30))
@@ -37,10 +38,12 @@
 === head of empty
 (head (list))
 --- error
+--- at 1:1
 
 === head of tuple is an error
 (head (tuple 1))
 --- error
+--- at 1:1
 
 === tail
 (tail (list 1 2 3))
@@ -55,6 +58,7 @@
 === tail of empty
 (tail (list))
 --- error
+--- at 1:1
 
 === nth
 (nth (list 10 20 30) 1)
@@ -69,18 +73,22 @@
 === nth out of range
 (nth (list 1 2) 5)
 --- error
+--- at 1:1
 
 === nth negative
 (nth (list 1 2) -1)
 --- error
+--- at 1:1
 
 === nth rejects a fractional index
 (nth (list 1 2) 1.5)
 --- error
+--- at 1:1
 
 === nth rejects nan
 (nth (list 1 2) (number "nan"))
 --- error
+--- at 1:1
 
 === nth accepts an integral float
 (nth (list 1 2) 1.0)
@@ -90,10 +98,12 @@
 === nth on tuple is an error
 (nth (tuple 1 2) 0)
 --- error
+--- at 1:1
 
 === nth arity
 (nth (list 1 2))
 --- error
+--- at 1:1
 
 === list-append
 (list-append (list 1) 2)
@@ -123,10 +133,12 @@
 === list-concat needs two lists
 (list-concat (list 1))
 --- error
+--- at 1:1
 
 === list-concat needs lists
 (list-concat (list 1) 2)
 --- error
+--- at 1:1
 
 === map
 (map (fn (x) (* x 2)) (list 1 2 3))
@@ -146,10 +158,12 @@
 === map function arity
 (map (fn (x y) x) (list 1))
 --- error
+--- at 1:1
 
 === map on tuple is an error
 (map (fn (x) x) (tuple 1 2))
 --- error
+--- at 1:1
 
 === filter
 (filter (fn (x) (> x 1)) (list 1 2 3))
@@ -169,6 +183,7 @@
 === filter predicate must return a bool
 (filter (fn (x) x) (list 1 2))
 --- error
+--- at 1:1
 
 === fold
 (fold (fn (acc x) (+ acc x)) 0 (list 1 2 3 4))
@@ -213,10 +228,12 @@
 === range rejects a fractional end
 (range 1.5)
 --- error
+--- at 1:1
 
 === range rejects a fractional start
 (range 2.5 5)
 --- error
+--- at 1:1
 
 === range accepts integral floats
 (range 2.0 4.0)
@@ -226,6 +243,7 @@
 === range arity
 (range)
 --- error
+--- at 1:1
 
 === a range kept in a list is an ordinary list
 (list (range 3) -1)
@@ -260,6 +278,7 @@
 === reverse on tuple is an error
 (reverse (tuple 1 2))
 --- error
+--- at 1:1
 
 === is-empty list
 (is-empty (list))

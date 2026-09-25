@@ -23,6 +23,7 @@ packs: strings
 === str-concat needs strings
 (str-concat "a" 1)
 --- error
+--- at 1:1
 
 === str-join
 (str-join "-" (list "a" "b"))
@@ -112,10 +113,12 @@ packs: strings
 === str-fmt %d rejects a fraction
 (str-fmt "%d" 1.5)
 --- error
+--- at 1:1
 
 === str-fmt %d rejects a string
 (str-fmt "%d" "1")
 --- error
+--- at 1:1
 
 === str-fmt %s renders any value as text
 (str-fmt "%s %s %s" 42 #t "x")
@@ -140,22 +143,27 @@ packs: strings
 === str-fmt unknown verb is an error
 (str-fmt "%x" 1)
 --- error
+--- at 1:1
 
 === str-fmt incomplete verb is an error
 (str-fmt "50%")
 --- error
+--- at 1:1
 
 === str-fmt missing argument is an error
 (str-fmt "%s %s" "a")
 --- error
+--- at 1:1
 
 === str-fmt extra argument is an error
 (str-fmt "%s" "a" "b")
 --- error
+--- at 1:1
 
 === str-fmt format must be a string
 (str-fmt 1)
 --- error
+--- at 1:1
 
 === str-upper maps Latin-1 letters
 (str-upper "ação é ÿ")
@@ -220,6 +228,7 @@ packs: strings
 === str-sub rejects a fractional start
 (str-sub "hello" 1.5)
 --- error
+--- at 1:1
 
 === str-trim removes a no-break space
 (str-trim "  hi  ")
@@ -234,6 +243,7 @@ packs: strings
 === str-join needs string elements
 (str-join "-" (list "a" 1))
 --- error
+--- at 1:1
 
 === str-len of a multibyte string
 (str-len "日本語")
@@ -303,10 +313,12 @@ packs: strings
 === str-fmt %d of a fraction in text
 (str-fmt "%d" 2.5)
 --- error
+--- at 1:1
 
 === str-fmt bad verb shape is an error
 (str-fmt "%1-d" 1)
 --- error
+--- at 1:1
 
 # Width and precision stop at ten million. Go's fmt stops honoring either at
 # 10,000,010 and writes %!(NOVERB) into the result; both runtimes refuse
@@ -315,14 +327,17 @@ packs: strings
 === str-fmt width past the ceiling is an error
 (str-fmt "%10000001s" "x")
 --- error
+--- at 1:1
 
 === str-fmt precision past the ceiling is an error
 (str-fmt "%.10000001f" 1)
 --- error
+--- at 1:1
 
 === str-fmt an absurd width is an error, not garbage
 (str-fmt "%719925474099s!" "ii")
 --- error
+--- at 1:1
 
 === str-fmt a long precision on %d keeps every digit
 (str-fmt "%.70d" 5)
@@ -342,6 +357,7 @@ packs: strings
 === str-fmt %d refuses what int64 cannot hold
 (str-fmt "%d" (pow 2 63))
 --- error
+--- at 1:1
 
 === str-fmt %f spells infinity and NaN as Go does
 (str-fmt "%f|%f|%5f|%+f" (pow 2 2000) (- (pow 2 2000)) (- (pow 2 2000) (pow 2 2000)) (- (pow 2 2000) (pow 2 2000)))

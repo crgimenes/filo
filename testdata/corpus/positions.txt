@@ -1,0 +1,142 @@
+# Where an error happened: every case here fails, and "--- at" pins the
+# line and column (both from 1, the column in bytes) the runtime reports.
+# The innermost expression that failed is the place; a parse error is where
+# the text stops making sense, or where a list or string that never closes
+# was opened.
+
+=== an error on a later line
+(def x 1)
+(def y 2)
+(+ x "y")
+--- error
+--- at 3:1
+
+=== an error in a nested call is the inner call
+(+ 1
+   (* 2
+      (- "three" 1)))
+--- error
+--- at 3:7
+
+=== an error inside a function is where the body fails
+(def half (fn (n)
+  (/ n 2)))
+(half "four")
+--- error
+--- at 2:3
+
+=== an error in a let body
+(let ((a 1)
+      (b "two"))
+  (+ a b))
+--- error
+--- at 3:3
+
+=== an error in a let binding
+(let ((a 1)
+      (b (head (list))))
+  (+ a b))
+--- error
+--- at 2:10
+
+=== an error in a cond clause
+(def pick (fn (x)
+  (cond
+    ((= x 1) "one")
+    ((= x 2) (str-missing x))
+    (#t "many"))))
+(pick 2)
+--- error
+--- at 4:15
+
+=== an error in a closure called by map
+(map (fn (x)
+       (* x x))
+     (list 1 "b" 3))
+--- error
+--- at 2:8
+
+=== an error in a closure called by fold
+(fold (fn (acc x)
+        (+ acc x))
+      0
+      (list 1 2 "c"))
+--- error
+--- at 2:9
+
+=== an error in a builtin called by map as a value is the map call
+(map -
+  (list 1 "x"))
+--- error
+--- at 1:1
+
+=== calling a non-function
+(def f 42)
+(do
+  (f 1))
+--- error
+--- at 3:3
+
+=== the wrong number of arguments
+(def two (fn (a b) (+ a b)))
+(two
+  1)
+--- error
+--- at 2:1
+
+=== an undefined global
+(def a 1)
+  (+ a missing-name)
+--- error
+--- at 2:8
+
+=== an explicit error
+(def check (fn (v)
+  (if (< v 0)
+      (error "negative")
+      v)))
+(check 1)
+(check -1)
+--- error
+--- at 3:7
+
+=== letv with the wrong arity
+(letv (a b c)
+  (tuple 1 2)
+  (+ a b))
+--- error
+--- at 1:1
+
+=== an unterminated list is where it opens
+(def x 1)
+(+ x
+   (* 2 3)
+--- error
+--- at 2:1
+
+=== an unterminated string is where it opens
+(def s "abc)
+(str-len s)
+--- error
+--- at 1:8
+
+=== an unsupported escape is the escaped character
+(def s "a\qb")
+--- error
+--- at 1:11
+
+=== an unexpected close is where it is
+(+ 1 2))
+--- error
+--- at 1:8
+
+=== a bad boolean literal
+(if #yes 1 2)
+--- error
+--- at 1:5
+
+=== a byte order mark is not a column
+﻿(+ 1
+   "a")
+--- error
+--- at 1:1

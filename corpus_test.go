@@ -2,6 +2,7 @@ package filo_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -32,6 +33,7 @@ import (
 //	--- want                      the expected value, as a Filo expression
 //	<expression>
 //	--- error                     or: any error is expected
+//	--- at 2:3                    optional after error: where it happened
 //	--- globals                   optional, globals expected after the run
 //	x = 42
 
@@ -44,6 +46,7 @@ type corpusCase struct {
 	script  string
 	want    string
 	wantErr bool
+	at      string // "line:col" the error must report; "" when not checked
 	globals []binding
 }
 
@@ -123,6 +126,10 @@ func runCorpusCase(t *testing.T, packs []string, c corpusCase) {
 		if err == nil {
 			t.Fatalf("line %d: expected an error, got %s", c.line, got.String())
 		}
+		at := errorAt(err, c.script)
+		if c.at != "" && at != c.at {
+			t.Fatalf("line %d: the error is at %q, want %s: %v", c.line, at, c.at, err)
+		}
 		return
 	}
 	if err != nil {
@@ -142,6 +149,29 @@ func runCorpusCase(t *testing.T, packs []string, c corpusCase) {
 			t.Fatalf("line %d: global %q is %s, want %s", c.line, g.name, v.String(), want.String())
 		}
 	}
+}
+
+// errorAt is where err says it happened, as "line:col": a run or compile
+// error says it, and a parse error gives the byte offset into the script
+// after a BOM, counted here as the C runtime counts it. "" when the error
+// does not say.
+func errorAt(err error, script string) string {
+	if pe, ok := errors.AsType[*filo.PositionError](err); ok {
+		return fmt.Sprintf("%d:%d", pe.Line, pe.Col)
+	}
+	pe, ok := errors.AsType[*filo.ParseError](err)
+	if !ok {
+		return ""
+	}
+	script = strings.TrimPrefix(script, "\ufeff")
+	line, col := 1, 1
+	for i := 0; i < pe.Pos && i < len(script); i++ {
+		col++
+		if script[i] == '\n' {
+			line, col = line+1, 1
+		}
+	}
+	return fmt.Sprintf("%d:%d", line, col)
 }
 
 // sameValue is exact: no epsilon, NaN equals NaN, and functions are never
@@ -260,9 +290,36 @@ func (p *corpusParser) startSection(n int, name string) error {
 	case "globals":
 		p.sec = secGlobals
 	default:
-		return fmt.Errorf("line %d: unknown section %q", n, name)
+		return p.atSection(n, name)
 	}
 	return nil
+}
+
+// atSection reads "at L:C", which may only follow '--- error', once.
+func (p *corpusParser) atSection(n int, name string) error {
+	at, ok := strings.CutPrefix(name, "at ")
+	if !ok {
+		return fmt.Errorf("line %d: unknown section %q", n, name)
+	}
+	line, col, found := strings.Cut(at, ":")
+	if !p.cur.wantErr || p.cur.at != "" || !found || !positive(line) || !positive(col) {
+		return fmt.Errorf("line %d: '--- at L:C' goes once after '--- error', got %q", n, name)
+	}
+	p.cur.at = at
+	return nil
+}
+
+// positive is a number from 1, written plainly: no sign, no leading zero.
+func positive(s string) bool {
+	if s == "" || s[0] == '0' {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *corpusParser) outsideCase(n int, line string) error {
@@ -427,6 +484,8 @@ func TestCorpusDetectsDisagreement(t *testing.T) {
 		{"wrong global", "=== a\n(set x 1)\n--- want\n1\n--- globals\nx = 2\n"},
 		{"missing global", "=== a\n(+ 1 1)\n--- want\n2\n--- globals\nx = 2\n"},
 		{"nan is not a number", "=== a\n(+ 1 1)\n--- want\n(number \"nan\")\n"},
+		{"error in another place", "=== a\n(+ 1\n  \"a\")\n--- error\n--- at 2:3\n"},
+		{"parse error in another place", "=== a\n(+ 1 2))\n--- error\n--- at 1:1\n"},
 	}
 	for _, tc := range bad {
 		t.Run(tc.name, func(t *testing.T) {
@@ -472,6 +531,10 @@ func TestCorpusFormatRejects(t *testing.T) {
 		"section outside a case": "--- want\n1\n",
 		"unknown section":        "=== a\n1\n--- expect\n1\n",
 		"text after error":       "=== a\n1\n--- error\nsome message\n",
+		"at without error":       "=== a\n1\n--- want\n1\n--- at 1:1\n",
+		"at twice":               "=== a\n(x)\n--- error\n--- at 1:1\n--- at 1:1\n",
+		"at without a column":    "=== a\n(x)\n--- error\n--- at 1\n",
+		"at from zero":           "=== a\n(x)\n--- error\n--- at 0:1\n",
 		"text after want":        "=== a\n1\n--- want\n1\n\nstray text\n",
 		"bad given":              "=== a\ngiven x\n1\n--- want\n1\n",
 		"bad limit":              "=== a\nlimits steps=abc\n1\n--- want\n1\n",

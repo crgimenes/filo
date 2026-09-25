@@ -10,6 +10,7 @@ needs host-math
 needs host-math
 (sqrt -1)
 --- error
+--- at 1:1
 
 === abs negative
 (abs -5)
@@ -69,6 +70,7 @@ needs host-math
 === math-min needs an argument
 (math-min)
 --- error
+--- at 1:1
 
 === pi
 (> (pi) 3.14159)

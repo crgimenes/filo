@@ -43,6 +43,7 @@
 === sub needs an argument
 (-)
 --- error
+--- at 1:1
 
 === mul
 (* 2 3)
@@ -77,18 +78,22 @@
 === div by zero
 (/ 1 0)
 --- error
+--- at 1:1
 
 === div zero by zero
 (/ 0 0)
 --- error
+--- at 1:1
 
 === div by float zero
 (/ 1 0.0)
 --- error
+--- at 1:1
 
 === div needs an argument
 (/)
 --- error
+--- at 1:1
 
 === mod
 (% 10 3)
@@ -123,6 +128,7 @@
 === mod by zero
 (% 1 0)
 --- error
+--- at 1:1
 
 # The operands below are built from powers of two, which every runtime and
 # host computes exactly: a literal like 1e300 is outside what a host without
@@ -184,14 +190,17 @@ needs host-pow
 === pow arity
 (pow 2)
 --- error
+--- at 1:1
 
 === type error
 (+ 1 "a")
 --- error
+--- at 1:1
 
 === type error nested
 (* 2 (+ 1 #t))
 --- error
+--- at 1:6
 
 === nested arithmetic
 (+ (* 2 3) (- 10 4) (/ 8 2))
@@ -216,3 +225,4 @@ needs host-pow
 === unary division of zero
 (/ 0)
 --- error
+--- at 1:1

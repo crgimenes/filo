@@ -23,18 +23,22 @@
 === if condition must be a bool
 (if 1 2 3)
 --- error
+--- at 1:1
 
 === if condition list is not a bool
 (if (list) 1 2)
 --- error
+--- at 1:1
 
 === if too few arguments
 (if #t)
 --- error
+--- at 1:1
 
 === if too many arguments
 (if #t 1 2 3)
 --- error
+--- at 1:1
 
 === if only evaluates the taken branch
 (if #t 1 (/ 1 0))
@@ -84,14 +88,17 @@
 === cond test must be a bool
 (cond (5 1))
 --- error
+--- at 1:1
 
 === cond clause needs a body
 (cond (else))
 --- error
+--- at 1:1
 
 === cond malformed clause
 (cond 5)
 --- error
+--- at 1:1
 
 === do returns the last
 (do 1 2 3)
@@ -111,6 +118,7 @@
 === do empty
 (do)
 --- error
+--- at 1:1
 
 === exit no value
 (exit)
@@ -209,6 +217,7 @@ a = 1
 === exit arity
 (exit 1 2)
 --- error
+--- at 1:1
 
 === return at top level acts like exit
 (return 42)
@@ -266,3 +275,4 @@ a = 1
 === return arity
 (return 1 2)
 --- error
+--- at 1:1

@@ -83,10 +83,12 @@
 === string of a function is an error
 (string (fn (x) x))
 --- error
+--- at 1:1
 
 === string arity
 (string)
 --- error
+--- at 1:1
 
 === number of numeric string
 (number "1.5")
@@ -122,6 +124,7 @@
 === number rejects hex
 (number "0x10")
 --- error
+--- at 1:1
 
 === number of a number
 (number 7)
@@ -131,18 +134,22 @@
 === number of non-numeric string
 (number "abc")
 --- error
+--- at 1:1
 
 === number of empty string
 (number "")
 --- error
+--- at 1:1
 
 === number of malformed
 (number "1.5.5")
 --- error
+--- at 1:1
 
 === number of a bool
 (number #t)
 --- error
+--- at 1:1
 
 === cross-kind compare via string
 (= (string 1) "1")
@@ -187,6 +194,7 @@
 === type-of arity
 (type-of)
 --- error
+--- at 1:1
 
 # Number text is exact both ways for every double, in every runtime and host:
 # the shortest digits that read back, and reading rounds correctly however

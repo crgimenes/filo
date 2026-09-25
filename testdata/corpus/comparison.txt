@@ -23,6 +23,7 @@
 === equal needs two
 (= 1)
 --- error
+--- at 1:1
 
 === equal bools
 (= #t #t)
@@ -62,10 +63,12 @@
 === cross kind is an error
 (= 1 "1")
 --- error
+--- at 1:1
 
 === tuple vs list is an error
 (= (tuple 1) (list 1))
 --- error
+--- at 1:1
 
 === not equal
 (!= 1 2)
@@ -80,6 +83,7 @@
 === not equal cross kind is an error
 (!= 1 "1")
 --- error
+--- at 1:1
 
 === less
 (< 1 2)
@@ -124,7 +128,9 @@
 === ordering needs numbers
 (< "a" "b")
 --- error
+--- at 1:1
 
 === ordering needs two
 (< 1)
 --- error
+--- at 1:1

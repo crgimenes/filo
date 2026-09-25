@@ -3,8 +3,8 @@
 Plain-text cases that pin what a Filo script evaluates to. This directory is
 the behavioral contract of the language: every runtime runs the same files and
 must agree with them. Cases assert outcomes — the resulting value, the fact
-that an error occurred, the globals left behind — never the wording of an error
-message.
+that an error occurred and where, the globals left behind — never the wording
+of an error message.
 
 Because it is a contract between implementations that live in different
 repositories, this directory is duplicated and the two copies must stay
@@ -32,6 +32,7 @@ x = 42
 === another case
 (script)
 --- error                    # any error; nothing may follow on this line
+--- at 1:1                   # optional; where the error happened, line:col
 ```
 
 - The script is everything between the case header lines and the first
@@ -41,6 +42,13 @@ x = 42
   Functions cannot be expected. The expression ends at the first blank line;
   after it, only blank lines and `#` comments may appear until the next case.
 - `--- error` and `--- want` are mutually exclusive and one is required.
+- `--- at L:C`, once, right after `--- error`: the line and column (both from
+  1, the column in bytes, a leading BOM not counted) the runtime reports for
+  the error. A run or compile error is the innermost expression that failed;
+  a parse error is where the text stops making sense, or where a list or a
+  string that never closes was opened. Every runtime and every way it runs
+  (the tree, the VM) must report the same place; the one exception is a step
+  limit on a VM, which counts steps differently from the tree.
 - A runtime that does not implement a pack listed in `packs:` skips the file.
 - `needs` names something the runtime can only do when its host supplies it,
   so a runtime running without it skips that case instead of counting as a

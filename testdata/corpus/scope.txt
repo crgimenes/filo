@@ -43,22 +43,27 @@
 === let needs a body
 (let ((x 1)))
 --- error
+--- at 1:1
 
 === let needs bindings
 (let)
 --- error
+--- at 1:1
 
 === let binding must be a pair
 (let (x) x)
 --- error
+--- at 1:1
 
 === let binding without value
 (let ((x)) x)
 --- error
+--- at 1:1
 
 === let binding name must be a symbol
 (let ((1 2)) 1)
 --- error
+--- at 1:1
 
 === letv destructures a tuple
 (letv (a b) (tuple 1 2) (+ a b))
@@ -78,14 +83,17 @@
 === letv arity mismatch, too few
 (letv (a b) (values 1) a)
 --- error
+--- at 1:1
 
 === letv arity mismatch, too many
 (letv (a) (values 1 2) a)
 --- error
+--- at 1:1
 
 === letv needs a tuple
 (letv (a) (list 1) a)
 --- error
+--- at 1:1
 
 === letv does not alias the tuple
 (let ((tup (values 5 6)))
@@ -124,18 +132,22 @@ y = 5
 === set name must be a symbol
 (set 1 2)
 --- error
+--- at 1:1
 
 === set arity
 (set)
 --- error
+--- at 1:1
 
 === undefined global
 y
 --- error
+--- at 1:1
 
 === undefined symbol in expression
 (+ missing 1)
 --- error
+--- at 1:4
 
 === def global
 (do (def g 100) g)
@@ -161,10 +173,12 @@ inner = 9
 === def needs a value
 (def z)
 --- error
+--- at 1:1
 
 === def name must be a symbol
 (def 1 2)
 --- error
+--- at 1:1
 
 === read a given global
 given x = 5

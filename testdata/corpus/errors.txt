@@ -3,18 +3,22 @@
 === error raises
 (error "boom")
 --- error
+--- at 1:1
 
 === error needs a string
 (error 1)
 --- error
+--- at 1:1
 
 === error needs a message
 (error)
 --- error
+--- at 1:1
 
 === error takes exactly one
 (error "a" "b")
 --- error
+--- at 1:1
 
 === error inside a branch not taken does not raise
 (if #t 1 (error "no"))
@@ -24,6 +28,7 @@
 === error inside a function propagates
 (do (def f (fn (x) (if (< x 0) (error "negative") x))) (f -1))
 --- error
+--- at 1:32
 
 === error not raised on the happy path
 (do (def f (fn (x) (if (< x 0) (error "negative") x))) (f 1))
@@ -33,11 +38,14 @@
 === error inside map propagates
 (map (fn (x) (if (> x 2) (error "big") x)) (list 1 2 3))
 --- error
+--- at 1:26
 
 === error stops later side effects
 (do (set a 1) (error "stop") (set a 2))
 --- error
+--- at 1:15
 
 === unknown builtin is an undefined global
 (no-such-function 1)
 --- error
+--- at 1:2

@@ -5,16 +5,19 @@
 limits steps=100
 (let () (def loop (fn (n) (loop n))) (loop 0))
 --- error
+--- at 1:28
 
 === infinite recursion stops on the recursion limit
 limits recursion=5
 (let () (def loop (fn (n) (loop n))) (loop 0))
 --- error
+--- at 1:27
 
 === deep recursion fails under a small recursion limit
 limits recursion=5
 (let () (def f (fn (n) (if (= n 0) 0 (f (- n 1))))) (f 50))
 --- error
+--- at 1:38
 
 === the same recursion succeeds with the default limits
 (let () (def f (fn (n) (if (= n 0) 0 (f (- n 1))))) (f 50))
@@ -25,6 +28,7 @@ limits recursion=5
 limits steps=50
 (fold (fn (acc x) (+ acc x)) 0 (range 100))
 --- error
+--- at 1:19
 
 === the same loop succeeds with the default limits
 (fold (fn (acc x) (+ acc x)) 0 (range 100))
@@ -40,11 +44,14 @@ limits steps=100000
 === range beyond the element ceiling is an error
 (range 1e18)
 --- error
+--- at 1:1
 
 === range with a huge negative start is an error
 (range -1e18 0)
 --- error
+--- at 1:1
 
 === range with bounds past the integers a number holds is an error
 (range -9e18 9e18)
 --- error
+--- at 1:1
