@@ -7,14 +7,27 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 )
 
+// The examples are built in one go build, which compiles the engine once,
+// and only running each is held to a deadline: a go run apiece, all at
+// once, compiled it for each, and on a slow runner compiling alone ran
+// past the 30 seconds.
 func TestExamples(t *testing.T) {
-	// Walk examples directory
-	err := filepath.Walk("examples", func(path string, info os.FileInfo, err error) error {
+	bin := t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", bin+string(os.PathSeparator), "./examples/...")
+	build.Env = append(os.Environ(), "GOWORK=off")
+	out, err := build.CombinedOutput()
+	if err != nil {
+		t.Fatalf("building examples: %v\n%s", err, out)
+	}
+	err = filepath.Walk("examples", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -27,7 +40,11 @@ func TestExamples(t *testing.T) {
 
 		t.Run(filepath.Dir(path), func(t *testing.T) {
 			t.Parallel()
-			verifyExample(t, path)
+			exe := filepath.Join(bin, filepath.Base(filepath.Dir(path)))
+			if runtime.GOOS == "windows" {
+				exe += ".exe"
+			}
+			verifyExample(t, path, exe)
 		})
 		return nil
 	})
@@ -36,7 +53,7 @@ func TestExamples(t *testing.T) {
 	}
 }
 
-func verifyExample(t *testing.T, sourcePath string) {
+func verifyExample(t *testing.T, sourcePath, exe string) {
 	// 1. Parse expected output from source
 	expectedOutput, hasOutput := parseExpectedOutput(t, sourcePath)
 
@@ -44,8 +61,7 @@ func verifyExample(t *testing.T, sourcePath string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "go", "run", "-trimpath", sourcePath)
-	cmd.Env = append(os.Environ(), "GOWORK=off")
+	cmd := exec.CommandContext(ctx, exe) // #nosec G204 -- a binary this test just built
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
