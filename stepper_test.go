@@ -58,7 +58,7 @@ func TestSteppingIntoACall(t *testing.T) {
 		_ = s.Step(context.Background())
 	}
 	st := s.State()
-	if len(st.Frames) != 2 || st.Frames[1].Fn != 4 || st.Line != 2 {
+	if len(st.Frames) != 2 || st.Frames[1].Fn != 4 || st.Line != 1 {
 		t.Fatalf("inside half: %+v", st)
 	}
 	if st.Frames[1].Slots[0].Str != "four" || len(st.Frames[0].Operands) != 0 {
@@ -68,7 +68,7 @@ func TestSteppingIntoACall(t *testing.T) {
 	_, _, err = s.Result()
 	_, _, runErr := u.Run(context.Background(), "fail", nil, EvalConfig{})
 	pe, ok := errors.AsType[*PositionError](err)
-	if !ok || err.Error() != runErr.Error() || pe.Line != 2 || pe.Col != 3 {
+	if !ok || err.Error() != runErr.Error() || pe.Line != 1 || pe.Col != 19 {
 		t.Fatalf("got %v, Run gives %v", err, runErr)
 	}
 }

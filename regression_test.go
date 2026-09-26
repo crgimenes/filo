@@ -433,7 +433,7 @@ func TestValuesTooLargeToWalkAreRefused(t *testing.T) {
 	if !strings.Contains(shared.Walkable().Error(), "too large") || !strings.Contains(deep.Walkable().Error(), "too deep") {
 		t.Fatalf("got %v and %v", shared.Walkable(), deep.Walkable())
 	}
-	if shared.String() != "<value too large: more than 4194304 parts>" {
+	if shared.String() != "<value too large: more than 262144 parts>" {
 		t.Fatalf("String() = %.60q", shared.String())
 	}
 	var into []any

@@ -1,7 +1,5 @@
 ; Functions are values: map, filter and fold each take one and apply it.
 ; The sum of the squares of the even numbers below ten.
-(fold (fn (sum x) (+ sum x))
-  0
-  (map (fn (x) (* x x))
-    (filter (fn (x) (= (% x 2) 0)) (range 10))))
+(fold (fn (sum x) (+ sum x)) 0
+  (map (fn (x) (* x x)) (filter (fn (x) (= (% x 2) 0)) (range 10))))
 ; Output: 120

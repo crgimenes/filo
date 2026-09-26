@@ -51,19 +51,19 @@ func TestStepNextAndBack(t *testing.T) {
 	if fn != 1 || line != 1 {
 		t.Fatalf("at the start: fn %d line %d", fn, line)
 	}
-	s.line(false) // the def of half is line 1; the call is on line 3
+	s.line(false) // the def of half is line 1; the call is on line 2
 	fn, line, _ = where(s)
-	if fn != 1 || line != 3 {
+	if fn != 1 || line != 2 {
 		t.Fatalf("after s: fn %d line %d", fn, line)
 	}
 	s.line(false) // into half
 	fn, line, col := where(s)
-	if fn != 4 || line != 2 || col != 6 {
+	if fn != 4 || line != 1 || col != 22 {
 		t.Fatalf("stepped into half: fn %d at %d:%d", fn, line, col)
 	}
 	s.back()
 	fn, line, _ = where(s)
-	if fn != 1 || line != 3 {
+	if fn != 1 || line != 2 {
 		t.Fatalf("back: fn %d line %d", fn, line)
 	}
 	s.line(true) // over the call, which fails

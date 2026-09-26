@@ -125,11 +125,13 @@ func (v Value) describe() string {
 // writing it and converting it check first (Walkable), comparing it counts
 // as it goes (equalWalk).
 const (
-	walkPartsMax  = 1 << 22
+	// writing 2^18 numbers takes ~1.3 s on the C runtime with libc, the
+	// number that sets it (measured 2026-09-26)
+	walkPartsMax  = 1 << 18
 	walkLevelsMax = 512 // the C runtime's evaluation depth: its stack
 )
 
-// Walkable says whether v can be walked: nil when it has at most 4,194,304
+// Walkable says whether v can be walked: nil when it has at most 262,144
 // parts (every value in it, itself included) and 512 levels of lists and
 // tuples, or the error saying which ceiling it passed. Counting stops at the
 // ceiling, so this costs at most that much. Code outside the engine that

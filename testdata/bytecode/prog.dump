@@ -1,4 +1,4 @@
-unit: 399 bytes, format 1, checksum c20b1c8b ok
+unit: 399 bytes, format 1, checksum 7eb6cc15 ok
 widest stack 6, widest frame 2
 debug: line and column of each instruction
 
@@ -47,18 +47,18 @@ fn 0 (entry "main"): params 0, slots 2, stack 6, 30 bytes
   0022  39                     POP      1
   0023  20                     STORE_L  0         slot 0
   0024  39                     POP      1
-  0025  18              4:6    PUSH_L   0         slot 0
-  0026  19              4:8    PUSH_L   1         slot 1
-  0027  52 03           4:3    CALLB    2 3       +
+  0025  18              3:35   PUSH_L   0         slot 0
+  0026  19              3:37   PUSH_L   1         slot 1
+  0027  52 03           3:32   CALLB    2 3       +
   0029  58                     RET      0         return
 
 fn 1 (entry "fail"): params 0, slots 0, stack 2, 7 bytes
   0030  64              1:11   CLOSURE  4         fn 4
   0031  13              1:1    STORE_G  3         half
   0032  39                     POP      1
-  0033  0b              3:2    PUSH_G   3         half
-  0034  04              3:7    PUSH_K   4         "four"
-  0035  49              3:1    CALL     1
+  0033  0b              2:2    PUSH_G   3         half
+  0034  04              2:7    PUSH_K   4         "four"
+  0035  49              2:1    CALL     1
   0036  58                     RET      0         return
 
 fn 2: params 1, slots 1, stack 2, 5 bytes
@@ -74,7 +74,7 @@ fn 3: params 2, slots 2, stack 2, 5 bytes
   0046  58                     RET      0         return
 
 fn 4: params 1, slots 1, stack 2, 5 bytes
-  0047  18              2:6    PUSH_L   0         slot 0
-  0048  02              2:8    PUSH_K   2         2
-  0049  52 05           2:3    CALLB    2 5       /
+  0047  18              1:22   PUSH_L   0         slot 0
+  0048  02              1:24   PUSH_K   2         2
+  0049  52 05           1:19   CALLB    2 5       /
   0051  58                     RET      0         return

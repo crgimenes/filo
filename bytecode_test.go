@@ -68,8 +68,8 @@ func TestUnitErrorsSayWhere(t *testing.T) {
 	u := loadUnit(t, NewEngine(), "prog.fbc")
 	_, _, err := u.Run(context.Background(), "fail", nil, EvalConfig{})
 	pe, ok := errors.AsType[*PositionError](err)
-	if !ok || pe.Line != 2 || pe.Col != 3 {
-		t.Fatalf("got %v, want an error at 2:3", err)
+	if !ok || pe.Line != 1 || pe.Col != 19 {
+		t.Fatalf("got %v, want an error at 1:19", err)
 	}
 	if !strings.Contains(err.Error(), `in builtin "/"`) {
 		t.Fatalf("got %q", err)

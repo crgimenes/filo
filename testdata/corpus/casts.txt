@@ -234,6 +234,11 @@
 --- want
 "2.2250738585072014e-308"
 
+=== string of a power of two takes the digits on its wide side
+(list (string 7.2911220195563975e-304) (string -8.2090736025967525e-289))
+--- want
+(list "7.291122019556398e-304" "-8.209073602596753e-289")
+
 === a 17-digit literal reads as the nearest double
 (= 9.9999999999999995e-08 1e-7)
 --- want

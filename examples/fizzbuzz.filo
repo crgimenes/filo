@@ -1,10 +1,11 @@
 ; cond tries its clauses in order and takes the first whose test holds;
 ; else takes the rest.
-(map (fn (n)
-       (cond
-         ((= (% n 15) 0) "FizzBuzz")
-         ((= (% n 3) 0) "Fizz")
-         ((= (% n 5) 0) "Buzz")
-         (else n)))
+(map
+  (fn (n)
+    (cond
+      ((= (% n 15) 0) "FizzBuzz")
+      ((= (% n 3) 0) "Fizz")
+      ((= (% n 5) 0) "Buzz")
+      (else n)))
   (range 1 16))
 ; Output: (list 1 2 "Fizz" 4 "Buzz" "Fizz" 7 8 "Fizz" "Buzz" 11 "Fizz" 13 14 "FizzBuzz")

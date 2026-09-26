@@ -47,15 +47,15 @@ func TestInstructionsAndPlaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// fn 4 is half's body: (/ n 2) on line 2
+	// fn 4 is half's body: (/ n 2) on line 1
 	f := u.Fns[4]
 	in := u.Insn(f.Off + 2)
 	if in.Op != OpCallB || in.Len != 2 || in.Operands != "2 5" || in.Note != "/" {
 		t.Fatalf("got %+v", in)
 	}
 	line, col, ok := u.Position(in.PC)
-	if !ok || line != 2 || col != 3 {
-		t.Fatalf("position %d:%d %v, want 2:3", line, col, ok)
+	if !ok || line != 1 || col != 19 {
+		t.Fatalf("position %d:%d %v, want 1:19", line, col, ok)
 	}
 	if u.Insn(u.Code.Len).Len != 0 {
 		t.Fatal("an instruction past the code read")
