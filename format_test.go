@@ -268,6 +268,16 @@ func TestFormatLayout(t *testing.T) {
 			"(cond\n  ((is-empty c) (set NOTE \"\"))\n  ((chose c \"a\" \"articles\") (goto-screen \"area:/pub\" (list)))\n  (else (set NOTE \"unknown choice (try ?)\")))",
 		},
 		{
+			"a cond clause that does not fit keeps its test, the body breaks",
+			"(cond (cramped (attr A_BOLD) (centred (floor (/ H 2)) \"the den is too small\") (attr 0)) ((= k 1) (move 0 -1)))",
+			"(cond\n  (cramped\n    (attr A_BOLD)\n    (centred (floor (/ H 2)) \"the den is too small\")\n    (attr 0))\n  ((= k 1) (move 0 -1)))",
+		},
+		{
+			"the close parens after a child count toward its fit",
+			"(def take (fn (items from to) (map (fn (i) (nth items (+ from i))) (range (- to from)))))",
+			"(def take\n  (fn (items from to)\n    (map (fn (i) (nth items (+ from i))) (range (- to from)))))",
+		},
+		{
 			"a list of long strings is a column",
 			"(def lines (list \"Type the letter of a menu entry and press Enter.\" \"In an area, type the item number to read it.\"))",
 			"(def lines\n  (list\n    \"Type the letter of a menu entry and press Enter.\"\n    \"In an area, type the item number to read it.\"))",

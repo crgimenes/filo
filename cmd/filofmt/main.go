@@ -112,7 +112,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
-		_, err = fmt.Fprintln(stdout, formatted)
+		if !strings.HasSuffix(formatted, "\n") {
+			formatted += "\n"
+		}
+		_, err = fmt.Fprint(stdout, formatted)
 		if err != nil {
 			return 1
 		}

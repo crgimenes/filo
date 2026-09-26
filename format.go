@@ -204,14 +204,17 @@ func codeBefore(src string, i int) bool {
 // line; one that does not keeps its leading children on the head line while
 // they fit, and from the first that does not, every child takes a line of
 // its own — so nothing ever trails behind a multi-line argument. Special
-// forms keep a fixed head instead (see headInline). Comments and blank
-// lines stay where they are and rule out packing the form around them.
+// forms keep a fixed head instead (see headInline), and so does a cond
+// clause: its test. The close parens that follow a child land on its line,
+// so they count toward whether it fits. Comments and blank lines stay where
+// they are and rule out packing the form around them.
 type frame struct {
 	head     string // symbol right after the paren, "" until seen
 	children int    // children laid out so far, the head not counted
 	broken   bool   // a child took a line of its own: the rest follow
 	align    int    // column the children of a broken frame start on
 	inline   int    // children the head line keeps; -1 for an ordinary call
+	clause   bool   // a clause of cond: the head line keeps the test
 }
 
 // headInline is how many children a form keeps on its head line once it has
@@ -432,6 +435,9 @@ func (l *layout) open(i int) int {
 		width = utf8.RuneCountInString(g.compact)
 	}
 	headSlot := p != nil && p.inline >= 0 && p.children < p.inline
+	if width >= 0 {
+		width += l.closersAfter(g.end)
+	}
 	l.place(p, width)
 	if fitsHere(width, l.col, l.needSpace(), l.cfg) {
 		if l.needSpace() {
@@ -447,6 +453,9 @@ func (l *layout) open(i int) int {
 		l.write(" ")
 	}
 	f := frame{align: (len(l.stack) + 1) * l.indentWidth, inline: -1}
+	if p != nil && p.head == "cond" {
+		f.clause, f.inline = true, 1
+	}
 	if headSlot {
 		// bindings and params open on the head line and stack their own
 		// children under the first one
@@ -463,6 +472,14 @@ func (l *layout) open(i int) int {
 	return i + 1
 }
 
+func (l *layout) closersAfter(i int) int {
+	n := 0
+	for j := i + 1; j < len(l.tokens) && l.tokens[j].typ == tokClose && l.tokens[j].blanksBefore == 0; j++ {
+		n++
+	}
+	return n
+}
+
 func (l *layout) close() {
 	l.write(")")
 	if len(l.stack) > 0 {
@@ -470,17 +487,23 @@ func (l *layout) close() {
 	}
 }
 
-func (l *layout) atom(tok token) {
+func (l *layout) atom(i int) {
+	tok := l.tokens[i]
 	p := l.parent()
 	if p != nil && p.head == "" && p.children == 0 && endsWithOpen(&l.b) {
 		l.write(tok.value)
 		p.head = tok.value
 		p.inline = headInline(tok.value)
+		if p.clause {
+			p.inline = 0 // the test is the head
+		}
 		return
 	}
 	width := utf8.RuneCountInString(tok.value)
 	if strings.Contains(tok.value, "\n") {
 		width = -1
+	} else {
+		width += l.closersAfter(i)
 	}
 	if p != nil {
 		l.place(p, width)
@@ -520,7 +543,7 @@ func formatTokens(tokens []token, cfg FormatConfig) string {
 			l.close()
 			i++
 		case tokAtom:
-			l.atom(tok)
+			l.atom(i)
 			i++
 		case tokBlank:
 			i++
