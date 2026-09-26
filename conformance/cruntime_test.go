@@ -23,11 +23,11 @@ import (
 // runs TestExportOracle, and they are skipped unless asked for.
 
 // TestExportSteps writes the steps each corpus case takes on the Go engine,
-// "file<TAB>case<TAB>steps" a line: the smallest step limit it runs under,
-// found by bisection (the engine does not report the count). Only cases that
-// run, with no given globals and no packs. The C runtime's IR must take the
-// same steps (corpus_runner --steps): a step limit is behavior a script can
-// see. The corpus is this repository's, the same as the C one.
+// "file<TAB>case<TAB>steps" a line: the smallest step limit it runs under.
+// Only cases that run, with no given globals and no packs. The C runtime's
+// IR must take the same steps (corpus_runner --steps): a step limit is
+// behavior a script can see. The corpus is this repository's, the same as
+// the C one.
 //
 //	FILO_STEPS_OUT=/path/to/steps.txt go test -run TestExportSteps -count=1 .
 func TestExportSteps(t *testing.T) {
@@ -107,30 +107,16 @@ func stepCases(path string) (cases [][2]string, packs bool, err error) {
 	return cases, packs, sc.Err()
 }
 
-// stepsOf is the smallest step limit script runs under; false when it does
-// not run at all.
+// stepsOf is the steps script takes, the smallest step limit it runs under;
+// false when it does not run at all.
 func stepsOf(script string) (int, bool) {
 	p, err := filo.NewEngine().Compile(script)
 	if err != nil {
 		return 0, false
 	}
-	run := func(k int) bool {
-		_, _, err := p.Execute(context.Background(), nil, filo.EvalConfig{StepLimit: k, RecursionLimit: 128})
-		return err == nil
-	}
-	if !run(1 << 30) {
-		return 0, false
-	}
-	lo, hi := 1, 1<<30
-	for lo < hi {
-		mid := (lo + hi) / 2
-		if run(mid) {
-			hi = mid
-		} else {
-			lo = mid + 1
-		}
-	}
-	return lo, true
+	var n int
+	_, _, err = p.Execute(context.Background(), nil, filo.EvalConfig{StepLimit: 1 << 30, RecursionLimit: 128, Steps: &n})
+	return n, err == nil
 }
 
 // TestCUnits runs the units the C runtime compiled (corpus_runner
@@ -287,7 +273,7 @@ func sameBuild(dir string, no int) string {
 			return err.Error()
 		}
 		e := filo.NewEngine()
-		for _, p := range strings.Fields(string(packs)) {
+		for p := range strings.FieldsSeq(string(packs)) {
 			switch p {
 			case "math":
 				filomath.RegisterBuiltins(e)
@@ -324,7 +310,7 @@ func sameShow(dir string, no int) string {
 	}
 	packs, _ := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d.packs", no))) // #nosec G304 -- a file of the directory the test was given
 	e := filo.NewEngine()
-	for _, p := range strings.Fields(string(packs)) {
+	for p := range strings.FieldsSeq(string(packs)) {
 		switch p {
 		case "math":
 			filomath.RegisterBuiltins(e)
