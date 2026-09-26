@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -38,16 +39,17 @@ func TestUsageAndRefusals(t *testing.T) {
 		stdout string
 		stderr string
 	}{
-		{[]string{"-h"}, "", 0, "usage: filo build", ""},
-		{nil, "", 2, "", "usage: filo build"},
-		{[]string{"run", "x"}, "", 2, "", "usage: filo build"},
-		{[]string{"build", "x.filo"}, "", 2, "", "usage: filo build"},
-		{[]string{"bundle", "-o", "x.fbb"}, "", 2, "", "usage: filo build"},
+		{[]string{"-h"}, "", 0, "usage: filo", ""},
+		{nil, "", 1, "", "error: empty script"},
+		{[]string{"run"}, "", 2, "", "usage: filo"},
+		{[]string{"run", "x"}, "", 1, "", "filo: cannot open: x"},
+		{[]string{"build", "x.filo"}, "", 2, "", "usage: filo"},
+		{[]string{"bundle", "-o", "x.fbb"}, "", 2, "", "usage: filo"},
 		{[]string{"dump", "-"}, "(+ 1 2)", 1, "", "filo: not a unit or a bundle"},
 		{[]string{"dump", "no-such-file.fbc"}, "", 1, "", "filo: open no-such-file.fbc"},
-		{[]string{"check", "a", "b"}, "", 2, "", "usage: filo build"},
+		{[]string{"check", "a", "b"}, "", 2, "", "usage: filo"},
 		{[]string{"check", "-"}, "(+ 1 2)", 1, "", "filo: not a unit or a bundle"},
-		{[]string{"size", "a", "b"}, "", 2, "", "usage: filo build"},
+		{[]string{"size", "a", "b"}, "", 2, "", "usage: filo"},
 		{[]string{"check", "-vm", "no-such.vm", "x.fbc"}, "", 1, "", "filo: open no-such.vm"},
 	}
 	for _, c := range cases {
@@ -120,7 +122,7 @@ func TestSize(t *testing.T) {
 	var out, errs bytes.Buffer
 	code := run([]string{"size", "../../testdata/bytecode/demo.fbb"}, nil, &out, &errs)
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if code != 0 || lines[0] != "demo.fbb  615 bytes: 2 members, 57 of header and table" {
+	if code != 0 || lines[0] != "demo.fbb  617 bytes: 2 members, 57 of header and table" {
 		t.Fatalf("exit %d:\n%s%s", code, out.String(), errs.String())
 	}
 	sum, member := 0, 0
@@ -132,7 +134,7 @@ func TestSize(t *testing.T) {
 		}
 		sum += atoi(t, f[len(f)-1])
 	}
-	if sum != member || member != 615-57 || strings.Contains(out.String(), "between") {
+	if sum != member || member != 617-57 || strings.Contains(out.String(), "between") {
 		t.Fatalf("sections %d, members %d:\n%s", sum, member, out.String())
 	}
 	if !strings.Contains(out.String(), "  debug          102\n") {
@@ -147,4 +149,86 @@ func atoi(t *testing.T, s string) int {
 		t.Fatal(err)
 	}
 	return n
+}
+
+// run does what the C runtime's filo run does, and writes what it writes:
+// a source on the tree, as bytecode, both ways, traced; a bundle's member;
+// a unit that lacks something is refused naming it.
+func TestRun(t *testing.T) {
+	dir := t.TempDir()
+	src := dir + "/sq.filo"
+	_ = os.WriteFile(src, []byte("(def sq (fn (x) (* x x)))\n; comment\n(map sq (list 1 (+ 1 1) 3))\n"), 0o600)
+	bad := dir + "/bad.filo"
+	_ = os.WriteFile(bad, []byte("(def x 1)\n(+ x \"a\")\n"), 0o600)
+	cases := []struct {
+		args   []string
+		code   int
+		stdout string
+		stderr string
+	}{
+		{[]string{"run", src}, 0, "(list 1 4 9)\n", ""},
+		{[]string{"run", "--vm", src}, 0, "(list 1 4 9)\n", ""},
+		{[]string{"run", "--both", src}, 0,
+			"ir  (list 1 4 9)  (18 steps, one a node)\nvm  (list 1 4 9)  (22 steps, one an instruction)\n", ""},
+		{[]string{"run", bad}, 1, "", "filo: " + bad + ":2:1: in let: in builtin \"+\": expected number, got string\n"},
+		{[]string{"run", "--both", bad}, 0,
+			"ir  error at 2:1: in let: in builtin \"+\": expected number, got string  (6 steps, one a node)\n" +
+				"vm  error at 2:1: in builtin \"+\": expected number, got string  (6 steps, one an instruction)\n", ""},
+		{[]string{"run", "../../testdata/bytecode/demo.fbb", "upper"}, 0, "HELLO\n", ""},
+		{[]string{"run", "../../testdata/bytecode/prog.fbc"}, 1, "", "filo: missing (1): base\n"},
+		{[]string{"run", src, "main"}, 2, "", "filo: entries are for units, and this is source: " + src + "\n"},
+		{[]string{"run", dir + "/none.filo"}, 1, "", "filo: cannot open: " + dir + "/none.filo\n"},
+	}
+	for _, c := range cases {
+		var out, errs bytes.Buffer
+		code := run(c.args, nil, &out, &errs)
+		if code != c.code || out.String() != c.stdout || errs.String() != c.stderr {
+			t.Errorf("%v: exit %d\nstdout %q\nstderr %q", c.args, code, out.String(), errs.String())
+		}
+	}
+	var out, errs bytes.Buffer
+	code := run([]string{"run", "--trace", src}, nil, &out, &errs)
+	lines := strings.Split(out.String(), "\n")
+	if code != 0 || lines[0] != "0000  CLOSURE  1         fn 1            |" ||
+		!strings.Contains(out.String(), "\n  0012  PUSH_L   0         slot 0          |\n") ||
+		!strings.Contains(out.String(), "-- sq: 22 steps\n(list 1 4 9)\n") {
+		t.Fatalf("trace: exit %d\n%s", code, out.String())
+	}
+}
+
+// Each program of examples/ says what it gives on its last line: "; Output:
+// VALUE", on the tree and as bytecode alike, or "; Error: LINE:COL:
+// MESSAGE". The C repository keeps the same files and holds its filo to
+// the same lines.
+func TestExamples(t *testing.T) {
+	paths, err := filepath.Glob("../../examples/*.filo")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no examples: %v", err)
+	}
+	for _, path := range paths {
+		src, _ := os.ReadFile(path)
+		lines := strings.Split(strings.TrimRight(string(src), "\n"), "\n")
+		last := lines[len(lines)-1]
+		want, output := strings.CutPrefix(last, "; Output: ")
+		if output {
+			for _, mode := range [][]string{{"run", path}, {"run", "--vm", path}} {
+				var out, errs bytes.Buffer
+				code := run(mode, nil, &out, &errs)
+				if code != 0 || out.String() != want+"\n" {
+					t.Errorf("%v: exit %d, %q%q, want %q", mode, code, out.String(), errs.String(), want)
+				}
+			}
+			continue
+		}
+		want, failure := strings.CutPrefix(last, "; Error: ")
+		if !failure {
+			t.Errorf("%s: the last line says neither Output nor Error", path)
+			continue
+		}
+		var out, errs bytes.Buffer
+		code := run([]string{"run", path}, nil, &out, &errs)
+		if code != 1 || errs.String() != "filo: "+path+":"+want+"\n" {
+			t.Errorf("%s: exit %d, %q, want %q", path, code, errs.String(), want)
+		}
+	}
 }

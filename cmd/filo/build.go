@@ -13,7 +13,7 @@ import (
 )
 
 // cmdBuild compiles FILE... into one unit, as the C runtime's filo build:
-// each file an entry named by it ("lib/ola.filo" is the entry "ola"), the
+// each file an entry named by it ("lib/hello.filo" is the entry "hello"), the
 // same bytes the C compiler writes; --strip leaves the debug section out.
 func cmdBuild(args []string, stderr io.Writer) int {
 	strip := len(args) > 0 && args[0] == "--strip"
@@ -38,7 +38,7 @@ func cmdBuild(args []string, stderr io.Writer) int {
 }
 
 // cmdBundle puts units into one bundle, as the C runtime's filo bundle:
-// each a member named by its file ("lib/ola.fbc" is the member "ola").
+// each a member named by its file ("lib/hello.fbc" is the member "hello").
 func cmdBundle(args []string, stderr io.Writer) int {
 	if len(args) < 3 || args[0] != "-o" {
 		_, _ = io.WriteString(stderr, usage)
@@ -105,8 +105,8 @@ func placed(path string, src []byte, err error) error {
 	return fmt.Errorf("%s: %w", path, err)
 }
 
-// entryName is a file's name without its directory and ext: "lib/ola.filo"
-// is "ola".
+// entryName is a file's name without its directory and ext: "lib/hello.filo"
+// is "hello".
 func entryName(path, ext string) string {
 	base := filepath.Base(path)
 	name := strings.TrimSuffix(base, ext)

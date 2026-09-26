@@ -312,19 +312,42 @@ Three small binaries live under `cmd/`; `make tools` builds all of them into
   errors. Flags `-w`, `-l`, `-d` as filofmt, plus `-fmt` to run the formatter
   on the result. Install with
   `go install github.com/crgimenes/filo/cmd/filofix@latest`.
-- **`filo-repl`** -- an interactive REPL (line editing, history, multi-line
-  input) that falls back to batch mode when stdin is a pipe. Load extension
-  packages with `-filo-package math,rand,str,print,json`, and bound the run with
-  `-step-limit`, `-recursion-limit`, and `-timeout`. Install with
-  `go install github.com/crgimenes/filo/cmd/filo-repl@latest`.
+- **`filo`** -- the language's command, the C runtime's `filo` in Go: it
+  runs, builds, bundles and lists the same bytes, and says the same things.
+  Alone it is the REPL (line editing, history, multi-line input), which
+  falls back to batch mode when stdin is a pipe; math and strings are
+  loaded, `-filo-package` names others (rand, print, json), and
+  `-step-limit`, `-recursion-limit` and `-timeout` bound the run.
+  `filo run` runs a source, a unit or a bundle (`--vm`, `--trace`,
+  `--both`); `build`, `bundle`, `dump`, `check`, `size` and `debug` are
+  under Bytecode below. Install with
+  `go install github.com/crgimenes/filo/cmd/filo@latest`.
 
 ## Examples
+
+### Programs in Filo
+
+`examples/*.filo` are programs in Filo alone, a lesson each, in order:
+`hello`, `constants`, `double`, `fib`, `mistake`, `lists`,
+`higher-order`, `strings`, `math`, `closures`, `bindings`, `fizzbuzz`,
+`globals`, `early`. Each says what it gives on its last line (`; Output:`
+or `; Error:`), and the tests hold `filo run` to it, on the tree and as
+bytecode; the C repository keeps the same files and holds its `filo` to
+the same lines.
+
+```bash
+filo run examples/fizzbuzz.filo
+filo run --both examples/mistake.filo
+filo debug examples/closures.filo
+```
+
+The subdirectories are Go programs that embed Filo.
 
 ### 1. Calculated field
 
 ```lisp
-(let ((forca field:for) (bonus field:bonus))
-  (+ (* forca 2) bonus))
+(let ((strength field:str) (bonus field:bonus))
+  (+ (* strength 2) bonus))
 ```
 
 ### 2. Dynamic configuration

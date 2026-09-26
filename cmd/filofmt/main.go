@@ -22,6 +22,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -36,6 +37,13 @@ const version = "0.1.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+func usage(fs *flag.FlagSet, w io.Writer) {
+	_, _ = fmt.Fprintf(w, "usage: %s [flags] [path ...]\n%s\n\n", fs.Name(), "Formats Filo source: each path (a directory: its .filo files), or standard input to standard output.")
+	fs.SetOutput(w)
+	fs.PrintDefaults()
+	_, _ = fmt.Fprintf(w, "\nExample: %s\n", "filofmt -w script.filo")
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -58,9 +66,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.IntVar(&indentSize, "indent", 2, "spaces per indent level")
 	fs.BoolVar(&showVer, "version", false, "print version and exit")
 
+	fs.Usage = func() {}
 	err := fs.Parse(args)
+	if errors.Is(err, flag.ErrHelp) {
+		usage(fs, stdout)
+		return 0
+	}
 	if err != nil {
-		return 1
+		usage(fs, stderr)
+		return 2
 	}
 
 	if showVer {

@@ -1,7 +1,8 @@
 // Command filo is the Filo toolchain on the desktop, the C runtime's filo
-// command in Go: build and bundle write the bytes the C ones write, dump
-// lists what the C one lists, check and size look at what a unit asks for
-// and weighs, and debug steps an entry point on the terminal.
+// command in Go: run, build, bundle and dump do and write what the C ones
+// do and write; repl reads and evaluates (filo alone is the REPL); check
+// and size look at what a unit asks for and weighs; debug steps an entry
+// point on the terminal.
 package main
 
 import (
@@ -15,15 +16,30 @@ import (
 	"github.com/crgimenes/filo/fbc"
 )
 
-const usage = `usage: filo build [--strip] -o OUT FILE...
+const usage = `usage: filo [repl] [-filo-package LIST] [-step-limit N] [-recursion-limit N] [-timeout S]
+       filo run [--vm | --trace | --both] FILE [MEMBER] [ENTRY...]
+       filo build [--strip] -o OUT FILE...
        filo bundle -o OUT UNIT...
        filo dump [FILE]
        filo check [-vm PROFILE] [FILE]
        filo size [FILE]
        filo debug [-src DIR] [-g NAME=EXPR]... FILE [MEMBER] [ENTRY]
 
+filo alone, or filo repl, is the REPL: on a terminal it evaluates
+expression by expression (.help lists its commands); with standard input a
+pipe it runs what comes as one script and writes its value. The packages
+are math and strings unless -filo-package names others (rand, print, json).
+
+run runs a program and writes its value: a source (FILE is told apart from
+bytecode by the magic) on the tree the compiler lowers; --vm compiles it to
+bytecode in memory first; --trace runs it as bytecode, writing each
+instruction with the top of its operand stack; --both runs it both ways, a
+line each, with their steps. For a unit, the ENTRY points run in order and
+share their globals (default: main, or the first); for a bundle, MEMBER is
+the unit (default: main, or the first).
+
 build compiles programs into one unit of bytecode (docs/bytecode.md), each
-an entry named by its file (lib/ola.filo is the entry "ola"): the same bytes
+an entry named by its file (lib/hello.filo is the entry "hello"): the same bytes
 the C runtime's filo build writes. --strip leaves out the debug section (the
 lines and columns errors say). bundle puts units into one bundle, each a
 member named by its file.
@@ -57,6 +73,8 @@ main.filo, beside FILE or in -src DIR. -g gives the run a global, the
 expression in Filo: a value, or a function a unit imports and the VM lacks.
 
 Examples:
+  echo '(str-upper "hello world")' | filo
+  filo run --both fib.filo
   filo build -o prog.fbc main.filo fail.filo
   filo dump lib/msh/edt.fbb | less
   filo check -vm bin.vm mine.fbb
@@ -75,8 +93,16 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		_, _ = io.WriteString(stdout, usage)
 		return 0
 	}
+	if len(args) > 0 && args[0] == "repl" {
+		return cmdRepl(args[1:], stdin, stdout, stderr)
+	}
+	if len(args) == 0 || strings.HasPrefix(args[0], "-") { // filo alone, or with the REPL's flags
+		return cmdRepl(args, stdin, stdout, stderr)
+	}
 	if len(args) > 0 {
 		switch args[0] {
+		case "run":
+			return cmdRun(args[1:], stdout, stderr)
 		case "debug":
 			return debug(args[1:], stderr)
 		case "build":

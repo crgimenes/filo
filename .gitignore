@@ -89,7 +89,6 @@ config.local.lua
 *.swo
 *~
 
-cmd/filo-repl/filo-repl
 cmd/filofmt/filofmt
 cmd/filofix/filofix
 /filo

@@ -249,16 +249,16 @@ with the libc-free number host, no libm and a symbol table of 128
 `filo` (built by `make cli`) takes a program from source to the machine in
 view:
 
-    filo show tree examples/constantes.filo   # the tree as read
-    filo show folded examples/constantes.filo # once constants fold: 10
-    filo show ir examples/dobro.filo        # the IR, frames and slots named
-    filo run examples/dobro.filo            # 42, from the IR
-    filo run --both examples/erro.filo      # IR and VM side by side
-    filo build -o dobro.fbc examples/dobro.filo
-    filo dump dobro.fbc                     # the unit, every operand named
-    filo run --trace dobro.fbc              # each instruction, with the stack
-    filo bundle -o demo.fbb ola.fbc dobro.fbc
-    filo run demo.fbb dobro                 # one member of the bundle
+    filo show tree examples/constants.filo    # the tree as read
+    filo show folded examples/constants.filo  # once constants fold: 10
+    filo show ir examples/double.filo       # the IR, frames and slots named
+    filo run examples/double.filo           # 42, from the IR
+    filo run --both examples/mistake.filo   # IR and VM side by side
+    filo build -o double.fbc examples/double.filo
+    filo dump double.fbc                    # the unit, every operand named
+    filo run --trace double.fbc             # each instruction, with the stack
+    filo bundle -o demo.fbb hello.fbc double.fbc
+    filo run demo.fbb double                # one member of the bundle
 
 The C reader goes from characters straight to the tree, so there is no
 token stage to show; `filo_show` shows the three that exist before the

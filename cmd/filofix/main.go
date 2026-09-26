@@ -26,6 +26,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -40,6 +41,13 @@ const version = "0.1.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+func usage(fs *flag.FlagSet, w io.Writer) {
+	_, _ = fmt.Fprintf(w, "usage: %s [flags] [path ...]\n%s\n\n", fs.Name(), "Rewrites Filo source written for older versions of the language: each path, or standard input to standard output.")
+	fs.SetOutput(w)
+	fs.PrintDefaults()
+	_, _ = fmt.Fprintf(w, "\nExample: %s\n", "filofix -w -fmt script.filo")
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -60,9 +68,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.BoolVar(&fmtFlag, "fmt", false, "run the formatter (filofmt) on the result")
 	fs.BoolVar(&showVer, "version", false, "print version and exit")
 
+	fs.Usage = func() {}
 	err := fs.Parse(args)
+	if errors.Is(err, flag.ErrHelp) {
+		usage(fs, stdout)
+		return 0
+	}
 	if err != nil {
-		return 1
+		usage(fs, stderr)
+		return 2
 	}
 
 	if showVer {

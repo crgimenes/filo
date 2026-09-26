@@ -1,18 +1,12 @@
-// Command filo-repl provides an interactive REPL for the Filo language.
-//
-// When stdin is a TTY, it runs in interactive mode with line editing, history,
-// and multi-line support. When stdin is a pipe, it runs in batch mode.
-//
-// Usage:
-//
-//	filo-repl                         # Interactive REPL
-//	echo '(+ 1 2)' | filo-repl        # Batch mode
-//	filo-repl --filo-package math     # REPL with math package
+// The REPL: filo alone, or filo repl. On a terminal it reads and evaluates
+// expression by expression, with line editing, history and multi-line input;
+// with standard input a pipe it runs what comes as one script (batch mode).
 package main
 
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -32,7 +26,7 @@ import (
 	"golang.org/x/term"
 )
 
-//go:embed help.txt
+//go:embed repl_help.txt
 var helpContent string
 
 const (
@@ -43,13 +37,10 @@ const (
 	promptCont            = "...   "
 )
 
-func main() {
-	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
-}
-
-func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("filo-repl", flag.ContinueOnError)
+func cmdRepl(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("filo repl", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	fs.Usage = func() {}
 
 	var (
 		packages       string
@@ -59,15 +50,20 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		foldConst      bool
 	)
 
-	fs.StringVar(&packages, "filo-package", "", "Comma-separated list of extension packages (math, rand, str)")
+	fs.StringVar(&packages, "filo-package", "math,strings", "Comma-separated list of extension packages (math, strings, rand, print, json)")
 	fs.IntVar(&stepLimit, "step-limit", defaultStepLimit, "Maximum evaluation steps")
 	fs.IntVar(&recursionLimit, "recursion-limit", defaultRecursionLimit, "Maximum recursion depth")
 	fs.IntVar(&timeoutSeconds, "timeout", defaultTimeoutSeconds, "Script execution timeout in seconds")
 	fs.BoolVar(&foldConst, "fold-const", false, "Enable interactive constant folding")
 
 	err := fs.Parse(args)
-	if err != nil {
-		return 1
+	if errors.Is(err, flag.ErrHelp) {
+		_, _ = io.WriteString(stdout, usage)
+		return 0
+	}
+	if err != nil || fs.NArg() > 0 {
+		_, _ = io.WriteString(stderr, usage)
+		return 2
 	}
 
 	// Parse requested packages
@@ -134,11 +130,10 @@ func runBatchMode(engine *filo.Engine, stdin io.Reader, stdout, stderr io.Writer
 	ctx := context.Background()
 	result, _, err := engine.RunScript(ctx, script, nil, cfg)
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
-		return 1
+		return complain(stderr, placed("stdin", data, err))
 	}
 
-	_, _ = fmt.Fprintln(stdout, formatResult(result))
+	_, _ = fmt.Fprintln(stdout, valueText(result))
 	return 0
 }
 
@@ -399,10 +394,10 @@ func executeAndPrint(t *term.Terminal, engine *filo.Engine, script string, globa
 	ctx := context.Background()
 	result, newGlobals, err := engine.RunScript(ctx, script, globals, cfg)
 	if err != nil {
-		_, _ = fmt.Fprintf(t, "error: %v\n", err)
+		_, _ = fmt.Fprintf(t, "error: %s\n", replError([]byte(script), err))
 		return nil
 	}
-	_, _ = fmt.Fprintln(t, formatResult(result))
+	_, _ = fmt.Fprintln(t, valueText(result))
 	return newGlobals
 }
 
@@ -593,52 +588,30 @@ func registerPackage(engine *filo.Engine, pkg string) error {
 		filomath.RegisterBuiltins(engine)
 	case "rand":
 		filorand.RegisterBuiltins(engine)
-	case "str":
+	case "strings", "str":
 		filostrings.RegisterBuiltins(engine)
 	case "print":
 		filoprint.RegisterBuiltins(engine)
 	case "json":
 		filojson.RegisterBuiltins(engine)
 	default:
-		return fmt.Errorf("unknown filo package: %q (available: math, rand, str, print, json)", pkg)
+		return fmt.Errorf("unknown filo package: %q (available: math, strings, rand, print, json)", pkg)
 	}
 	return nil
 }
 
-func formatResult(v filo.Value) string {
-	err := v.Walkable()
-	if err != nil {
-		return "<" + err.Error() + ">"
-	}
-	return formatWalkable(v)
+// replError is an error of what was typed, where it happened in it: the
+// line and column, with no file to name.
+func replError(src []byte, err error) string {
+	text := placed("", src, err).Error()
+	return strings.TrimPrefix(strings.TrimPrefix(text, ":"), " ")
 }
 
-func formatWalkable(v filo.Value) string {
-	switch v.Kind {
-	case filo.KNumber:
-		return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%f", v.Num), "0"), ".")
-	case filo.KBool:
-		if v.Bool {
-			return "#t"
-		}
-		return "#f"
-	case filo.KString:
+// valueText is a value as filo run writes it, the C runtime's too: a string
+// as its text, anything else as Filo reads it back.
+func valueText(v filo.Value) string {
+	if v.Kind == filo.KString {
 		return v.Str
-	case filo.KList:
-		var items []string
-		for _, item := range v.List {
-			items = append(items, formatWalkable(item))
-		}
-		return "(" + strings.Join(items, " ") + ")"
-	case filo.KTuple:
-		var items []string
-		for _, item := range v.Tup {
-			items = append(items, formatWalkable(item))
-		}
-		return "(values " + strings.Join(items, " ") + ")"
-	case filo.KFunc:
-		return "<fn>"
-	default:
-		return v.String()
 	}
+	return v.String()
 }

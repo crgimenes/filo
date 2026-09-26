@@ -65,7 +65,7 @@ func TestCountParens(t *testing.T) {
 		},
 		{
 			name:      "utf8 content",
-			input:     "(print \"olá mundo 世界\")",
+			input:     "(print \"naïve café 世界\")",
 			wantOpen:  1,
 			wantClose: 1,
 		},
@@ -202,8 +202,8 @@ func TestBatchModeScriptError(t *testing.T) {
 		t.Errorf("expected exit code 1 for script error, got %d", code)
 	}
 
-	if !strings.Contains(stderr.String(), "error") {
-		t.Errorf("expected error message, got: %s", stderr.String())
+	if !strings.Contains(stderr.String(), "filo: stdin:1:2: in call: undefined global: undefined-function") {
+		t.Errorf("expected the error and where, got: %s", stderr.String())
 	}
 }
 
@@ -223,29 +223,47 @@ func TestUnknownPackage(t *testing.T) {
 	}
 }
 
-func TestFormatResult(t *testing.T) {
+// The REPL writes a value as filo run does: a string as its text, anything
+// else as Filo reads it back.
+func TestValueText(t *testing.T) {
 	tests := []struct {
 		name string
-		v    func() filo.Value
+		v    filo.Value
 		want string
 	}{
-		{"integer", func() filo.Value { return filo.VNum(42) }, "42"},
-		{"float", func() filo.Value { return filo.VNum(3.14) }, "3.14"},
-		{"bool true", func() filo.Value { return filo.VBool(true) }, "#t"},
-		{"bool false", func() filo.Value { return filo.VBool(false) }, "#f"},
-		{"string", func() filo.Value { return filo.VString("hello") }, "hello"},
-		{"empty list", func() filo.Value { return filo.VList([]filo.Value{}) }, "()"},
-		{"list", func() filo.Value {
-			return filo.VList([]filo.Value{filo.VNum(1), filo.VNum(2)})
-		}, "(1 2)"},
+		{"integer", filo.VNum(42), "42"},
+		{"float", filo.VNum(3.14), "3.14"},
+		{"tiny", filo.VNum(1e-10), "1e-10"},
+		{"bool true", filo.VBool(true), "#t"},
+		{"bool false", filo.VBool(false), "#f"},
+		{"string", filo.VString("hello"), "hello"},
+		{"empty list", filo.VList([]filo.Value{}), "(list)"},
+		{"list", filo.VList([]filo.Value{filo.VNum(1), filo.VString("a")}), `(list 1 "a")`},
 	}
-
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := formatResult(tt.v())
-			if got != tt.want {
-				t.Errorf("formatResult() = %q, want %q", got, tt.want)
-			}
-		})
+		got := valueText(tt.v)
+		if got != tt.want {
+			t.Errorf("%s: %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+// A script that fails says where, as filo run says it; math and strings
+// are there without asking; filo repl is the same REPL, and -h its help.
+func TestReplAsFiloRunIs(t *testing.T) {
+	var out, errs bytes.Buffer
+	code := run(nil, strings.NewReader("(def x 1)\n(+ x \"a\")"), &out, &errs)
+	if code != 1 || !strings.HasPrefix(errs.String(), "filo: stdin:2:1: ") {
+		t.Fatalf("exit %d, %q", code, errs.String())
+	}
+	out.Reset()
+	code = run([]string{"repl"}, strings.NewReader(`(str-upper (string (sqrt 16)))`), &out, &errs)
+	if code != 0 || out.String() != "4\n" {
+		t.Fatalf("exit %d, %q %q", code, out.String(), errs.String())
+	}
+	out.Reset()
+	code = run([]string{"repl", "-h"}, nil, &out, &errs)
+	if code != 0 || !strings.HasPrefix(out.String(), "usage: filo") {
+		t.Fatalf("exit %d, %q", code, out.String())
 	}
 }

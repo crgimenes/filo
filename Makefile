@@ -4,7 +4,7 @@
 export CGO_ENABLED=0
 
 BUILD_FLAGS := -trimpath -ldflags "-s -w"
-TOOLS       := filo-repl filofmt filofix
+TOOLS       := filo filofmt filofix
 
 # Default: the checks CI runs, plus the tool binaries in ./bin.
 all: build vet test tools

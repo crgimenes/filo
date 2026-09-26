@@ -22,6 +22,9 @@ type EvalConfig struct {
 	StepLimit      int
 	RecursionLimit int
 	Timeout        time.Duration
+	// Steps, when set, receives the steps the run took, whether it ended
+	// or failed: nodes of the IR, or instructions of a unit.
+	Steps *int
 }
 
 const (
@@ -226,6 +229,9 @@ func (e *Engine) run(ctx context.Context, ast Node, globals map[string]Value, cf
 	}
 
 	ev := newEvaluator(runCtx, cfg, root, e.builtins)
+	if cfg.Steps != nil {
+		defer func() { *cfg.Steps = ev.steps }()
+	}
 
 	result, err = ev.eval(ir)
 	if err != nil {

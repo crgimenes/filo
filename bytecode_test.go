@@ -101,7 +101,7 @@ func TestUnitRefusedForWhatTheEngineLacks(t *testing.T) {
 	})
 	u = loadUnit(t, e, "upper.fbc")
 	v, _, err := u.Run(context.Background(), "upper", nil, EvalConfig{})
-	if err != nil || v.Str != "OLA" {
+	if err != nil || v.Str != "HELLO" {
 		t.Fatalf("got %v, %v", v, err)
 	}
 }

@@ -279,7 +279,7 @@ func TestGlobalsGiven(t *testing.T) {
 		t.Fatal(err)
 	}
 	u.finish()
-	if u.msg != `returned "OLA"` { // str-upper is the strings pack's, which filo has
+	if u.msg != `returned "HELLO"` { // str-upper is the strings pack's, which filo has
 		t.Fatalf("upper: %q", u.msg)
 	}
 }

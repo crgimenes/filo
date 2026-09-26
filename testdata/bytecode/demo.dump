@@ -1,8 +1,8 @@
-bundle: 615 bytes, format 1, checksum ee5be2b7 ok
+bundle: 617 bytes, format 1, checksum efb5cae7 ok
 widest stack 6, widest frame 2
 members (2)
   prog                399 bytes at 56
-  upper               159 bytes at 456
+  upper               161 bytes at 456
 
 == prog
 unit: 399 bytes, format 1, checksum c20b1c8b ok
@@ -87,7 +87,7 @@ fn 4: params 1, slots 1, stack 2, 5 bytes
   0051  58                     RET      0         return
 
 == upper
-unit: 159 bytes, format 1, checksum 7fde3b33 ok
+unit: 161 bytes, format 1, checksum 781d4b1f ok
 widest stack 1, widest frame 0
 debug: line and column of each instruction
 
@@ -95,11 +95,11 @@ imports (1): functions the loading VM must provide
      0  str-upper
 globals (0)
 constants (1)
-     0  "ola"
+     0  "hello"
 exports (1)
   upper -> fn 0
 
 fn 0 (entry "upper"): params 0, slots 0, stack 1, 4 bytes
-  0000  00              1:12   PUSH_K   0         "ola"
+  0000  00              1:12   PUSH_K   0         "hello"
   0001  51 00           1:1    CALLB    1 0       str-upper
   0003  58                     RET      0         return

@@ -315,10 +315,10 @@ func TestSetAndGlobals(t *testing.T) {
 func TestCalculatedFieldExample(t *testing.T) {
 	cfg := defaultCfg()
 	globals := map[string]Value{
-		"field:for":   VNum(8),
+		"field:str":   VNum(8),
 		"field:bonus": VNum(3),
 	}
-	script := "(let ((forca field:for) (bonus field:bonus)) (+ (* forca 2) bonus))"
+	script := "(let ((strength field:str) (bonus field:bonus)) (+ (* strength 2) bonus))"
 	val, _ := run(t, script, globals, cfg)
 	num, err := val.AsNumber()
 	if err != nil {

@@ -91,6 +91,9 @@ func (u *Unit) Run(ctx context.Context, entry string, globals map[string]Value, 
 		defer cancel()
 	}
 	ev := newEvaluator(runCtx, cfg, root, e.builtins)
+	if cfg.Steps != nil {
+		defer func() { *cfg.Steps = ev.steps }()
+	}
 	result, err = ev.runBC(fn, nil, nil)
 	if err != nil {
 		switch sig := err.(type) {
