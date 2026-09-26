@@ -1,0 +1,7 @@
+; let names values for its body; a function gives back several in a tuple,
+; and letv takes the tuple apart.
+(def divmod (fn (a b) (tuple (/ (- a (% a b)) b) (% a b))))
+(letv (q r) (divmod 17 5)
+  (let ((back (+ (* q 5) r)))
+    (list q r back)))
+; Output: (list 3 2 17)

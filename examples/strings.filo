@@ -1,0 +1,4 @@
+; The strings pack: split, join, change case, format.
+(let ((words (str-split " " "the quick brown fox")))
+  (str-fmt "%d words: %s" (length words) (str-join "-" (map str-upper words))))
+; Output: 4 words: THE-QUICK-BROWN-FOX

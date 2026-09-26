@@ -1,0 +1,4 @@
+; The math pack: roots, rounding and the like. pow is the core's, the same
+; double on every machine.
+(list (sqrt 2) (floor 2.7) (round 2.5) (pow 2 10) (math-max 3 9))
+; Output: (list 1.4142135623730951 2 3 1024 9)

@@ -1,0 +1,6 @@
+; def names a global; set changes it, from anywhere, even inside a function
+; map calls.
+(def total 0)
+(map (fn (x) (set total (+ total x))) (range 5))
+total
+; Output: 10

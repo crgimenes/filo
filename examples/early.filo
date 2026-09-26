@@ -1,0 +1,7 @@
+; return leaves a function early, with a value.
+(def sign (fn (x)
+  (if (< x 0) (return "negative"))
+  (if (= x 0) (return "zero"))
+  "positive"))
+(list (sign -3) (sign 0) (sign 8))
+; Output: (list "negative" "zero" "positive")

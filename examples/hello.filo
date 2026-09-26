@@ -1,0 +1,3 @@
+; The smallest program: its value is what it says.
+"hello world"
+; Output: hello world

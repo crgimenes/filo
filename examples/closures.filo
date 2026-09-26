@@ -1,0 +1,6 @@
+; A function made inside another keeps what it saw when it was made:
+; adder makes functions that add, each its own n.
+(def adder (fn (n) (fn (x) (+ x n))))
+(def add10 (adder 10))
+(list (add10 1) ((adder 100) 1))
+; Output: (list 11 101)

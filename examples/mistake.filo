@@ -1,0 +1,5 @@
+; A mistake on the third line: a string where double wants a number. The
+; error says where it happened, inside double, and the calls it came through.
+(def double (fn (x) (* x 2)))
+(double "twenty-one")
+; Error: 3:21: in let: in function call: in builtin "*": expected number, got string
