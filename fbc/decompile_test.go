@@ -105,7 +105,7 @@ var shapes = []string{
 	`(let ((a 1)) (let ((b 2)) (+ a b)))`,
 	`(let ((a (let ((c 5)) c))) (let ((b 1)) (+ a b)))`,
 	`(let ((a (let ((c 5)) c)) (b 1)) (+ a b))`,
-	`(letv (a b) (tuple 1 2) (+ a b))`,
+	`(letv (a b) (tuple 1 2) (+ a b))`, `(letv () (tuple) 1)`, `(let ((a (letv () (tuple) 1))) a)`,
 	`(def g (fn (n) (let ((m 2)) (fn (k) (+ n m k))))) ((g 1) 2)`,
 	`(def h (fn (n) (fn () (set n (+ n 1)) n)))`,
 	`(def c 0) (set c (+ c 1)) c`,
@@ -137,4 +137,22 @@ func TestDecompileShapes(t *testing.T) {
 func TestDecompileEntries(t *testing.T) {
 	roundTrip(t, "three entries", build(t, []string{"one", "two", "three"},
 		[]string{`(def k 5) (def f (fn (x) (+ x k)))`, `(f 1)`, `(list k "k" (f k))`}))
+}
+
+// A unit is untrusted bytes: whatever reads, decompiles or says why not,
+// and never panics.
+func FuzzDecompileDoesNotPanic(f *testing.F) {
+	for _, name := range []string{"prog.fbc", "fib.fbc", "upper.fbc", "stripped.fbc"} {
+		data, err := os.ReadFile("../testdata/bytecode/" + name)
+		if err == nil {
+			f.Add(data)
+		}
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		u, err := fbc.Read(data)
+		if err != nil {
+			return
+		}
+		_, _ = fbc.Decompile(u)
+	})
 }

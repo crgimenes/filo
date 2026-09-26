@@ -410,32 +410,58 @@ func (d *decompiler) region(st *fnState, from, to int) ([]entry, error) {
 	return r.stack, nil
 }
 
-// leaf is the form an instruction that pushes one thing pushes.
-func (d *decompiler) leaf(st *fnState, in Insn, x int) (*node, bool) {
+// leaf is the form an instruction that pushes one thing pushes; an
+// operand past its table is an error, a unit being untrusted bytes.
+func (d *decompiler) leaf(st *fnState, in Insn, x int) (*node, bool, error) {
 	switch in.Op {
 	case OpPushK:
-		return d.konst(x), true
+		if x >= len(d.u.Consts) {
+			return nil, true, fmt.Errorf("a constant past the table")
+		}
+		return d.konst(x), true, nil
 	case OpPushG:
-		return atom(d.u.Globals[x]), true
+		if x >= len(d.u.Globals) {
+			return nil, true, fmt.Errorf("a global past the table")
+		}
+		return atom(d.u.Globals[x]), true, nil
 	case OpPushL:
-		return atom(d.name(st.fn, x)), true
+		n, err := d.local(st.fn, x)
+		return atom(n), true, err
 	case OpPushUp:
-		return atom(d.name(d.ancestor(st.fn, x), operand2(in))), true
+		n, err := d.local(d.ancestor(st.fn, x), operand2(in))
+		return atom(n), true, err
 	case OpPushB:
-		return atom(d.u.Imports[x]), true
+		if x >= len(d.u.Imports) {
+			return nil, true, fmt.Errorf("an import past the table")
+		}
+		return atom(d.u.Imports[x]), true, nil
 	}
-	return nil, false
+	return nil, false, nil
+}
+
+// local is name, checked: slot s of function fn, within its frame.
+func (d *decompiler) local(fn, s int) (string, error) {
+	if fn < 0 || fn >= len(d.u.Fns) || s >= d.u.Fns[fn].Slots {
+		return "", fmt.Errorf("a local out of reach")
+	}
+	return d.name(fn, s), nil
 }
 
 // insn reads the instruction at pc; where the next one starts.
 func (d *decompiler) insn(st *fnState, r *stackReader, in Insn, pc int) (int, error) {
 	x, next := operand(in), pc+in.Len
-	if n, ok := d.leaf(st, in, x); ok {
+	if n, ok, err := d.leaf(st, in, x); ok {
+		if err != nil {
+			return next, err
+		}
 		r.push(n)
 		return next, nil
 	}
 	switch in.Op {
 	case OpClosure:
+		if x <= st.fn || x >= len(d.u.Fns) {
+			return next, fmt.Errorf("a closure of a function that is not a later one")
+		}
 		forms, err := d.function(x)
 		if err != nil {
 			return next, err
@@ -444,6 +470,9 @@ func (d *decompiler) insn(st *fnState, r *stackReader, in Insn, pc int) (int, er
 	case OpTrap:
 		return next, d.trap(r, x)
 	case OpStoreG:
+		if x >= len(d.u.Globals) {
+			return next, fmt.Errorf("a global past the table")
+		}
 		kw := "set"
 		if d.parent[st.fn] < 0 {
 			kw = "def"
@@ -452,7 +481,10 @@ func (d *decompiler) insn(st *fnState, r *stackReader, in Insn, pc int) (int, er
 	case OpStoreL:
 		return d.storeLocal(st, r, x, next)
 	case OpStoreUp:
-		name := d.name(d.ancestor(st.fn, x), operand2(in))
+		name, err := d.local(d.ancestor(st.fn, x), operand2(in))
+		if err != nil {
+			return next, err
+		}
 		return next, r.combine(1, func(ns []*node) *node { return list("set", atom(name), ns[0]) }, nil)
 	case OpPop:
 		if len(r.stack) < x {
@@ -462,6 +494,9 @@ func (d *decompiler) insn(st *fnState, r *stackReader, in Insn, pc int) (int, er
 			r.drop()
 		}
 	case OpCallB:
+		if operand2(in) >= len(d.u.Imports) {
+			return next, fmt.Errorf("an import past the table")
+		}
 		name := d.u.Imports[operand2(in)]
 		return next, r.combine(x, func(ns []*node) *node { return list(name, ns...) },
 			func(ns []*node) bool { return folds(name, ns) })
@@ -503,6 +538,9 @@ func (d *decompiler) call(ns []*node) *node {
 // storeLocal is a STORE_L: a let binding when it is the slot's first store
 // and a POP follows, else a set.
 func (d *decompiler) storeLocal(st *fnState, r *stackReader, x, next int) (int, error) {
+	if _, err := d.local(st.fn, x); err != nil {
+		return next, err
+	}
 	after := d.u.Insn(next)
 	if st.declared[x] || x < d.u.Fns[st.fn].Params || after.Op != OpPop || after.Operands != "1" || len(r.stack) == 0 {
 		return next, r.combine(1, func(ns []*node) *node { return list("set", atom(d.name(st.fn, x)), ns[0]) }, nil)
@@ -513,7 +551,7 @@ func (d *decompiler) storeLocal(st *fnState, r *stackReader, x, next int) (int, 
 	// value has higher ones: it stays inside
 	keep := len(e.pre)
 	for i, p := range e.pre {
-		if p.kind == bind && p.slot > x || p.kind == unpack && p.slots[0] > x {
+		if p.kind == bind && p.slot > x || p.kind == unpack && len(p.slots) > 0 && p.slots[0] > x {
 			keep = i
 			break
 		}
@@ -544,6 +582,9 @@ func (d *decompiler) unpack(st *fnState, r *stackReader, n, at int) (int, error)
 			return at, fmt.Errorf("UNPACK %d not followed by its stores", n)
 		}
 		slots[i] = operand(store)
+		if _, err := d.local(st.fn, slots[i]); err != nil {
+			return at, err
+		}
 		st.declared[slots[i]] = true
 		at += store.Len + pop.Len
 	}
@@ -561,8 +602,15 @@ func (d *decompiler) unpack(st *fnState, r *stackReader, n, at int) (int, error)
 // and or an or at JMP 2 or 3, the check of the last operand at JMP 4.
 func (d *decompiler) jump(st *fnState, r *stackReader, pc, next int) (int, error) {
 	cond, target := d.jmp(pc)
+	f := d.u.Fns[st.fn]
+	if target < next || target > f.Off+f.Len {
+		return next, fmt.Errorf("a jump out of its function or backward")
+	}
 	switch cond {
 	case 1:
+		if target < 3 {
+			return next, fmt.Errorf("an if with no jump over its else")
+		}
 		back := d.u.Insn(target - 3)
 		if back.Op != OpJmp {
 			return next, fmt.Errorf("an if with no jump over its else")
@@ -570,6 +618,9 @@ func (d *decompiler) jump(st *fnState, r *stackReader, pc, next int) (int, error
 		always, end := d.jmp(target - 3)
 		if always != 0 {
 			return next, fmt.Errorf("an if whose then ends in JMP %d", always)
+		}
+		if end < target || end > f.Off+f.Len {
+			return next, fmt.Errorf("an if whose end is out of its function")
 		}
 		then, err := d.one(st, next, target-3)
 		if err != nil {

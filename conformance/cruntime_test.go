@@ -322,6 +322,16 @@ func sameDecompiled(dir string, no int) string {
 		if err != nil {
 			return fmt.Sprintf("decompile%s: %v", suffix, err)
 		}
+		// the C runtime's decompiler (fbc_decompile.c) wrote the same text
+		if cText, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d%s.dec", no, suffix))); err == nil { // #nosec G304 -- a file of the directory the test was given
+			var goText strings.Builder
+			for _, src := range srcs {
+				goText.WriteString("; " + src.Name + "\n" + src.Text)
+			}
+			if goText.String() != string(cText) {
+				return fmt.Sprintf("decompile%s: the Go text is not the C one\nGo:\n%sC:\n%s", suffix, goText.String(), cText)
+			}
+		}
 		e := filo.NewEngine()
 		for p := range strings.FieldsSeq(string(packs)) {
 			switch p {

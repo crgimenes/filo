@@ -53,3 +53,5 @@ jobs:
         run: go test -run '^$' -fuzz '^FuzzRunScriptDoesNotPanic$' -fuzztime 30s .
       - name: Fuzz marshal round-trip
         run: go test -run '^$' -fuzz '^FuzzMarshalUnmarshalString$' -fuzztime 30s .
+      - name: Fuzz decompile
+        run: go test -run '^$' -fuzz '^FuzzDecompileDoesNotPanic$' -fuzztime 30s ./fbc/
