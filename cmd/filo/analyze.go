@@ -48,10 +48,11 @@ func parts(path string, data []byte) ([]part, int, error) {
 func cmdCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("filo check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
+	fs.Usage = func() {}
 	vm := fs.String("vm", "", "a profile of the VM: the names it gives, one a line")
 	err := fs.Parse(args)
 	if err != nil || fs.NArg() > 1 {
-		_, _ = io.WriteString(stderr, usage)
+		_, _ = io.WriteString(stderr, help("check"))
 		return 2
 	}
 	var offers map[string]bool
@@ -134,7 +135,7 @@ func lacking(data []byte, offers map[string]bool) ([]string, int, int, error) {
 // cmdSize says where a file's bytes go: each unit's header and sections.
 func cmdSize(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 1 {
-		_, _ = io.WriteString(stderr, usage)
+		_, _ = io.WriteString(stderr, help("size"))
 		return 2
 	}
 	path := "-"

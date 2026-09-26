@@ -32,6 +32,7 @@ type session struct {
 	cursor  int            // the source line the arrows move, from 1; it follows the run
 	breaks  map[string]map[int]bool
 	globals map[string]filo.Value // what the run is given, every time it starts again
+	last    filo.StepState        // the run before its last step: where it ended
 }
 
 // newSession loads a unit (a .fbc, or a member of a .fbb) for its entry:
@@ -74,7 +75,16 @@ func newSession(data []byte, member, entry, srcDir string, globals map[string]fi
 			s.sources[file] = strings.Split(string(text), "\n")
 		}
 	}
-	return s, s.restart()
+	err = s.restart()
+	if err != nil {
+		return nil, err
+	}
+	// it runs anyway, as far as it can: that is what a debugger is for
+	lack := u.Missing(globals)
+	if len(lack) > 0 {
+		s.msg = fmt.Sprintf("missing (%d): %s; -g NAME=EXPR gives one", len(lack), strings.Join(lack, " "))
+	}
+	return s, nil
 }
 
 // engine has what the C runtime's filo command has: the core and the
@@ -181,22 +191,38 @@ func (s *session) restart() error {
 	if s.run != nil {
 		s.run.Close()
 	}
-	s.run, s.steps, s.msg = run, 0, ""
+	s.run, s.steps, s.msg, s.last = run, 0, "", filo.StepState{}
 	s.follow()
 	return nil
 }
 
+// shown is the state the screen shows: the run's, or once it ended, where
+// it was when it did, so the source stays and an error shows its place.
+func (s *session) shown() filo.StepState {
+	st := s.run.State()
+	if len(st.Frames) > 0 || len(s.last.Frames) == 0 {
+		return st
+	}
+	st = s.last
+	_, _, err := s.run.Result()
+	pe, ok := errors.AsType[*filo.PositionError](err)
+	if ok && pe.Line > 0 {
+		st.Line, st.Col = pe.Line, pe.Col
+	}
+	return st
+}
+
 // follow brings the cursor to the line the run is at.
 func (s *session) follow() {
-	st := s.run.State()
+	st := s.shown()
 	if st.Line > 0 {
 		s.cursor = st.Line
 	}
 }
 
-// file is the source file of the function running, "" once the run ended.
+// file is the source file of the function shown, "" when there is none.
 func (s *session) file() string {
-	st := s.run.State()
+	st := s.shown()
 	if len(st.Frames) == 0 {
 		return ""
 	}
@@ -240,6 +266,7 @@ func (s *session) step() bool {
 	if s.run.Done() {
 		return false
 	}
+	s.last = s.run.State()
 	_ = s.run.Step(context.Background())
 	s.steps++
 	if s.run.Done() {
@@ -250,14 +277,19 @@ func (s *session) step() bool {
 
 func (s *session) ending() string {
 	v, _, err := s.run.Result()
-	if err != nil {
+	if err == nil {
+		return "returned " + v.String()
+	}
+	pe, ok := errors.AsType[*filo.PositionError](err)
+	if !ok || pe.Line == 0 {
 		return "error: " + err.Error()
 	}
-	return "returned " + v.String()
+	return fmt.Sprintf("error at %s %d:%d: %s", s.file(), pe.Line, pe.Col, err)
 }
 
 // move runs a movement, remembering where it began so back can undo it.
 func (s *session) move(how func()) {
+	s.msg = ""
 	if s.run.Done() {
 		s.msg = "the run has ended: r starts again, b goes back"
 		return

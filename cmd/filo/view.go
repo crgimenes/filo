@@ -24,9 +24,11 @@ const (
 	tabWidth  = 8
 )
 
+// the footer's keys, the ones a narrow screen drops last first: quit
+// among them, as the edt keeps its ^Q
 var hints = []struct{ key, rest string }{
-	{"s", " step"}, {"n", " next"}, {"c", " continue"}, {"space", " break"},
-	{"b", " back"}, {"i", " instruction"}, {"r", " restart"}, {"q", " quit"},
+	{"s", " step"}, {"n", " next"}, {"c", " continue"}, {"q", " quit"},
+	{"space", " break"}, {"b", " back"}, {"i", " instruction"}, {"r", " restart"},
 }
 
 // draw paints the session: the source on the left, the function's
@@ -38,7 +40,7 @@ func draw(s *session, scr *screen) {
 		scr.print(0, 0, "filo debug: the terminal is too small")
 		return
 	}
-	st := s.run.State()
+	st := s.shown()
 	stackRows := min(max(scr.h/4, 3), 10)
 	top := scr.h - 1 - stackRows
 	left := scr.w / 2
@@ -63,7 +65,9 @@ func drawSource(s *session, scr *screen, fn, line, col, rows, width int) {
 	text, ok := s.sources[file]
 	if !ok {
 		if file != "" {
-			scr.print(2, 1, "(no source: "+file+" is not beside the unit; -src DIR says where)")
+			for i, l := range wrap("(no source: "+file+" is not beside the unit; -src DIR says where)", width-2) {
+				scr.print(2+i, 1, l)
+			}
 		}
 		return
 	}
@@ -77,13 +81,19 @@ func drawSource(s *session, scr *screen, fn, line, col, rows, width int) {
 			shift = at - room/2
 		}
 	}
+	inString := false // a string open at the start of the line, as the edt carries it
+	for n := 1; n < first && n <= len(text); n++ {
+		_, inString = hlClasses(text[n-1], inString)
+	}
 	for row := 1; row < rows; row++ {
 		n := first + row - 1
 		if n > len(text) {
 			break
 		}
 		here := n == line
+		bg := int16(colorDefault)
 		if here {
+			bg = colBar
 			scr.color(colorDefault, colBar)
 			scr.fill(row, 0, 1, width, ' ')
 			scr.color(colKeys, colBar)
@@ -93,13 +103,11 @@ func drawSource(s *session, scr *screen, fn, line, col, rows, width int) {
 		}
 		scr.print(row, 0, fmt.Sprintf("%5d ", n))
 		scr.style(false, false)
-		shown := string(dropRunes(expandTabs(text[n-1]), shift))
-		if here {
-			scr.color(colorDefault, colBar)
-		} else {
-			scr.color(colorDefault, colorDefault)
-		}
-		scr.print(row, 6, cutTo(shown, width-7))
+		expanded := expandTabs(text[n-1])
+		var cls []byte
+		cls, inString = hlClasses(expanded, inString)
+		drawColoured(scr, row, 6, expanded, cls, shift, width-7, bg)
+		shown := string(dropRunes(expanded, shift))
 		if here && col > 0 {
 			at := 6 + len([]rune(expandTabs(prefixBytes(text[n-1], col-1)))) - shift
 			if at < width {
@@ -113,6 +121,36 @@ func drawSource(s *session, scr *screen, fn, line, col, rows, width int) {
 			}
 		}
 	}
+}
+
+// drawColoured prints text from its rune skip on, at most cols runes, each
+// run of one class in its colour over bg.
+func drawColoured(scr *screen, row, col int, text string, cls []byte, skip, cols int, bg int16) {
+	var run strings.Builder
+	cur := byte(hlPlain)
+	at, shown, k := col, 0, 0
+	flush := func() {
+		scr.color(hlColor[cur], bg)
+		at += scr.print(row, at, run.String())
+		run.Reset()
+	}
+	for i, r := range text {
+		if k < skip {
+			k++
+			continue
+		}
+		if shown == cols {
+			break
+		}
+		if cls[i] != cur && run.Len() > 0 {
+			flush()
+		}
+		cur = cls[i]
+		run.WriteRune(r)
+		shown++
+		k++
+	}
+	flush()
 }
 
 // drawMarks puts the breakpoints (red dots) and the cursor (an orange
@@ -292,6 +330,23 @@ func dropRunes(text string, n int) []rune {
 		return nil
 	}
 	return rs[max(n, 0):]
+}
+
+// wrap breaks text into lines of at most cols runes, at spaces.
+func wrap(text string, cols int) []string {
+	var lines []string
+	line := ""
+	for w := range strings.FieldsSeq(text) {
+		if line != "" && len([]rune(line))+1+len([]rune(w)) > cols {
+			lines = append(lines, line)
+			line = ""
+		}
+		if line != "" {
+			line += " "
+		}
+		line += w
+	}
+	return append(lines, line)
 }
 
 func cutTo(text string, cols int) string {

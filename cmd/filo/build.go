@@ -21,7 +21,7 @@ func cmdBuild(args []string, stderr io.Writer) int {
 		args = args[1:]
 	}
 	if len(args) < 3 || args[0] != "-o" {
-		_, _ = io.WriteString(stderr, usage)
+		_, _ = io.WriteString(stderr, help("build"))
 		return 2
 	}
 	unit, err := compileFiles(args[2:])
@@ -41,7 +41,7 @@ func cmdBuild(args []string, stderr io.Writer) int {
 // each a member named by its file ("lib/hello.fbc" is the member "hello").
 func cmdBundle(args []string, stderr io.Writer) int {
 	if len(args) < 3 || args[0] != "-o" {
-		_, _ = io.WriteString(stderr, usage)
+		_, _ = io.WriteString(stderr, help("bundle"))
 		return 2
 	}
 	var members []filo.BundleMember

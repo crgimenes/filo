@@ -61,6 +61,20 @@ func TestUsageAndRefusals(t *testing.T) {
 	}
 }
 
+// Asking a command for help, anywhere in its arguments, is using it: its own
+// help, on standard output, and exit 0.
+func TestEachCommandsHelp(t *testing.T) {
+	for _, c := range commands {
+		for _, args := range [][]string{{c.name, "-h"}, {c.name, "x", "--help"}} {
+			var out, errs bytes.Buffer
+			code := run(args, strings.NewReader(""), &out, &errs)
+			if code != 0 || errs.Len() != 0 || !strings.HasPrefix(out.String(), "usage: "+c.synopsis+"\n") {
+				t.Errorf("%v: exit %d, stdout %.60q, stderr %q", args, code, out.String(), errs.String())
+			}
+		}
+	}
+}
+
 // build and bundle write the C runtime's bytes: the units and the bundle in
 // testdata/bytecode are its filo's.
 func TestBuildAndBundle(t *testing.T) {

@@ -87,9 +87,17 @@ func TestStepNextAndBack(t *testing.T) {
 
 func TestContinueToTheEnd(t *testing.T) {
 	s := testSession(t, "main")
+	if s.msg != "missing (1): base; -g NAME=EXPR gives one" {
+		t.Fatalf("at the start: %q", s.msg) // the run strict loading refuses, said up front
+	}
 	s.finish()
-	if !s.run.Done() || s.msg != "error: undefined global: base" {
+	if !s.run.Done() || s.msg != "error at main.filo 3:26: undefined global: base" {
 		t.Fatalf("continue: %q", s.msg) // prog's main reads base, which no one gave
+	}
+	// the screen stays where the run ended, on the error
+	st := s.shown()
+	if len(st.Frames) == 0 || st.Line != 3 || st.Col != 26 || s.file() != "main.filo" {
+		t.Fatalf("shown at the end: %+v in %q", st, s.file())
 	}
 }
 

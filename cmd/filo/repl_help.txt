@@ -16,9 +16,12 @@ This REPL allows you to interactively evaluate Filo expressions.
 
 Filo uses S-expressions (prefix notation):
 
-  (+ 1 2 3)           → 6
-  (* 2 (+ 3 4))       → 14
-  (if (> 10 5) "yes" "no") → "yes"
+  (+ 1 2 3)           => 6
+  (* 2 (+ 3 4))       => 14
+  (if (> 10 5) "yes" "no") => yes
+
+A string result is written as its text, without quotes, as filo run
+writes it; inside a list it keeps them: (list "a") => (list "a").
 
 ## Types
 
@@ -42,12 +45,15 @@ Filo uses S-expressions (prefix notation):
   Lists:       list head tail nth length map fold
   Types:       type-of is-empty is-nil
 
-## Extension Packages
+## Packages
 
-Use --filo-package to load:
+Always loaded:
 
-  math   sqrt sin cos log abs floor ceil round pi e
-  str    str-upper str-lower str-trim str-split str-join
+  math     sqrt sin cos log abs floor ceil round (pi) (e)
+  strings  str-upper str-lower str-trim str-split str-join
+
+Added with -filo-package (a comma-separated list, e.g. rand,json):
+
   rand   rand-int rand-float uuid-v4
   print  print println printf (supports %T for Filo types)
   json   json-marshal json-unmarshal json-null

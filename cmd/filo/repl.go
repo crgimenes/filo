@@ -59,11 +59,11 @@ func cmdRepl(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	err := fs.Parse(args)
 	if errors.Is(err, flag.ErrHelp) {
-		_, _ = io.WriteString(stdout, usage)
+		_, _ = io.WriteString(stdout, help("repl"))
 		return 0
 	}
 	if err != nil || fs.NArg() > 0 {
-		_, _ = io.WriteString(stderr, usage)
+		_, _ = io.WriteString(stderr, help("repl"))
 		return 2
 	}
 
@@ -408,31 +408,16 @@ func showHelp(stdinFd int, oldState *term.State) error {
 		pager = "less"
 	}
 
-	// Create temp file with help content
-	tmpFile, err := os.CreateTemp("", "filo-help-*.txt")
-	if err != nil {
-		return fmt.Errorf("create help file: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-	defer func() { _ = os.Remove(tmpPath) }()
-
-	_, err = tmpFile.WriteString(helpContent)
-	if err != nil {
-		return fmt.Errorf("write help file: %w", err)
-	}
-	err = tmpFile.Close()
-	if err != nil {
-		return fmt.Errorf("close help file: %w", err)
-	}
-
-	err = term.Restore(stdinFd, oldState)
+	err := term.Restore(stdinFd, oldState)
 	if err != nil {
 		return fmt.Errorf("restore terminal for pager: %w", err)
 	}
 
+	// on its standard input, so the pager has no file name to show; it reads
+	// the keys from the terminal
 	// #nosec G204,G702 -- PAGER intentionally selects the executable without invoking a shell.
-	cmd := exec.Command(pager, tmpPath)
-	cmd.Stdin = os.Stdin
+	cmd := exec.Command(pager)
+	cmd.Stdin = strings.NewReader(helpContent)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	runErr := cmd.Run()

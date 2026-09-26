@@ -30,12 +30,12 @@ func cmdRun(args []string, stdout, stderr io.Writer) int {
 			trace = true
 		default:
 			_, _ = fmt.Fprintf(stderr, "filo: unknown flag: %s\n", args[i])
-			_, _ = io.WriteString(stderr, usage)
+			_, _ = io.WriteString(stderr, help("run"))
 			return 2
 		}
 	}
 	if i >= len(args) {
-		_, _ = io.WriteString(stderr, usage)
+		_, _ = io.WriteString(stderr, help("run"))
 		return 2
 	}
 	path, rest := args[i], args[i+1:]
@@ -279,7 +279,7 @@ func operandsText(vs []filo.Value) string {
 // or the IR, each line with where it came from.
 func cmdShow(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 2 {
-		_, _ = io.WriteString(stderr, usage)
+		_, _ = io.WriteString(stderr, help("show"))
 		return 2
 	}
 	stage, path := args[0], args[1]
