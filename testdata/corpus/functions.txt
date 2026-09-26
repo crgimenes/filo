@@ -19,46 +19,55 @@
 ((fn (x) x) 1 2)
 --- error
 --- at 1:1
+--- message function expects 1 arguments, got 2
 
 === arity mismatch too few
 ((fn (x y) x) 1)
 --- error
 --- at 1:1
+--- message function expects 2 arguments, got 1
 
 === fn needs parameters and body
 (fn)
 --- error
 --- at 1:1
+--- message fn expects parameters and body
 
 === fn needs a body
 (fn (x))
 --- error
 --- at 1:1
+--- message fn expects parameters and body
 
 === fn parameters must be symbols
 ((fn (1) 1) 2)
 --- error
 --- at 1:2
+--- message fn params must be symbols
 
 === calling a number
 (1 2)
 --- error
 --- at 1:1
+--- message attempt to call non-function (got number)
 
 === calling a string
 ("a")
 --- error
 --- at 1:1
+--- message attempt to call non-function (got string)
 
 === calling the result of a call
 ((+ 1 2) 3)
 --- error
 --- at 1:1
+--- message attempt to call non-function (got number)
 
 === empty list expression
 ()
 --- error
 --- at 1:1
+--- message empty list expression
 
 === builtin is a function value
 (type-of +)
@@ -99,6 +108,7 @@
 ((if #t + -) 1 "a")
 --- error
 --- at 1:1
+--- message expected number, got string
 
 === builtin as a value keeps each call's arguments apart
 (map list (list 1 2))
@@ -147,8 +157,10 @@
 ((fn (x) x) (/ 1 0))
 --- error
 --- at 1:13
+--- message division by zero
 
 === error inside the body propagates
 ((fn (x) (/ x 0)) 1)
 --- error
 --- at 1:10
+--- message division by zero

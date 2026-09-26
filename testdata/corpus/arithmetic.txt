@@ -44,6 +44,7 @@
 (-)
 --- error
 --- at 1:1
+--- message - expects at least 1 argument
 
 === mul
 (* 2 3)
@@ -79,21 +80,25 @@
 (/ 1 0)
 --- error
 --- at 1:1
+--- message division by zero
 
 === div zero by zero
 (/ 0 0)
 --- error
 --- at 1:1
+--- message division by zero
 
 === div by float zero
 (/ 1 0.0)
 --- error
 --- at 1:1
+--- message division by zero
 
 === div needs an argument
 (/)
 --- error
 --- at 1:1
+--- message / expects at least 1 argument
 
 === mod
 (% 10 3)
@@ -129,6 +134,7 @@
 (% 1 0)
 --- error
 --- at 1:1
+--- message modulo by zero
 
 # The operands below are built from powers of two, which every runtime and
 # host computes exactly: a literal like 1e300 is outside what a host without
@@ -191,16 +197,19 @@ needs host-pow
 (pow 2)
 --- error
 --- at 1:1
+--- message pow expects 2 arguments
 
 === type error
 (+ 1 "a")
 --- error
 --- at 1:1
+--- message expected number, got string
 
 === type error nested
 (* 2 (+ 1 #t))
 --- error
 --- at 1:6
+--- message expected number, got bool
 
 === nested arithmetic
 (+ (* 2 3) (- 10 4) (/ 8 2))
@@ -226,6 +235,7 @@ needs host-pow
 (/ 0)
 --- error
 --- at 1:1
+--- message division by zero
 
 # pow with an integral exponent is the double nearest the exact power, the
 # same on every machine; testdata/pow.txt holds three thousand more.

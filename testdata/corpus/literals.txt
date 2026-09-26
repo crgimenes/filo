@@ -123,36 +123,43 @@ given field:for = 3
 #true
 --- error
 --- at 1:1
+--- message invalid boolean literal
 
 === bool literal needs a boundary
 #t#f
 --- error
 --- at 1:1
+--- message invalid boolean literal
 
 === unsupported escape
 "\q"
 --- error
 --- at 1:3
+--- message unsupported escape: \q
 
 === unterminated string
 "abc
 --- error
 --- at 1:1
+--- message unterminated string literal
 
 === unterminated list
 (list 1
 --- error
 --- at 1:1
+--- message unterminated list
 
 === stray close paren
 )
 --- error
 --- at 1:1
+--- message expected token
 
 === only a comment is an empty script
 ; nothing here
 --- error
 --- at 1:1
+--- message empty script
 
 === plus sign literal
 +5
@@ -178,46 +185,55 @@ given field:for = 3
 inf
 --- error
 --- at 1:1
+--- message undefined global: inf
 
 === negative inf is a symbol
 -inf
 --- error
 --- at 1:1
+--- message undefined global: -inf
 
 === nan is a symbol
 nan
 --- error
 --- at 1:1
+--- message undefined global: nan
 
 === Infinity is a symbol
 Infinity
 --- error
 --- at 1:1
+--- message undefined global: Infinity
 
 === underscore is not a digit separator
 1_000
 --- error
 --- at 1:1
+--- message undefined global: 1_000
 
 === hex literal is a symbol
 0x10
 --- error
 --- at 1:1
+--- message undefined global: 0x10
 
 === exponent without digits is a symbol
 1e
 --- error
 --- at 1:1
+--- message undefined global: 1e
 
 === dot alone is a symbol
 .
 --- error
 --- at 1:1
+--- message undefined global: .
 
 === trailing garbage makes a symbol
 12abc
 --- error
 --- at 1:1
+--- message undefined global: 12abc
 
 === a literal of a hundred digits is a number
 888000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

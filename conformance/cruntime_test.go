@@ -164,6 +164,9 @@ func TestCUnits(t *testing.T) {
 			why = sameBuild(dir, no)
 		}
 		if why == "" {
+			why = sameShow(dir, no)
+		}
+		if why == "" {
 			passed++
 			continue
 		}
@@ -306,6 +309,54 @@ func sameBuild(dir string, no int) string {
 	}
 }
 
+// sameShow is "" when the Go engine shows the three stages of a unit's
+// source (Engine.Show) as the C runtime's filo_show did (NNNNN.show, written
+// by corpus_runner --write-units): "== tree", "== folded", "== ir", each
+// stage's lines or "error".
+func sameShow(dir string, no int) string {
+	want, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d.show", no))) // #nosec G304 -- a file of the directory the test was given
+	if err != nil {
+		return ""
+	}
+	src, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d.filo", no))) // #nosec G304 -- a source of the directory the test was given
+	if err != nil {
+		return err.Error()
+	}
+	packs, _ := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d.packs", no))) // #nosec G304 -- a file of the directory the test was given
+	e := filo.NewEngine()
+	for _, p := range strings.Fields(string(packs)) {
+		switch p {
+		case "math":
+			filomath.RegisterBuiltins(e)
+		case "strings":
+			filostrings.RegisterBuiltins(e)
+		}
+	}
+	var b strings.Builder
+	for _, stage := range []string{"tree", "folded", "ir"} {
+		b.WriteString("== " + stage + "\n")
+		lines, err := e.Show(string(src), stage)
+		if err != nil {
+			b.WriteString("error\n")
+			continue
+		}
+		for _, l := range lines {
+			b.WriteString(l + "\n")
+		}
+	}
+	if b.String() != string(want) {
+		got := strings.Split(b.String(), "\n")
+		kept := strings.Split(string(want), "\n")
+		for i := 0; i < len(got) && i < len(kept); i++ {
+			if got[i] != kept[i] {
+				return fmt.Sprintf("show, line %d: %q, the C runtime %q", i+1, got[i], kept[i])
+			}
+		}
+		return fmt.Sprintf("show: %d lines, the C runtime %d", len(got), len(kept))
+	}
+	return ""
+}
+
 func firstByte(a, b []byte) int {
 	for i := 0; i < len(a) && i < len(b); i++ {
 		if a[i] != b[i] {
@@ -426,28 +477,7 @@ func checkExpect(l string, got filo.Value, after map[string]filo.Value, err erro
 func repr(v filo.Value) string {
 	switch v.Kind {
 	case filo.KString:
-		var b strings.Builder
-		b.WriteByte('"')
-		for i := 0; i < len(v.Str); i++ {
-			c := v.Str[i]
-			switch {
-			case c == '"' || c == '\\':
-				b.WriteByte('\\')
-				b.WriteByte(c)
-			case c == '\n':
-				b.WriteString(`\n`)
-			case c == '\t':
-				b.WriteString(`\t`)
-			case c == '\r':
-				b.WriteString(`\r`)
-			case c < 0x20 || c == 0x7f:
-				fmt.Fprintf(&b, `\x%02x`, c)
-			default:
-				b.WriteByte(c)
-			}
-		}
-		b.WriteByte('"')
-		return b.String()
+		return v.String() // the one writer both engines share
 	case filo.KList, filo.KTuple:
 		head, items := "(list", v.List
 		if v.Kind == filo.KTuple {

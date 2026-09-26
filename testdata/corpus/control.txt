@@ -24,21 +24,25 @@
 (if 1 2 3)
 --- error
 --- at 1:1
+--- message expected bool, got number
 
 === if condition list is not a bool
 (if (list) 1 2)
 --- error
 --- at 1:1
+--- message expected bool, got list
 
 === if too few arguments
 (if #t)
 --- error
 --- at 1:1
+--- message if expects 2 or 3 arguments (condition then [else])
 
 === if too many arguments
 (if #t 1 2 3)
 --- error
 --- at 1:1
+--- message if expects 2 or 3 arguments (condition then [else])
 
 === if only evaluates the taken branch
 (if #t 1 (/ 1 0))
@@ -89,16 +93,19 @@
 (cond (5 1))
 --- error
 --- at 1:1
+--- message expected bool, got number
 
 === cond clause needs a body
 (cond (else))
 --- error
 --- at 1:1
+--- message cond clause must be a list of a test and a body
 
 === cond malformed clause
 (cond 5)
 --- error
 --- at 1:1
+--- message cond clause must be a list of a test and a body
 
 === do returns the last
 (do 1 2 3)
@@ -119,6 +126,7 @@
 (do)
 --- error
 --- at 1:1
+--- message do expects at least 1 expression
 
 === exit no value
 (exit)
@@ -218,6 +226,7 @@ a = 1
 (exit 1 2)
 --- error
 --- at 1:1
+--- message exit expects 0 or 1 argument
 
 === return at top level acts like exit
 (return 42)
@@ -276,3 +285,4 @@ a = 1
 (return 1 2)
 --- error
 --- at 1:1
+--- message return expects 0 or 1 argument

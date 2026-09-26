@@ -627,13 +627,15 @@ func formatNumber(n float64) string {
 	return strconv.FormatFloat(n, 'g', -1, 64)
 }
 
-// formatString properly escapes a string for Filo output.
-// Handles: \", \\, \n, \t
+// formatString is s as Filo reads it back: between double quotes, with the
+// escapes the reader knows, and every other byte as it is — invalid UTF-8
+// and control bytes included, since the reader takes them raw and has no
+// escape for them. The C runtime writes a string the same way.
 func formatString(s string) string {
 	var b strings.Builder
 	b.WriteByte('"')
-	for _, r := range s {
-		switch r {
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; c {
 		case '"':
 			b.WriteString(`\"`)
 		case '\\':
@@ -642,8 +644,20 @@ func formatString(s string) string {
 			b.WriteString(`\n`)
 		case '\t':
 			b.WriteString(`\t`)
+		case '\r':
+			b.WriteString(`\r`)
+		case 0:
+			b.WriteString(`\0`)
+		case '\a':
+			b.WriteString(`\a`)
+		case '\b':
+			b.WriteString(`\b`)
+		case '\f':
+			b.WriteString(`\f`)
+		case '\v':
+			b.WriteString(`\v`)
 		default:
-			b.WriteRune(r)
+			b.WriteByte(c)
 		}
 	}
 	b.WriteByte('"')

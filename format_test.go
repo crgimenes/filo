@@ -1,6 +1,8 @@
 package filo
 
 import (
+	"context"
+	"math/rand/v2"
 	"strings"
 	"testing"
 )
@@ -340,5 +342,27 @@ func TestFormatKeepsProgram(t *testing.T) {
 				t.Errorf("program changed by formatting:\n%s\n---\n%s", a, b)
 			}
 		})
+	}
+}
+
+// A string written by Value.String reads back as the same bytes, whatever
+// they are: control bytes, invalid UTF-8 and quotes included.
+func TestStringsReadBackAsWritten(t *testing.T) {
+	r := rand.New(rand.NewPCG(3, 5))
+	e := NewEngine()
+	for range 2000 {
+		b := make([]byte, r.IntN(24))
+		for i := range b {
+			b[i] = byte(r.IntN(256))
+		}
+		written := VString(string(b)).String()
+		p, err := e.Compile(written)
+		if err != nil {
+			t.Fatalf("%q written as %q does not read: %v", b, written, err)
+		}
+		v, _, err := p.Execute(context.Background(), nil, EvalConfig{})
+		if err != nil || v.Kind != KString || v.Str != string(b) {
+			t.Fatalf("%q written as %q read back as %q (%v)", b, written, v.Str, err)
+		}
 	}
 }

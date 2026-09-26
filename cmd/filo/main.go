@@ -1,6 +1,6 @@
 // Command filo is the Filo toolchain on the desktop, the C runtime's filo
-// command in Go: run, build, bundle and dump do and write what the C ones
-// do and write; repl reads and evaluates (filo alone is the REPL); check
+// command in Go: run, show, build, bundle and dump do and write what the C
+// ones do and write; repl reads and evaluates (filo alone is the REPL); check
 // and size look at what a unit asks for and weighs; debug steps an entry
 // point on the terminal.
 package main
@@ -18,6 +18,7 @@ import (
 
 const usage = `usage: filo [repl] [-filo-package LIST] [-step-limit N] [-recursion-limit N] [-timeout S]
        filo run [--vm | --trace | --both] FILE [MEMBER] [ENTRY...]
+       filo show tree|folded|ir FILE
        filo build [--strip] -o OUT FILE...
        filo bundle -o OUT UNIT...
        filo dump [FILE]
@@ -28,7 +29,7 @@ const usage = `usage: filo [repl] [-filo-package LIST] [-step-limit N] [-recursi
 filo alone, or filo repl, is the REPL: on a terminal it evaluates
 expression by expression (.help lists its commands); with standard input a
 pipe it runs what comes as one script and writes its value. The packages
-are math and strings unless -filo-package names others (rand, print, json).
+are math and strings; -filo-package adds others (rand, print, json).
 
 run runs a program and writes its value: a source (FILE is told apart from
 bytecode by the magic) on the tree the compiler lowers; --vm compiles it to
@@ -37,6 +38,10 @@ instruction with the top of its operand stack; --both runs it both ways, a
 line each, with their steps. For a unit, the ENTRY points run in order and
 share their globals (default: main, or the first); for a bundle, MEMBER is
 the unit (default: main, or the first).
+
+show writes one stage of what the compiler makes of a source, each line
+with the line:column it came from: the tree as read, the tree once
+constants folded, or the IR, frames and slots named.
 
 build compiles programs into one unit of bytecode (docs/bytecode.md), each
 an entry named by its file (lib/hello.filo is the entry "hello"): the same bytes
@@ -103,6 +108,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		switch args[0] {
 		case "run":
 			return cmdRun(args[1:], stdout, stderr)
+		case "show":
+			return cmdShow(args[1:], stdout, stderr)
 		case "debug":
 			return debug(args[1:], stderr)
 		case "build":

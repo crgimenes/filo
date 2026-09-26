@@ -14,11 +14,13 @@
 (not 1)
 --- error
 --- at 1:1
+--- message expected bool, got number
 
 === not arity
 (not)
 --- error
 --- at 1:1
+--- message not expects 1 argument
 
 === and true
 (and #t #t)
@@ -49,6 +51,7 @@
 (and 1)
 --- error
 --- at 1:1
+--- message expected bool, got number
 
 === and short-circuits past an error
 (and #f (/ 1 0))
@@ -59,6 +62,7 @@
 (and #t (/ 1 0))
 --- error
 --- at 1:9
+--- message division by zero
 
 === or true
 (or #f #t)
@@ -84,8 +88,10 @@
 (or #f (/ 1 0))
 --- error
 --- at 1:8
+--- message division by zero
 
 === or tail must be a bool
 (or #f 1)
 --- error
 --- at 1:1
+--- message expected bool, got number

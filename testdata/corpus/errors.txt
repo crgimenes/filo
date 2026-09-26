@@ -4,21 +4,25 @@
 (error "boom")
 --- error
 --- at 1:1
+--- message boom
 
 === error needs a string
 (error 1)
 --- error
 --- at 1:1
+--- message error expects a string message: expected string, got number
 
 === error needs a message
 (error)
 --- error
 --- at 1:1
+--- message error expects 1 argument (a message string)
 
 === error takes exactly one
 (error "a" "b")
 --- error
 --- at 1:1
+--- message error expects 1 argument (a message string)
 
 === error inside a branch not taken does not raise
 (if #t 1 (error "no"))
@@ -29,6 +33,7 @@
 (do (def f (fn (x) (if (< x 0) (error "negative") x))) (f -1))
 --- error
 --- at 1:32
+--- message negative
 
 === error not raised on the happy path
 (do (def f (fn (x) (if (< x 0) (error "negative") x))) (f 1))
@@ -39,13 +44,16 @@
 (map (fn (x) (if (> x 2) (error "big") x)) (list 1 2 3))
 --- error
 --- at 1:26
+--- message big
 
 === error stops later side effects
 (do (set a 1) (error "stop") (set a 2))
 --- error
 --- at 1:15
+--- message stop
 
 === unknown builtin is an undefined global
 (no-such-function 1)
 --- error
 --- at 1:2
+--- message undefined global: no-such-function

@@ -273,3 +273,29 @@ func operandsText(vs []filo.Value) string {
 	}
 	return b.String()
 }
+
+// cmdShow writes one stage of what the compiler makes of a source, as the
+// C runtime's filo show: the tree as read, the tree once constants folded,
+// or the IR, each line with where it came from.
+func cmdShow(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 2 {
+		_, _ = io.WriteString(stderr, usage)
+		return 2
+	}
+	stage, path := args[0], args[1]
+	data, err := os.ReadFile(path) // #nosec G304 G703 -- the program the command was given
+	if err != nil {
+		return complain(stderr, fmt.Errorf("cannot open: %s", path))
+	}
+	if len(data) == 0 {
+		return complain(stderr, fmt.Errorf("%s: is empty", path))
+	}
+	lines, err := engine().Show(string(data), stage)
+	if err != nil {
+		return complain(stderr, placed(path, data, err))
+	}
+	for _, l := range lines {
+		_, _ = fmt.Fprintln(stdout, l)
+	}
+	return 0
+}

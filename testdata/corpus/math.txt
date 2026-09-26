@@ -11,6 +11,7 @@ needs host-math
 (sqrt -1)
 --- error
 --- at 1:1
+--- message sqrt of negative number
 
 === abs negative
 (abs -5)
@@ -71,6 +72,7 @@ needs host-math
 (math-min)
 --- error
 --- at 1:1
+--- message math-min expects at least 1 argument
 
 === pi
 (> (pi) 3.14159)

@@ -289,7 +289,7 @@ func defaultBuiltins() map[string]builtinFunc {
 		case KString:
 			n, err := strconv.ParseFloat(strings.TrimSpace(args[0].Str), 64)
 			if err != nil && !errors.Is(err, strconv.ErrRange) { // past the doubles is ±Inf
-				return Value{}, fmt.Errorf("number: cannot parse %q", args[0].Str)
+				return Value{}, fmt.Errorf("number: cannot parse %s", formatString(args[0].Str))
 			}
 			return VNum(n), nil
 		default:

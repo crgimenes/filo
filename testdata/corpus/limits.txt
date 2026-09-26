@@ -6,18 +6,21 @@ limits steps=100
 (let () (def loop (fn (n) (loop n))) (loop 0))
 --- error
 --- at 1:28
+--- message step limit exceeded
 
 === infinite recursion stops on the recursion limit
 limits recursion=5
 (let () (def loop (fn (n) (loop n))) (loop 0))
 --- error
 --- at 1:27
+--- message recursion limit exceeded
 
 === deep recursion fails under a small recursion limit
 limits recursion=5
 (let () (def f (fn (n) (if (= n 0) 0 (f (- n 1))))) (f 50))
 --- error
 --- at 1:38
+--- message recursion limit exceeded
 
 === the same recursion succeeds with the default limits
 (let () (def f (fn (n) (if (= n 0) 0 (f (- n 1))))) (f 50))
@@ -29,6 +32,7 @@ limits steps=50
 (fold (fn (acc x) (+ acc x)) 0 (range 100))
 --- error
 --- at 1:19
+--- message step limit exceeded
 
 === the same loop succeeds with the default limits
 (fold (fn (acc x) (+ acc x)) 0 (range 100))
@@ -45,16 +49,19 @@ limits steps=100000
 (range 1e18)
 --- error
 --- at 1:1
+--- message range expects integer bounds, got 0 and 1e+18
 
 === range with a huge negative start is an error
 (range -1e18 0)
 --- error
 --- at 1:1
+--- message range expects integer bounds, got -1e+18 and 0
 
 === range with bounds past the integers a number holds is an error
 (range -9e18 9e18)
 --- error
 --- at 1:1
+--- message range expects integer bounds, got -9e+18 and 9e+18
 
 # A list or a tuple may hold the same value more than once: a value made in
 # a few steps can be small in memory and far too large to walk. Writing it
@@ -65,18 +72,21 @@ limits steps=100000
   (string v))
 --- error
 --- at 2:3
+--- message value too large: more than 4194304 parts
 
 === a shared value too large to compare is an error
 (let ((v (fold (fn (a x) (tuple a a)) 0 (range 30))))
   (= v v))
 --- error
 --- at 2:3
+--- message value too large: more than 4194304 parts
 
 === a value too deep to compare is an error
 (let ((v (fold (fn (a x) (list a)) 0 (range 600))))
   (= v v))
 --- error
 --- at 2:3
+--- message value too deep: more than 512 levels
 
 === a comparison settled early walks no further
 (let ((v (fold (fn (a x) (tuple a a)) 0 (range 30))))

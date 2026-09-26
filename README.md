@@ -319,7 +319,9 @@ Three small binaries live under `cmd/`; `make tools` builds all of them into
   loaded, `-filo-package` names others (rand, print, json), and
   `-step-limit`, `-recursion-limit` and `-timeout` bound the run.
   `filo run` runs a source, a unit or a bundle (`--vm`, `--trace`,
-  `--both`); `build`, `bundle`, `dump`, `check`, `size` and `debug` are
+  `--both`); `filo show tree|folded|ir` writes a stage of the compiling —
+  the tree as read, once constants fold, the IR — each line with where it
+  came from; `build`, `bundle`, `dump`, `check`, `size` and `debug` are
   under Bytecode below. Install with
   `go install github.com/crgimenes/filo/cmd/filo@latest`.
 

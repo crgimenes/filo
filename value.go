@@ -183,7 +183,7 @@ func (v Value) text() string {
 		}
 		return "#f"
 	case KString:
-		return fmt.Sprintf("%q", v.Str)
+		return formatString(v.Str)
 	case KList:
 		var b strings.Builder
 		b.WriteString("(list")
@@ -233,7 +233,7 @@ func ensureSameKind(values []Value) error {
 	target := values[0].Kind
 	for i := 1; i < len(values); i++ {
 		if values[i].Kind != target {
-			return fmt.Errorf("expected values of the same kind, got %v and %v", target, values[i].Kind)
+			return fmt.Errorf("expected values of the same kind, got %s and %s", values[0].describe(), values[i].describe())
 		}
 	}
 	return nil

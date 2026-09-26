@@ -24,12 +24,27 @@ func foldNode(node Node, m *sourceMap) (Node, bool) {
 	if changed && m != nil {
 		if _, list := out.([]Node); !list {
 			p, known := m.at[node]
-			if _, has := m.at[out]; known && !has {
-				m.at[out] = p
+			if known {
+				placeNew(out, p, m)
 			}
 		}
 	}
 	return out, changed
+}
+
+// placeNew gives the nodes folding made — out and whatever inside it came
+// from no source — the place of the one out replaced, as the C runtime
+// places them; a node that was read keeps its own.
+func placeNew(out Node, p int, m *sourceMap) {
+	if _, has := m.at[out]; has {
+		return
+	}
+	m.at[out] = p
+	if l, ok := out.(*List); ok {
+		for _, e := range l.Elems {
+			placeNew(e, p, m)
+		}
+	}
 }
 
 func foldOnce(node Node, m *sourceMap) (Node, bool) {

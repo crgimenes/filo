@@ -84,11 +84,13 @@
 (string (fn (x) x))
 --- error
 --- at 1:1
+--- message string: cannot convert a function
 
 === string arity
 (string)
 --- error
 --- at 1:1
+--- message string expects 1 argument
 
 === number of numeric string
 (number "1.5")
@@ -125,6 +127,7 @@
 (number "0x10")
 --- error
 --- at 1:1
+--- message number: cannot parse "0x10"
 
 === number of a number
 (number 7)
@@ -135,21 +138,25 @@
 (number "abc")
 --- error
 --- at 1:1
+--- message number: cannot parse "abc"
 
 === number of empty string
 (number "")
 --- error
 --- at 1:1
+--- message number: cannot parse ""
 
 === number of malformed
 (number "1.5.5")
 --- error
 --- at 1:1
+--- message number: cannot parse "1.5.5"
 
 === number of a bool
 (number #t)
 --- error
 --- at 1:1
+--- message number expects a number or a numeric string, got bool
 
 === cross-kind compare via string
 (= (string 1) "1")
@@ -195,6 +202,7 @@
 (type-of)
 --- error
 --- at 1:1
+--- message type-of expects 1 argument
 
 # Number text is exact both ways for every double, in every runtime and host:
 # the shortest digits that read back, and reading rounds correctly however

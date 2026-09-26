@@ -34,6 +34,7 @@ import (
 //	<expression>
 //	--- error                     or: any error is expected
 //	--- at 2:3                    optional after error: where it happened
+//	--- message TEXT              optional after error: how its message ends
 //	--- globals                   optional, globals expected after the run
 //	x = 42
 
@@ -47,6 +48,7 @@ type corpusCase struct {
 	want    string
 	wantErr bool
 	at      string // "line:col" the error must report; "" when not checked
+	message string // what the error's message must end with; "" when not checked
 	globals []binding
 }
 
@@ -129,6 +131,9 @@ func runCorpusCase(t *testing.T, packs []string, c corpusCase) {
 		at := errorAt(err, c.script)
 		if c.at != "" && at != c.at {
 			t.Fatalf("line %d: the error is at %q, want %s: %v", c.line, at, c.at, err)
+		}
+		if !strings.HasSuffix(err.Error(), c.message) {
+			t.Fatalf("line %d: the error says %q, want it to end with %q", c.line, err.Error(), c.message)
 		}
 		return
 	}
@@ -295,8 +300,16 @@ func (p *corpusParser) startSection(n int, name string) error {
 	return nil
 }
 
-// atSection reads "at L:C", which may only follow '--- error', once.
+// atSection reads "at L:C" and "message TEXT", which may only follow
+// '--- error', once each.
 func (p *corpusParser) atSection(n int, name string) error {
+	if msg, ok := strings.CutPrefix(name, "message "); ok {
+		if !p.cur.wantErr || p.cur.message != "" || msg == "" {
+			return fmt.Errorf("line %d: '--- message TEXT' goes once after '--- error', got %q", n, name)
+		}
+		p.cur.message = msg
+		return nil
+	}
 	at, ok := strings.CutPrefix(name, "at ")
 	if !ok {
 		return fmt.Errorf("line %d: unknown section %q", n, name)
@@ -486,6 +499,7 @@ func TestCorpusDetectsDisagreement(t *testing.T) {
 		{"nan is not a number", "=== a\n(+ 1 1)\n--- want\n(number \"nan\")\n"},
 		{"error in another place", "=== a\n(+ 1\n  \"a\")\n--- error\n--- at 2:3\n"},
 		{"parse error in another place", "=== a\n(+ 1 2))\n--- error\n--- at 1:1\n"},
+		{"error that says something else", "=== a\n(/ 1 0)\n--- error\n--- message expected number, got string\n"},
 	}
 	for _, tc := range bad {
 		t.Run(tc.name, func(t *testing.T) {
@@ -531,6 +545,8 @@ func TestCorpusFormatRejects(t *testing.T) {
 		"section outside a case": "--- want\n1\n",
 		"unknown section":        "=== a\n1\n--- expect\n1\n",
 		"text after error":       "=== a\n1\n--- error\nsome message\n",
+		"message without error":  "=== a\n1\n--- want\n1\n--- message one\n",
+		"message twice":          "=== a\n(/ 1 0)\n--- error\n--- message a\n--- message b\n",
 		"at without error":       "=== a\n1\n--- want\n1\n--- at 1:1\n",
 		"at twice":               "=== a\n(x)\n--- error\n--- at 1:1\n--- at 1:1\n",
 		"at without a column":    "=== a\n(x)\n--- error\n--- at 1\n",

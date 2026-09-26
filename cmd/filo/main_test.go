@@ -178,6 +178,13 @@ func TestRun(t *testing.T) {
 		{[]string{"run", "../../testdata/bytecode/prog.fbc"}, 1, "", "filo: missing (1): base\n"},
 		{[]string{"run", src, "main"}, 2, "", "filo: entries are for units, and this is source: " + src + "\n"},
 		{[]string{"run", dir + "/none.filo"}, 1, "", "filo: cannot open: " + dir + "/none.filo\n"},
+		{[]string{"show", "folded", src}, 0, "1:1     list of 4\n1:1       symbol let\n1:1       list of 0\n" +
+			"1:1       list of 3\n1:2         symbol def\n1:6         symbol sq\n1:9         list of 3\n" +
+			"1:10          symbol fn\n1:13          list of 1\n1:14            symbol x\n1:17          list of 3\n" +
+			"1:18            symbol *\n1:20            symbol x\n1:22            symbol x\n3:1       list of 3\n" +
+			"3:2         symbol map\n3:6         symbol sq\n3:9         list of 4\n3:10          symbol list\n" +
+			"3:15          number 1\n3:17          number 2\n3:25          number 3\n", ""},
+		{[]string{"show", "tokens", src}, 1, "", "filo: " + src + ": no stage named tokens\n"},
 	}
 	for _, c := range cases {
 		var out, errs bytes.Buffer

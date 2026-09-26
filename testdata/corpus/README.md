@@ -3,8 +3,10 @@
 Plain-text cases that pin what a Filo script evaluates to. This directory is
 the behavioral contract of the language: every runtime runs the same files and
 must agree with them. Cases assert outcomes — the resulting value, the fact
-that an error occurred and where, the globals left behind — never the wording
-of an error message.
+that an error occurred, where, and how its message ends, the globals left
+behind. The end of the message is the part that says what happened; the
+contexts before it ("in let: ", "in builtin ..." ) differ between the tree
+and the bytecode, and are not checked.
 
 Because it is a contract between implementations that live in different
 repositories, this directory is duplicated and the two copies must stay
@@ -33,6 +35,7 @@ x = 42
 (script)
 --- error                    # any error; nothing may follow on this line
 --- at 1:1                   # optional; where the error happened, line:col
+--- message division by zero # optional; how the error's message ends
 ```
 
 - The script is everything between the case header lines and the first

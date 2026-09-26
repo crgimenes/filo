@@ -29,6 +29,7 @@
 (length "abc")
 --- error
 --- at 1:1
+--- message length expects list or tuple
 
 === head
 (head (list 10 20 30))
@@ -39,11 +40,13 @@
 (head (list))
 --- error
 --- at 1:1
+--- message head of empty list
 
 === head of tuple is an error
 (head (tuple 1))
 --- error
 --- at 1:1
+--- message expected list, got tuple
 
 === tail
 (tail (list 1 2 3))
@@ -59,6 +62,7 @@
 (tail (list))
 --- error
 --- at 1:1
+--- message tail of empty list
 
 === nth
 (nth (list 10 20 30) 1)
@@ -74,21 +78,25 @@
 (nth (list 1 2) 5)
 --- error
 --- at 1:1
+--- message index out of range
 
 === nth negative
 (nth (list 1 2) -1)
 --- error
 --- at 1:1
+--- message index out of range
 
 === nth rejects a fractional index
 (nth (list 1 2) 1.5)
 --- error
 --- at 1:1
+--- message nth expects an integer index, got 1.5
 
 === nth rejects nan
 (nth (list 1 2) (number "nan"))
 --- error
 --- at 1:1
+--- message nth expects an integer index, got NaN
 
 === nth accepts an integral float
 (nth (list 1 2) 1.0)
@@ -99,11 +107,13 @@
 (nth (tuple 1 2) 0)
 --- error
 --- at 1:1
+--- message expected list, got tuple
 
 === nth arity
 (nth (list 1 2))
 --- error
 --- at 1:1
+--- message nth expects 2 arguments
 
 === list-append
 (list-append (list 1) 2)
@@ -134,11 +144,13 @@
 (list-concat (list 1))
 --- error
 --- at 1:1
+--- message list-concat expects at least 2 arguments
 
 === list-concat needs lists
 (list-concat (list 1) 2)
 --- error
 --- at 1:1
+--- message list-concat: argument 1 is not a list
 
 === map
 (map (fn (x) (* x 2)) (list 1 2 3))
@@ -159,11 +171,13 @@
 (map (fn (x y) x) (list 1))
 --- error
 --- at 1:1
+--- message function expects 2 arguments, got 1
 
 === map on tuple is an error
 (map (fn (x) x) (tuple 1 2))
 --- error
 --- at 1:1
+--- message expected list, got tuple
 
 === filter
 (filter (fn (x) (> x 1)) (list 1 2 3))
@@ -184,6 +198,7 @@
 (filter (fn (x) x) (list 1 2))
 --- error
 --- at 1:1
+--- message filter predicate must return a bool: expected bool, got number
 
 === fold
 (fold (fn (acc x) (+ acc x)) 0 (list 1 2 3 4))
@@ -229,11 +244,13 @@
 (range 1.5)
 --- error
 --- at 1:1
+--- message range expects integer bounds, got 0 and 1.5
 
 === range rejects a fractional start
 (range 2.5 5)
 --- error
 --- at 1:1
+--- message range expects integer bounds, got 2.5 and 5
 
 === range accepts integral floats
 (range 2.0 4.0)
@@ -244,6 +261,7 @@
 (range)
 --- error
 --- at 1:1
+--- message range expects 1 or 2 arguments
 
 === a range kept in a list is an ordinary list
 (list (range 3) -1)
@@ -279,6 +297,7 @@
 (reverse (tuple 1 2))
 --- error
 --- at 1:1
+--- message expected list, got tuple
 
 === is-empty list
 (is-empty (list))

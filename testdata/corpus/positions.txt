@@ -10,6 +10,7 @@
 (+ x "y")
 --- error
 --- at 3:1
+--- message expected number, got string
 
 === an error in a nested call is the inner call
 (+ 1
@@ -17,6 +18,7 @@
       (- "three" 1)))
 --- error
 --- at 3:7
+--- message expected number, got string
 
 === an error inside a function is where the body fails
 (def half (fn (n)
@@ -24,6 +26,7 @@
 (half "four")
 --- error
 --- at 2:3
+--- message expected number, got string
 
 === an error in a let body
 (let ((a 1)
@@ -31,6 +34,7 @@
   (+ a b))
 --- error
 --- at 3:3
+--- message expected number, got string
 
 === an error in a let binding
 (let ((a 1)
@@ -38,6 +42,7 @@
   (+ a b))
 --- error
 --- at 2:10
+--- message head of empty list
 
 === an error in a cond clause
 (def pick (fn (x)
@@ -48,6 +53,7 @@
 (pick 2)
 --- error
 --- at 4:15
+--- message undefined global: str-missing
 
 === an error in a closure called by map
 (map (fn (x)
@@ -55,6 +61,7 @@
      (list 1 "b" 3))
 --- error
 --- at 2:8
+--- message expected number, got string
 
 === an error in a closure called by fold
 (fold (fn (acc x)
@@ -63,12 +70,14 @@
       (list 1 2 "c"))
 --- error
 --- at 2:9
+--- message expected number, got string
 
 === an error in a builtin called by map as a value is the map call
 (map -
   (list 1 "x"))
 --- error
 --- at 1:1
+--- message expected number, got string
 
 === calling a non-function
 (def f 42)
@@ -76,6 +85,7 @@
   (f 1))
 --- error
 --- at 3:3
+--- message attempt to call non-function (got number)
 
 === the wrong number of arguments
 (def two (fn (a b) (+ a b)))
@@ -83,12 +93,14 @@
   1)
 --- error
 --- at 2:1
+--- message function expects 2 arguments, got 1
 
 === an undefined global
 (def a 1)
   (+ a missing-name)
 --- error
 --- at 2:8
+--- message undefined global: missing-name
 
 === an explicit error
 (def check (fn (v)
@@ -99,6 +111,7 @@
 (check -1)
 --- error
 --- at 3:7
+--- message negative
 
 === letv with the wrong arity
 (letv (a b c)
@@ -106,6 +119,7 @@
   (+ a b))
 --- error
 --- at 1:1
+--- message letv arity mismatch
 
 === an unterminated list is where it opens
 (def x 1)
@@ -113,30 +127,36 @@
    (* 2 3)
 --- error
 --- at 2:1
+--- message unterminated list
 
 === an unterminated string is where it opens
 (def s "abc)
 (str-len s)
 --- error
 --- at 1:8
+--- message unterminated string literal
 
 === an unsupported escape is the escaped character
 (def s "a\qb")
 --- error
 --- at 1:11
+--- message unsupported escape: \q
 
 === an unexpected close is where it is
 (+ 1 2))
 --- error
 --- at 1:8
+--- message expected token
 
 === a bad boolean literal
 (if #yes 1 2)
 --- error
 --- at 1:5
+--- message invalid boolean literal
 
 === a byte order mark is not a column
 ﻿(+ 1
    "a")
 --- error
 --- at 1:1
+--- message expected number, got string

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -50,7 +51,7 @@ func cmdRepl(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		foldConst      bool
 	)
 
-	fs.StringVar(&packages, "filo-package", "math,strings", "Comma-separated list of extension packages (math, strings, rand, print, json)")
+	fs.StringVar(&packages, "filo-package", "", "Comma-separated list of extension packages to add to math and strings (rand, print, json)")
 	fs.IntVar(&stepLimit, "step-limit", defaultStepLimit, "Maximum evaluation steps")
 	fs.IntVar(&recursionLimit, "recursion-limit", defaultRecursionLimit, "Maximum recursion depth")
 	fs.IntVar(&timeoutSeconds, "timeout", defaultTimeoutSeconds, "Script execution timeout in seconds")
@@ -66,12 +67,12 @@ func cmdRepl(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	// Parse requested packages
-	var requestedPackages []string
+	// math and strings always, as the C runtime's filo; the flag adds to them
+	requestedPackages := []string{"math", "strings"}
 	if packages != "" {
 		for p := range strings.SplitSeq(packages, ",") {
 			p = strings.TrimSpace(p)
-			if p != "" {
+			if p != "" && !slices.Contains(requestedPackages, p) && p != "str" {
 				requestedPackages = append(requestedPackages, p)
 			}
 		}

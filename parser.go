@@ -127,8 +127,11 @@ func parseSource(input string) (Node, *sourceMap, error) {
 
 	// Multiple nodes: wrap in implicit (let () ...) block
 	// This allows sequential evaluation with the last value returned
-	wrapper := &List{Elems: append([]Node{&Symbol{Name: "let"}, &List{Elems: []Node{}}}, nodes...)}
-	m.at[wrapper] = lx.at[nodes[0]] // the implicit let is where the program starts
+	let, bindings := &Symbol{Name: "let"}, &List{Elems: []Node{}}
+	wrapper := &List{Elems: append([]Node{let, bindings}, nodes...)}
+	// the implicit let is where the program starts, and so are the two nodes
+	// it adds: the C runtime places them the same
+	m.at[wrapper], m.at[let], m.at[bindings] = lx.at[nodes[0]], lx.at[nodes[0]], lx.at[nodes[0]]
 	return wrapper, m, nil
 }
 
@@ -238,8 +241,8 @@ func (l *lexer) readString(startPos int) (Node, error) {
 				b.WriteByte('\f')
 			case 'v': // vertical tab
 				b.WriteByte('\v')
-			default:
-				return nil, l.errAt(l.i, fmt.Sprintf("unsupported escape: \\%c", escaped))
+			default: // the byte itself, as the C runtime says it: %c would make it a rune
+				return nil, l.errAt(l.i, "unsupported escape: \\"+l.src[l.i:l.i+1])
 			}
 			l.i++
 			continue

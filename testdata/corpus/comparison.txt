@@ -24,6 +24,7 @@
 (= 1)
 --- error
 --- at 1:1
+--- message = expects at least 2 arguments
 
 === equal bools
 (= #t #t)
@@ -64,11 +65,13 @@
 (= 1 "1")
 --- error
 --- at 1:1
+--- message expected values of the same kind, got number and string
 
 === tuple vs list is an error
 (= (tuple 1) (list 1))
 --- error
 --- at 1:1
+--- message expected values of the same kind, got tuple and list
 
 === not equal
 (!= 1 2)
@@ -84,6 +87,7 @@
 (!= 1 "1")
 --- error
 --- at 1:1
+--- message expected values of the same kind, got number and string
 
 === less
 (< 1 2)
@@ -129,8 +133,10 @@
 (< "a" "b")
 --- error
 --- at 1:1
+--- message expected number, got string
 
 === ordering needs two
 (< 1)
 --- error
 --- at 1:1
+--- message < expects at least 2 arguments
