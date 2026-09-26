@@ -1,0 +1,6 @@
+# The tests compare these byte for byte, so every checkout must have the
+# same bytes: a Windows one would otherwise turn their line ends into CRLF.
+testdata/** text eol=lf
+examples/*.filo text eol=lf
+*.fbc binary
+*.fbb binary
