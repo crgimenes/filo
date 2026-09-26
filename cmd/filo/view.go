@@ -27,17 +27,21 @@ const (
 // the footer's keys, the ones a narrow screen drops last first: quit
 // among them, as the edt keeps its ^Q
 var hints = []struct{ key, rest string }{
-	{"s", " step"}, {"n", " next"}, {"c", " continue"}, {"q", " quit"},
-	{"space", " break"}, {"b", " back"}, {"i", " instruction"}, {"r", " restart"},
+	{"s", " step"}, {"n", " next"}, {"c", " continue"}, {"q", " quit"}, {"h", " help"},
+	{"x", " bytes"}, {"space", " break"}, {"b", " back"}, {"i", " instruction"}, {"r", " restart"},
 }
 
-// draw paints the session: the source on the left, the function's
-// instructions on the right, the calls with their locals and operands
-// below, and the footer.
+// draw paints the session: the source on the left, the unit's instructions
+// on the right (all of them, around the one the run is at), the calls with
+// their locals and operands below, and the footer.
 func draw(s *session, scr *screen) {
 	scr.clear()
 	if scr.w < 40 || scr.h < 10 {
 		scr.print(0, 0, "filo debug: the terminal is too small")
+		return
+	}
+	if s.help {
+		drawHelp(s, scr)
 		return
 	}
 	st := s.shown()
@@ -53,7 +57,11 @@ func draw(s *session, scr *screen) {
 	drawMarks(s, scr, fn, st.Line, top)
 	scr.color(colRule, colorDefault)
 	scr.fill(0, left, top, 1, '│')
-	drawCode(s, scr, fn, pc, top, left+1)
+	if s.bytes {
+		drawBytes(s, scr, fn, pc, st.Line, top, left+1)
+	} else {
+		drawCode(s, scr, fn, pc, st.Line, top, left+1)
+	}
 	drawStack(s, scr, st, top, stackRows)
 	drawFooter(s, scr, st)
 }
@@ -184,47 +192,88 @@ func drawMarks(s *session, scr *screen, fn, line, rows int) {
 	}
 }
 
-func drawCode(s *session, scr *screen, fn, pc, rows, col int) {
+func drawCode(s *session, scr *screen, fn, pc, line, rows, col int) {
 	width := scr.w - col
 	if fn < 0 {
 		return
 	}
 	scr.color(colDim, colorDefault)
-	label := fmt.Sprintf(" fn %d", fn)
+	label := fmt.Sprintf(" at fn %d", fn)
 	name := s.entryName(fn)
 	if name != "" {
 		label += ` (entry "` + name + `")`
 	}
 	scr.print(0, col, label)
-	f := s.listing.Fns[fn]
-	var code []fbc.Insn
-	here := 0
-	for at := f.Off; at < f.Off+f.Len; {
-		in := s.listing.Insn(at)
-		if in.Len == 0 {
-			break
+	code, here := codeRows(s, pc)
+	// the cursor moved off the run's line: its instructions, in view and
+	// marked, so the arrows read the code the source makes
+	file, cursorOff := s.fileOf[fn], s.cursor != line
+	if cursorOff {
+		for i, r := range code {
+			if r.of >= 0 && r.line == s.cursor && s.fileOf[r.of] == file {
+				here = i
+				break
+			}
 		}
-		if at == pc {
-			here = len(code)
-		}
-		code = append(code, in)
-		at += in.Len
 	}
 	first := max(0, here-(rows-2)/2)
 	for row := 1; row < rows && first+row-1 < len(code); row++ {
-		in := code[first+row-1]
-		place := ""
-		line, c, ok := s.listing.Position(in.PC)
-		if ok {
-			place = fmt.Sprintf("%d:%d", line, c)
-		}
-		scr.color(colorDefault, colorDefault)
-		if in.PC == pc {
+		r := code[first+row-1]
+		switch {
+		case r.of < 0:
+			scr.color(colDim, colorDefault)
+		case r.in.PC == pc:
 			scr.color(colHereFg, colHereBg)
 			scr.fill(row, col, 1, width, ' ')
+		case cursorOff && r.line == s.cursor && s.fileOf[r.of] == file:
+			scr.color(colKeys, colorDefault)
+		default:
+			scr.color(colorDefault, colorDefault)
 		}
-		scr.print(row, col, cutTo(fmt.Sprintf(" %04d %-6s %s", in.PC, place, in), width))
+		scr.print(row, col, cutTo(r.text, width))
 	}
+}
+
+// codeRow is a row of the listing: a function's heading (of is -1) or an
+// instruction of function of, from line of its source.
+type codeRow struct {
+	of   int
+	line int
+	in   fbc.Insn
+	text string
+}
+
+// codeRows is the whole unit's code, as filo dump lists it, every function
+// under its heading, and the row of the instruction at pc: the functions
+// the run has not reached yet are there to read too.
+func codeRows(s *session, pc int) ([]codeRow, int) {
+	var rows []codeRow
+	here := 0
+	for i, f := range s.listing.Fns {
+		head := fmt.Sprintf(" fn %d: params %d, slots %d", i, f.Params, f.Slots)
+		name := s.entryName(i)
+		if name != "" {
+			head = fmt.Sprintf(` fn %d (entry "%s"): params %d, slots %d`, i, name, f.Params, f.Slots)
+		}
+		rows = append(rows, codeRow{of: -1, text: head})
+		for at := f.Off; at < f.Off+f.Len; {
+			in := s.listing.Insn(at)
+			if in.Len == 0 {
+				break
+			}
+			if at == pc {
+				here = len(rows)
+			}
+			place := ""
+			line, c, ok := s.listing.Position(in.PC)
+			if ok {
+				place = fmt.Sprintf("%d:%d", line, c)
+			}
+			rows = append(rows, codeRow{of: i, line: line, in: in, text: fmt.Sprintf(" %04d %-6s %s", in.PC, place, in)})
+			at += in.Len
+		}
+	}
+	return rows, here
 }
 
 func drawStack(s *session, scr *screen, st filo.StepState, top, rows int) {
@@ -283,7 +332,11 @@ func drawFooter(s *session, scr *screen, st filo.StepState) {
 	} else {
 		col := 1
 		for _, h := range hints {
-			if col+len(h.key)+len(h.rest) > room {
+			rest := h.rest
+			if h.key == "x" && s.bytes {
+				rest = " code" // what x goes to
+			}
+			if col+len(h.key)+len(rest) > room {
 				break
 			}
 			scr.color(colKeys, colBar)
@@ -291,7 +344,7 @@ func drawFooter(s *session, scr *screen, st filo.StepState) {
 			col += scr.print(y, col, h.key)
 			scr.color(colWords, colBar)
 			scr.style(false, false)
-			col += scr.print(y, col, h.rest) + 2
+			col += scr.print(y, col, rest) + 2
 		}
 	}
 	scr.color(colWhere, colBar)

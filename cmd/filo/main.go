@@ -57,12 +57,16 @@ order the file has them.`, `  filo size screens.fbb`},
 	{"debug", "filo debug [-src DIR] [-g NAME=EXPR]... FILE [MEMBER] [ENTRY]", `debug steps an entry point of a unit, a bundle or a source (compiled as
 build compiles it): ENTRY, else main, else the first — of MEMBER, chosen the
 same way, for a bundle. It runs on the terminal, in the edt's colours: the
-source on the left, the function's instructions on the right, the calls
-with their locals and operands below. Keys, as gdb's: s step a line (into
+source on the left, the unit's instructions on the right (all of them, as
+dump lists them, around the one the run is at), the calls with their
+locals and operands below. Keys, as gdb's: s step a line (into
 calls), n next line (over calls), i one instruction, c continue (to a
 breakpoint, else to the end), b back (undo the last movement), r restart,
-q quit; the arrows and PgUp/PgDn move a cursor in the source, and space
-sets or clears a breakpoint on its line. The source of the entry "main" is
+q quit; the arrows and PgUp/PgDn move a cursor in the source, which brings
+its line's instructions into view, marked, and space sets or clears a
+breakpoint on its line; x shows the unit's bytes instead of its
+instructions, the file as it is; h explains the language, every
+instruction and the bytes. The source of the entry "main" is
 main.filo, beside FILE or in -src DIR. -g gives the run a global, the
 expression in Filo: a value, or a function a unit imports and the VM lacks.`, `  filo debug fib.filo
   filo debug prog.fbc fail

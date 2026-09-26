@@ -101,6 +101,50 @@ func TestContinueToTheEnd(t *testing.T) {
 	}
 }
 
+// The code on the right is the whole unit's, as filo dump lists it: at the
+// start of main, half's body (fn 4, fail.filo's) is there to read.
+func TestCodeIsTheWholeUnit(t *testing.T) {
+	s := testSession(t, "main")
+	scr := &screen{}
+	scr.resize(100, 80)
+	draw(s, scr)
+	var all strings.Builder
+	for row := 0; row < scr.h; row++ {
+		for col := 0; col < scr.w; col++ {
+			all.WriteRune(scr.at(row, col).r)
+		}
+		all.WriteString("\n")
+	}
+	for _, want := range []string{` fn 0 (entry "main"): params 0`, " fn 4: params 1, slots 1", "CALLB    2 5       /"} {
+		if !strings.Contains(all.String(), want) {
+			t.Errorf("the code lacks %q:\n%s", want, all.String())
+		}
+	}
+}
+
+// The cursor, moved off the run's line, brings the code of its line into
+// view, marked: main starts on line 1, and line 3 makes the adder's sum.
+func TestCursorShowsItsCode(t *testing.T) {
+	s := testSession(t, "main")
+	s.moveCursor(2)
+	scr := &screen{}
+	scr.resize(100, 16)
+	draw(s, scr)
+	for row := 0; row < scr.h; row++ {
+		var b strings.Builder
+		for col := scr.w / 2; col < scr.w; col++ {
+			b.WriteRune(scr.at(row, col).r)
+		}
+		if strings.Contains(b.String(), "0017 3:20   PUSH_G") {
+			if scr.at(row, scr.w/2+2).fg != colKeys {
+				t.Fatalf("line 3's instruction is not marked: %q", b.String())
+			}
+			return
+		}
+	}
+	t.Fatal("line 3's instructions are not in view")
+}
+
 // The screen as the terminal would get it: the source line and the
 // instruction the run is at are marked, the calls listed, the keys shown.
 func TestDraw(t *testing.T) {

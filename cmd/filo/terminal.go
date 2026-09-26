@@ -60,16 +60,44 @@ func debugTerminal(s *session, in *os.File, out *os.File) error {
 	}
 }
 
+// helpKey scrolls the h page, or leaves it; Ctrl-C still quits.
+func (s *session) helpKey(k string) bool {
+	page := max(s.helpPage-1, 1)
+	switch k {
+	case "\x03":
+		return false
+	case "h", "q", "Q", "\x1b":
+		s.help = false
+	case "\x1b[A", "\x1bOA":
+		s.helpTop--
+	case "\x1b[B", "\x1bOB":
+		s.helpTop++
+	case "\x1b[5~", "b":
+		s.helpTop -= page
+	case "\x1b[6~", " ":
+		s.helpTop += page
+	}
+	s.helpTop = max(s.helpTop, 0)
+	return true
+}
+
 // key acts on what a key sent; false to quit.
 func (s *session) key(k []byte) bool {
 	if len(k) == 0 {
 		return true
+	}
+	if s.help {
+		return s.helpKey(string(k))
 	}
 	s.msg = ""
 	if s.run.Done() {
 		s.msg = s.ending()
 	}
 	switch string(k) {
+	case "h":
+		s.help, s.helpTop = true, 0
+	case "x":
+		s.bytes = !s.bytes
 	case "q", "Q", "\x1b", "\x03": // Esc alone, or Ctrl-C
 		return false
 	case "s":

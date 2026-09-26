@@ -20,19 +20,23 @@ import (
 // person, who may go back. Going back is starting again and stepping to
 // where the last movement began: the machine is deterministic.
 type session struct {
-	unit    *filo.Unit
-	listing *fbc.Unit
-	entry   string
-	run     *filo.Stepper
-	steps   int   // Steps taken since the start
-	marks   []int // where each movement began, the last one last
-	sources map[string][]string
-	fileOf  map[int]string // each function's source file, by the entry it belongs to
-	msg     string         // how the run ended, or why a key did nothing
-	cursor  int            // the source line the arrows move, from 1; it follows the run
-	breaks  map[string]map[int]bool
-	globals map[string]filo.Value // what the run is given, every time it starts again
-	last    filo.StepState        // the run before its last step: where it ended
+	unit     *filo.Unit
+	listing  *fbc.Unit
+	entry    string
+	run      *filo.Stepper
+	steps    int   // Steps taken since the start
+	marks    []int // where each movement began, the last one last
+	sources  map[string][]string
+	fileOf   map[int]string // each function's source file, by the entry it belongs to
+	msg      string         // how the run ended, or why a key did nothing
+	cursor   int            // the source line the arrows move, from 1; it follows the run
+	breaks   map[string]map[int]bool
+	globals  map[string]filo.Value // what the run is given, every time it starts again
+	last     filo.StepState        // the run before its last step: where it ended
+	bytes    bool                  // the right side shows the bytes, not the instructions
+	help     bool                  // the h page is up
+	helpTop  int                   // its first line shown
+	helpPage int                   // the lines it shows
 }
 
 // newSession loads a unit (a .fbc, or a member of a .fbb) for its entry:

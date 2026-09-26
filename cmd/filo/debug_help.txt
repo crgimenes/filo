@@ -1,0 +1,134 @@
+# filo debug
+
+A program runs here one step at a time. On the left, its source; on the
+right, what the compiler made of it: the instructions (x switches to the
+bytes the file really holds); below, the calls running, innermost first.
+
+# Keys
+
+  s          step a line, into the calls it makes
+  n          next line, over the calls
+  i          one instruction
+  c          continue to a breakpoint, or to the end
+  b          back: undo the last movement
+  r          restart from the first instruction
+  space      set or clear a breakpoint on the cursor's line
+  arrows     move the cursor in the source; its line's instructions
+  PgUp/PgDn  come into view on the right, in orange
+  x          instructions or bytes on the right
+  h          this help (arrows, PgUp/PgDn and space scroll; h, q or Esc
+             go back)
+  q          quit
+
+# Reading the screen
+
+The line the run is at has a dark bar, the column in orange. On the right,
+each instruction is a row:
+
+  0015 4:12   PUSH_L   0         slot 0
+  |    |      |        |         what the operand names
+  |    |      |        operands
+  |    |      the instruction
+  |    where in the source it came from, line:column
+  its address in the code, counted in bytes
+
+Below, each call: its function, where it is, its slots (the parameters
+first, then one for each let binding) and its operands (the values it is
+working on, the top last).
+
+# The language, in brief
+
+Everything is a list whose first element says what to do: (+ 1 2) is 3,
+(* 2 (+ 3 4)) is 14. Values are numbers (42, 3.14), strings ("hi"),
+booleans (#t, #f), lists (list 1 2 3), tuples (tuple 1 2) and functions.
+
+  (def name expr)            a global
+  (set name expr)            change the nearest name
+  (fn (x y) body...)         a function
+  (let ((a 1) (b 2)) body)   names for the body
+  (letv (a b) tuple body)    the elements of a tuple, named
+  (if test then else)        else may be left out: then it is (list)
+  (cond (test body...) ... (else body...))
+  (do e1 e2 ...)             in order; the value of the last
+  (and a b) (or a b)         stop at the first #f (and) or #t (or)
+  (return v)                 leave the function with v
+  (exit v)                   end the program with v
+
+Everything else is a call: a builtin (+ - * / = < list map fold
+str-upper ...) or a function of the program. Tests must be booleans;
+comparing values of different kinds is an error.
+
+# The machine
+
+The compiler turns each function into instructions for a stack machine.
+An instruction takes its inputs from the top of the operand stack and
+leaves its result there: (+ a b) is PUSH_L a, PUSH_L b, CALLB + with 2
+arguments, which pops both and pushes the sum.
+
+  constants  the literals of the unit, numbered (PUSH_K n)
+  globals    the program's names, numbered (PUSH_G, STORE_G)
+  slots      a call's parameters and let bindings (PUSH_L, STORE_L)
+  imports    the builtins the unit calls, looked up by name when it
+             loads: a VM that lacks one refuses the unit
+  functions  numbered: fn 0 is the first; an entry point (a file's
+             top level) is one the unit exports by name
+
+# The instructions
+
+  PUSH_K n       push constant n
+  PUSH_G n       push global n; an error when it was never set
+  STORE_G n      set global n to the top, which stays
+  PUSH_L n       push slot n of this call
+  STORE_L n      set slot n to the top, which stays
+  PUSH_UP d n    push slot n of the function d levels out (a closure
+                 reading a name of the function it was made in)
+  STORE_UP d n   set it
+  POP n          drop n values
+  JMP c -> a     jump to address a: always (c 0), when the popped test
+                 is false (1: if, cond), when false keeping it (2: and),
+                 when true keeping it (3: or); 4 only checks the last
+                 operand of and/or is a boolean
+  CALL n         call the function under its n arguments
+  CALLB n i      call builtin i (an import) with n arguments
+  RET 0          return the top from the function; from an entry point,
+                 end the run with it
+  RET 1          exit: end the run with the top, from anywhere
+  CLOSURE n      push function n as a value, holding on to this call's
+                 slots so it can read them later
+  TUPLE n        make a tuple of the top n values
+  UNPACK n       replace a tuple of exactly n by its elements (letv)
+  TRAP n         fail with the message in constant n: a malformed form
+                 fails where it would, not when compiled
+  PUSH_B i       push builtin i as a value: (map - xs)
+
+# The bytes
+
+x shows the unit as the file holds it, region by region, each byte in
+hexadecimal with its text on the right. The bytes of the instruction the
+run is at are in orange, and so are those of the cursor's line.
+
+An instruction is one byte, the opcode in its top five bits and a small
+operand in the low three: PUSH_L 0 is 3 << 3 | 0 = 0x18, CLOSURE 1 is
+12 << 3 | 1 = 0x61. An operand of 7 or more takes a second form: the low
+bits are 7 and the number follows. Numbers inside the file are ULEB128:
+seven bits a byte, low first, the high bit set on every byte but the last.
+A jump carries two bytes: the distance from its own end, signed.
+
+  header     7F 46 42 43 ("\x7fFBC"), kind (1 a unit), format version,
+             header size, a checksum (FNV-1a) of the whole file, the
+             widest stack and frame, then the table of the sections:
+             kind, offset and length of each
+  imports    the names of the builtins it calls
+  globals    the names of its globals
+  constants  each a tag and its value: 1 a number (8 bytes, IEEE 754),
+             2 a string (length, bytes), 3 true, 4 false, 5 empty list
+  functions  for each: where its code starts, its length, parameters,
+             slots and widest stack
+  code       every function's instructions, one after the other
+  exports    the entry points: a name and a function number
+  debug      where each instruction came from: line and column, as
+             differences from the one before (filo build --strip leaves
+             it out)
+  externs    the globals it reads and never sets: the host gives them
+
+docs/bytecode.md, in the Filo repository, has all of it.
