@@ -34,7 +34,9 @@ each instruction is a row:
 
 Below, each call: its function, where it is, its slots (the parameters
 first, then one for each let binding) and its operands (the values it is
-working on, the top last).
+working on, the top last). In the running call, the operands the next
+instruction takes are in orange, and it says which: before CALLB 2 + the
+top two are the numbers it adds.
 
 # The language, in brief
 

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/crgimenes/filo"
 )
 
 func TestDump(t *testing.T) {
@@ -251,5 +253,33 @@ func TestExamples(t *testing.T) {
 		if code != 1 || errs.String() != "filo: "+path+":"+want+"\n" {
 			t.Errorf("%s: exit %d, %q, want %q", path, code, errs.String(), want)
 		}
+	}
+}
+
+// decompile -o writes the entry points as files and their paths in the
+// unit's order: built from them, the same unit but for its debug section.
+func TestDecompileBuildsBack(t *testing.T) {
+	dir := t.TempDir()
+	var out, errs bytes.Buffer
+	code := run([]string{"decompile", "-o", dir, "../../testdata/bytecode/prog.fbc"}, nil, &out, &errs)
+	paths := strings.Fields(out.String())
+	if code != 0 || len(paths) != 2 || !strings.HasSuffix(paths[0], "main.filo") {
+		t.Fatalf("decompile: exit %d, %q, %q", code, out.String(), errs.String())
+	}
+	again := filepath.Join(dir, "again.fbc")
+	code = run(append([]string{"build", "-o", again}, paths...), nil, &out, &errs)
+	if code != 0 {
+		t.Fatalf("build: %s", errs.String())
+	}
+	a, _ := os.ReadFile("../../testdata/bytecode/prog.fbc")
+	b, _ := os.ReadFile(again)
+	sa, _ := filo.StripDebug(a)
+	sb, _ := filo.StripDebug(b)
+	if !bytes.Equal(sa, sb) {
+		t.Fatal("built back, not the same unit")
+	}
+	code = run([]string{"decompile", "../../testdata/bytecode/fib.filo"}, nil, &out, &errs)
+	if code != 1 || !strings.Contains(errs.String(), "a source is Filo already") {
+		t.Fatalf("a source: exit %d, %q", code, errs.String())
 	}
 }

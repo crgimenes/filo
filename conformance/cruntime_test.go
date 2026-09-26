@@ -153,6 +153,9 @@ func TestCUnits(t *testing.T) {
 			why = sameShow(dir, no)
 		}
 		if why == "" {
+			why = sameDecompiled(dir, no)
+		}
+		if why == "" {
 			passed++
 			continue
 		}
@@ -291,6 +294,59 @@ func sameBuild(dir string, no int) string {
 		}
 		if !bytes.Equal(got, want) {
 			return fmt.Sprintf("build%s: the Go compiler wrote %d bytes, the C one %d; they differ at byte %d", suffix, len(got), len(want), firstByte(got, want))
+		}
+	}
+}
+
+// sameDecompiled is "" when each unit of case no (NNNNN.fbc, and the
+// NNNNN.gK.fbc its given globals ran) decompiles (fbc.Decompile) to Filo that
+// the Go compiler, with the case's packs, compiles back to the same unit but
+// for its debug section: the bytes keep every form the decompiler cannot
+// tell apart in one shape.
+func sameDecompiled(dir string, no int) string {
+	packs, _ := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d.packs", no))) // #nosec G304 -- a file of the directory the test was given
+	for k := -1; ; k++ {
+		suffix := ""
+		if k >= 0 {
+			suffix = fmt.Sprintf(".g%d", k)
+		}
+		unit, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d%s.fbc", no, suffix))) // #nosec G304 -- a unit of the directory the test was given
+		if err != nil {
+			return ""
+		}
+		u, err := fbc.Read(unit)
+		if err != nil {
+			return fmt.Sprintf("decompile%s: %v", suffix, err)
+		}
+		srcs, err := fbc.Decompile(u)
+		if err != nil {
+			return fmt.Sprintf("decompile%s: %v", suffix, err)
+		}
+		e := filo.NewEngine()
+		for p := range strings.FieldsSeq(string(packs)) {
+			switch p {
+			case "math":
+				filomath.RegisterBuiltins(e)
+			case "strings":
+				filostrings.RegisterBuiltins(e)
+			}
+		}
+		var entries []filo.BuildEntry
+		for _, src := range srcs {
+			p, err := e.Compile(src.Text)
+			if err != nil {
+				return fmt.Sprintf("decompile%s: compiling back: %v\n%s", suffix, err, src.Text)
+			}
+			entries = append(entries, filo.BuildEntry{Name: src.Name, Program: p})
+		}
+		again, err := e.Build(entries)
+		if err != nil {
+			return fmt.Sprintf("decompile%s: building back: %v", suffix, err)
+		}
+		want, _ := filo.StripDebug(unit)
+		got, _ := filo.StripDebug(again)
+		if !bytes.Equal(got, want) {
+			return fmt.Sprintf("decompile%s: compiled back, %d bytes against %d, differ at %d\n%s", suffix, len(got), len(want), firstByte(got, want), srcs[0].Text)
 		}
 	}
 }

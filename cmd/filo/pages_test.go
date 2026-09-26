@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -110,4 +111,69 @@ func TestBytesView(t *testing.T) {
 func hex2(b byte) string {
 	const digits = "0123456789abcdef"
 	return string([]byte{digits[b>>4], digits[b&15]})
+}
+
+// The operands the next instruction takes are marked: before (half "four")
+// is called, CALL takes the function and "four", the top two.
+func TestOperandsTheNextInstructionTakes(t *testing.T) {
+	s := testSession(t, "fail")
+	for range 5 { // CLOSURE, STORE_G, POP, PUSH_G, PUSH_K
+		s.instruction()
+	}
+	scr := &screen{}
+	scr.resize(100, 24)
+	draw(s, scr)
+	text := screenText(scr, 0, scr.w)
+	if !strings.Contains(text, `operands (<fn> "four")  CALL takes 2`) {
+		t.Fatalf("no CALL taking two:\n%s", text)
+	}
+	for row := 0; row < scr.h; row++ {
+		var line strings.Builder
+		for col := range scr.w {
+			line.WriteRune(scr.at(row, col).r)
+		}
+		at := strings.Index(line.String(), `"four"`)
+		if at < 0 || !strings.Contains(line.String(), "takes") {
+			continue
+		}
+		col := len([]rune(line.String()[:at]))
+		if scr.at(row, col).fg != colKeys || scr.at(row, col-2).fg != colKeys {
+			t.Fatal("the operands CALL takes are not marked")
+		}
+		return
+	}
+	t.Fatal("no row with the operands")
+}
+
+func TestConsumes(t *testing.T) {
+	u, err := fbc.Read(mustRead(t, "../../testdata/bytecode/prog.fbc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for pc := 0; pc < u.Code.Len; {
+		in := u.Insn(pc)
+		got := consumes(in)
+		argc, _ := strconv.Atoi(strings.Fields(in.Operands)[0])
+		switch {
+		case in.Op == fbc.OpCallB && got != argc,
+			in.Op == fbc.OpPushK && got != 0,
+			in.Op == fbc.OpRet && got != 1:
+			t.Errorf("%s %s takes %d", in.Name, in.Operands, got)
+		}
+		seen[in.Name] = true
+		pc += in.Len
+	}
+	if !seen["CALLB"] || !seen["PUSH_K"] || !seen["RET"] {
+		t.Fatalf("prog.fbc lacks the instructions this test reads: %v", seen)
+	}
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }

@@ -52,6 +52,15 @@ VM is this command's (the core, math and strings), or the one PROFILE lists:
 the names it gives, one a line, "#" for a comment (msh's build writes the
 BBS's). A line a unit: "NAME  runs: ..." or "NAME  lacks N: a, b"; the exit
 status is 1 when one lacks something.`, `  filo check -vm bin.vm mine.fbb`},
+	{"decompile", "filo decompile [-o DIR] FILE [MEMBER]", `decompile writes a unit's entry points back as Filo, formatted: each under
+a "; NAME.filo" line, or with -o as DIR/NAME.filo, the paths written in the
+unit's order, which filo build takes to make the same unit again, byte for
+byte but for the debug section. The bytes do not keep comments, layout, or
+the names of parameters and let bindings (x y z, a b c here, a digit for a
+nested function's); forms that compile alike come back as one (cond for
+if chains, a constant for what was folded into it). For a bundle, MEMBER is
+the unit (default: main, or the first).`, `  filo decompile prog.fbc
+  filo build -o again.fbc $(filo decompile -o src prog.fbc)`},
 	{"size", "filo size [FILE]", `size says where the bytes go: each unit's header and sections, in the
 order the file has them.`, `  filo size screens.fbb`},
 	{"debug", "filo debug [-src DIR] [-g NAME=EXPR]... FILE [MEMBER] [ENTRY]", `debug steps an entry point of a unit, a bundle or a source (compiled as
@@ -138,6 +147,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return cmdCheck(args[1:], stdin, stdout, stderr)
 		case "size":
 			return cmdSize(args[1:], stdin, stdout, stderr)
+		case "decompile":
+			return cmdDecompile(args[1:], stdin, stdout, stderr)
 		}
 	}
 	if len(args) < 1 || args[0] != "dump" {

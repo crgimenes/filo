@@ -321,8 +321,8 @@ Three small binaries live under `cmd/`; `make tools` builds all of them into
   `filo run` runs a source, a unit or a bundle (`--vm`, `--trace`,
   `--both`); `filo show tree|folded|ir` writes a stage of the compiling —
   the tree as read, once constants fold, the IR — each line with where it
-  came from; `build`, `bundle`, `dump`, `check`, `size` and `debug` are
-  under Bytecode below. Install with
+  came from; `build`, `bundle`, `dump`, `check`, `size`, `debug` and
+  `decompile` are under Bytecode below. Install with
   `go install github.com/crgimenes/filo/cmd/filo@latest`.
 
 ## Examples
@@ -632,13 +632,18 @@ corpus compiles to. The run waits between steps as a coroutine: `Close` ends
 one left in the middle.
 
 `filo debug` steps a unit on the terminal, in the edt's colours: the source on
-the left with the line and column the run is at, the function's instructions
-on the right, the calls below with their locals and operand stacks (and
-"via map" on the one `map` called). The keys are gdb's: `s` a line into
+the left, highlighted as the edt highlights it, with the line and column the
+run is at; the unit's instructions on the right, all of them as `dump` lists
+them, around the one the run is at (`x` shows the unit's bytes instead,
+region by region, the instruction's in orange); the calls below with their
+locals and operand stacks, the operands the next instruction takes in orange
+(and "via map" on the one `map` called). `h` explains the language, every
+instruction and the bytes. The keys are gdb's: `s` a line into
 calls, those a builtin makes included, `n` a line over them, `i` one instruction,
 `c` to the next breakpoint (or the end), `b` back (undoes the last movement),
-`r` restart, `q` quit. The arrows move a cursor in the source, and space sets
-or clears a breakpoint on its line: `c` stops where the run enters it — from
+`r` restart, `q` quit. The arrows move a cursor in the source, which brings
+its line's instructions into view, and space sets or clears a breakpoint on
+its line: `c` stops where the run enters it — from
 another line, or a call starting there, so a recursive function stops once
 per call.
 The source of the entry `main` is `main.filo`, beside the unit or in `-src`,
@@ -648,6 +653,19 @@ Filo — a value, or a function the unit imports and the VM lacks:
 ```bash
 go run ./cmd/filo debug testdata/bytecode/fib.fbc
 go run ./cmd/filo debug -g base=5 testdata/bytecode/prog.fbc
+```
+
+`filo decompile` writes a unit back as Filo, formatted, and `-o DIR` as one
+file an entry point, the paths in the unit's order: `filo build` makes the
+same unit of them, byte for byte but for the debug section — held on every
+unit the corpus compiles to (17,212). What the bytes do not keep does not
+come back: comments, layout, the names of parameters and let bindings (made
+up: `x y z`, `a b c`), and forms that compile alike come back as one (an if
+chain as `cond`, a folded expression as its constant):
+
+```bash
+go run ./cmd/filo decompile testdata/bytecode/prog.fbc
+go run ./cmd/filo build -o again.fbc $(go run ./cmd/filo decompile -o src testdata/bytecode/prog.fbc)
 ```
 
 ## More of my projects

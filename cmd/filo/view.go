@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/crgimenes/filo"
@@ -300,14 +301,76 @@ func drawStack(s *session, scr *screen, st filo.StepState, top, rows int) {
 		scr.color(colDim, colorDefault)
 		n := scr.print(row, 1, label+"  "+s.place(st.Frames, i)+"  ")
 		scr.color(colorDefault, colorDefault)
-		text := "slots " + values(f.Slots) + "  operands " + values(f.Operands)
-		scr.print(row, 1+n, cutTo(text, scr.w-2-n))
+		if i < len(st.Frames)-1 {
+			scr.print(row, 1+n, cutTo("slots "+values(f.Slots)+"  operands "+values(f.Operands), scr.w-2-n))
+			row++
+			continue
+		}
+		drawOperands(s, scr, row, 1+n, f)
 		row++
 	}
 	if len(st.Frames) == 0 && s.msg != "" {
 		scr.color(colorDefault, colorDefault)
 		scr.print(row, 1, cutTo(s.msg, scr.w-2))
 	}
+}
+
+// drawOperands writes the running call's slots and operands, the operands
+// its next instruction takes in orange, and which instruction that is: the
+// stack is where the arguments of a call come from.
+func drawOperands(s *session, scr *screen, row, col int, f filo.StepFrame) {
+	in := s.listing.Insn(f.PC)
+	takes := min(consumes(in), len(f.Operands))
+	end := scr.w - 1
+	put := func(text string, fg int16, bold bool) {
+		if col >= end {
+			return
+		}
+		scr.color(fg, colorDefault)
+		scr.style(bold, false)
+		col += scr.print(row, col, cutTo(text, end-col))
+		scr.style(false, false)
+	}
+	put("slots "+values(f.Slots)+"  operands (", colorDefault, false)
+	for k, v := range f.Operands {
+		if k > 0 {
+			put(" ", colorDefault, false)
+		}
+		if k >= len(f.Operands)-takes {
+			put(v.String(), colKeys, true)
+		} else {
+			put(v.String(), colorDefault, false)
+		}
+	}
+	put(")", colorDefault, false)
+	if takes > 0 {
+		put(fmt.Sprintf("  %s takes %d", in.Name, takes), colDim, false)
+	}
+}
+
+// consumes is how many operands in takes from the top of the stack, as
+// docs/bytecode.md's table has it: a store reads the top and keeps it, a
+// conditional jump its test, a call its function and arguments.
+func consumes(in fbc.Insn) int {
+	count := 0
+	fields := strings.Fields(in.Operands)
+	if len(fields) > 0 {
+		count, _ = strconv.Atoi(fields[0])
+	}
+	switch in.Op {
+	case fbc.OpStoreG, fbc.OpStoreL, fbc.OpStoreUp, fbc.OpUnpack, fbc.OpRet:
+		return 1
+	case fbc.OpPop, fbc.OpTuple, fbc.OpCallB:
+		return count
+	case fbc.OpCall:
+		return count + 1
+	case fbc.OpJmp:
+		if in.Operands == "always" {
+			return 0
+		}
+		return 1
+	}
+	return 0
 }
 
 func values(vs []filo.Value) string {
