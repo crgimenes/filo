@@ -156,6 +156,9 @@ func TestCUnits(t *testing.T) {
 			why = sameDecompiled(dir, no)
 		}
 		if why == "" {
+			why = sameFormat(dir, no)
+		}
+		if why == "" {
 			passed++
 			continue
 		}
@@ -296,6 +299,28 @@ func sameBuild(dir string, no int) string {
 			return fmt.Sprintf("build%s: the Go compiler wrote %d bytes, the C one %d; they differ at byte %d", suffix, len(got), len(want), firstByte(got, want))
 		}
 	}
+}
+
+// sameFormat is "" when the Go filofmt formats a source the corpus kept
+// (NNNNN.filo) as the C runtime's filo_fmt did (NNNNN.fmt), byte for byte,
+// or when there is no C text kept for it.
+func sameFormat(dir string, no int) string {
+	want, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d.fmt", no))) // #nosec G304 -- a file of the directory the test was given
+	if err != nil {
+		return ""
+	}
+	src, err := os.ReadFile(filepath.Join(dir, fmt.Sprintf("%05d.filo", no))) // #nosec G304 -- a source of the directory the test was given
+	if err != nil {
+		return err.Error()
+	}
+	got, err := filo.Format(string(src))
+	if err != nil {
+		return "format: " + err.Error()
+	}
+	if got != string(want) {
+		return fmt.Sprintf("format: the Go filofmt wrote %d bytes, the C filo_fmt %d; they differ at byte %d", len(got), len(want), firstByte([]byte(got), want))
+	}
+	return ""
 }
 
 // sameDecompiled is "" when each unit of case no (NNNNN.fbc, and the
