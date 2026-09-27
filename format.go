@@ -452,7 +452,10 @@ func (l *layout) open(i int) int {
 	if l.needSpace() {
 		l.write(" ")
 	}
-	f := frame{align: (len(l.stack) + 1) * l.indentWidth, inline: -1}
+	// the children of a broken form indent from its own paren, which is
+	// not where the depth says under a column aligned to a head line (the
+	// bindings of let)
+	f := frame{align: l.col + l.indentWidth, inline: -1}
 	if p != nil && p.head == "cond" {
 		f.clause, f.inline = true, 1
 	}

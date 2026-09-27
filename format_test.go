@@ -263,6 +263,11 @@ func TestFormatLayout(t *testing.T) {
 			"(let ((big (>= W 69))\n      (art (if big banner small))\n      (wide (if big 67 33))\n      (nart (length art)))\n  (fg 2)\n  (attr A_BOLD))",
 		},
 		{
+			"a binding whose value does not fit indents it under the binding",
+			"(let ((n (length es)) (b (cond ((and all (> (length ARGS) 1)) (nth ARGS 1)) ((and (not all) (> (length ARGS) 0)) (nth ARGS 0)) (else (pwd))))) b)",
+			"(let ((n (length es))\n      (b\n        (cond\n          ((and all (> (length ARGS) 1)) (nth ARGS 1))\n          ((and (not all) (> (length ARGS) 0)) (nth ARGS 0))\n          (else (pwd)))))\n  b)",
+		},
+		{
 			"cond puts every clause on its own line",
 			"(cond ((is-empty c) (set NOTE \"\")) ((chose c \"a\" \"articles\") (goto-screen \"area:/pub\" (list))) (else (set NOTE \"unknown choice (try ?)\")))",
 			"(cond\n  ((is-empty c) (set NOTE \"\"))\n  ((chose c \"a\" \"articles\") (goto-screen \"area:/pub\" (list)))\n  (else (set NOTE \"unknown choice (try ?)\")))",
