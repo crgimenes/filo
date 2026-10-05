@@ -381,3 +381,34 @@ func TestStringsReadBackAsWritten(t *testing.T) {
 		}
 	}
 }
+
+// A quote ends an atom, as the reader has it: the formatter used to read
+// #t" " as the atom #t" and an open string, and a second pass changed it.
+func TestFormatQuoteEndsAtom(t *testing.T) {
+	src := "(anand(str-fmt \"%s%s %s\".5 #t\" \" _)\x00)"
+	once, err := Format(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	twice, err := Format(once)
+	if err != nil || twice != once {
+		t.Fatalf("not stable:\n%q\n%q (%v)", once, twice, err)
+	}
+	if !strings.Contains(once, `#t " "`) {
+		t.Fatalf("the bool and the string not apart: %q", once)
+	}
+}
+
+// A quote inside a symbol stays in it, as the reader has it: str-a" is one
+// symbol, so formatting it twice gives the same.
+func TestFormatQuoteInSymbol(t *testing.T) {
+	src := "(str-\xf0\xf0\xf0\xf0\xa9\")r"
+	once, err := Format(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	twice, err := Format(once)
+	if err != nil || twice != once {
+		t.Fatalf("not stable:\n%q\n%q (%v)", once, twice, err)
+	}
+}

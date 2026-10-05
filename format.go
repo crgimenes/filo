@@ -169,7 +169,11 @@ func tokenize(src string) []token {
 
 		// Atom (symbol, number, bool)
 		start := i
-		for i < len(src) {
+		isBool := c == '#' && i+2 < len(src) && (src[i+1] == 't' || src[i+1] == 'f') && src[i+2] == '"'
+		if isBool {
+			i += 2 // the reader's #t" ": a bool, then a string
+		}
+		for !isBool && i < len(src) {
 			c := src[i]
 			if c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '(' || c == ')' || c == ';' {
 				break
