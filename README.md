@@ -611,9 +611,12 @@ go run ./cmd/filo dump testdata/bytecode/prog.fbc
 
 `filo check` says whether a VM gives what a unit asks for (a bundle's
 members, each): the functions it imports and the extern globals it reads,
-against this command's VM or a profile — the names a VM gives, one a line,
-which a host writes from its context (msh's build writes the BBS's). The
-exit status is 1 when something lacks. `filo size` says where a unit's bytes
+against this command's VM or a profile — the names a VM gives, one a line
+(a function, or `global NAME` for a value it sets), which a host writes from
+its context (msh's build writes the BBS's). The exit status is 1 when
+something lacks. `filo build -vm` compiles against the same profile: a call
+to one of the VM's functions is an import, as where that VM compiles it,
+the bytes the C runtime's `filo build -vm` writes. `filo size` says where a unit's bytes
 go, section by section:
 
 ```bash

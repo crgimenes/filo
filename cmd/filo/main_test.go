@@ -92,6 +92,7 @@ func TestBuildAndBundle(t *testing.T) {
 		{[]string{"build", "--strip", "-o", dir + "/stripped.fbc", src + "main.filo"}, "stripped.fbc", "stripped.fbc"},
 		{[]string{"build", "-o", dir + "/upper.fbc", src + "upper.filo"}, "upper.fbc", "upper.fbc"},
 		{[]string{"bundle", "-o", dir + "/demo.fbb", dir + "/prog.fbc", dir + "/upper.fbc"}, "demo.fbb", "demo.fbb"},
+		{[]string{"build", "-vm", src + "host.vm", "-o", dir + "/host.fbc", src + "host.filo"}, "host.fbc", "host.fbc"},
 	} {
 		code := run(c.args, nil, &bytes.Buffer{}, &errs)
 		got, _ := os.ReadFile(dir + "/" + c.out)
@@ -124,7 +125,7 @@ func TestCheck(t *testing.T) {
 	if code != 1 || out.String() != "prog.fbc  lacks 1: /\n" {
 		t.Fatalf("exit %d: %q", code, out.String())
 	}
-	_ = os.WriteFile(vm, []byte("list\nmap\nfold\n+\n*\n/\nbase\n"), 0o600)
+	_ = os.WriteFile(vm, []byte("list\nmap\nfold\n+\n*\n/\nglobal base\n"), 0o600)
 	unit, _ := os.ReadFile("../../testdata/bytecode/prog.fbc")
 	out.Reset()
 	code = run([]string{"check", "-vm", vm}, bytes.NewReader(unit), &out, &errs)

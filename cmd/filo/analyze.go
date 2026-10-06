@@ -91,17 +91,36 @@ func cmdCheck(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return code
 }
 
-// profile is the names a VM's profile lists: one a line, "#" comments.
+// profile is the names a VM's profile lists: one a line, a function or
+// "global NAME" for a value it sets, "#" comments.
 func profile(text []byte) map[string]bool {
 	names := map[string]bool{}
+	eachProfiled(text, func(name string, _ bool) { names[name] = true })
+	return names
+}
+
+// profileFunctions is the functions a profile lists, in its order: what
+// build compiles a call to as an import.
+func profileFunctions(text []byte) []string {
+	var names []string
+	eachProfiled(text, func(name string, global bool) {
+		if !global {
+			names = append(names, name)
+		}
+	})
+	return names
+}
+
+func eachProfiled(text []byte, fn func(name string, global bool)) {
 	sc := bufio.NewScanner(bytes.NewReader(text))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
-		if line != "" && !strings.HasPrefix(line, "#") {
-			names[line] = true
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
 		}
+		name, global := strings.CutPrefix(line, "global ")
+		fn(strings.TrimSpace(name), global)
 	}
-	return names
 }
 
 // lacking is what a unit asks for that the VM does not give, the functions

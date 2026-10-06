@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -14,17 +15,32 @@ import (
 
 // cmdBuild compiles FILE... into one unit, as the C runtime's filo build:
 // each file an entry named by it ("lib/hello.filo" is the entry "hello"), the
-// same bytes the C compiler writes; --strip leaves the debug section out.
+// same bytes the C compiler writes; --strip leaves the debug section out, and
+// -vm compiles against a profile's VM: a call to one of its functions is a
+// call to a builtin (an import), as where that VM compiles it.
 func cmdBuild(args []string, stderr io.Writer) int {
 	strip := len(args) > 0 && args[0] == "--strip"
 	if strip {
 		args = args[1:]
 	}
+	e := engine()
+	if len(args) >= 2 && args[0] == "-vm" {
+		text, err := os.ReadFile(args[1]) // #nosec G304 G703 -- the profile the command was given
+		if err != nil {
+			return complain(stderr, err)
+		}
+		for _, name := range profileFunctions(text) {
+			// the one refusal left is a name the core has already, and the
+			// core's builtin is what a call to it compiles to anyway
+			_ = e.RegisterBuiltin(name, profiled)
+		}
+		args = args[2:]
+	}
 	if len(args) < 3 || args[0] != "-o" {
 		_, _ = io.WriteString(stderr, help("build"))
 		return 2
 	}
-	unit, err := compileFiles(args[2:])
+	unit, err := compileWith(e, args[2:])
 	if err != nil {
 		return complain(stderr, err)
 	}
@@ -35,6 +51,12 @@ func cmdBuild(args []string, stderr io.Writer) int {
 		}
 	}
 	return write(args[1], unit, stderr)
+}
+
+// profiled is what a profile's function does here: build only compiles
+// against it, and nothing runs it in this command.
+func profiled(context.Context, []filo.Value) (filo.Value, error) {
+	return filo.Value{}, errors.New("a builtin of the profile's VM, not this command's")
 }
 
 // cmdBundle puts units into one bundle, as the C runtime's filo bundle:
@@ -64,7 +86,12 @@ func cmdBundle(args []string, stderr io.Writer) int {
 
 // compileFiles compiles each file as the entry named by it, in one unit.
 func compileFiles(paths []string) ([]byte, error) {
-	e := engine()
+	return compileWith(engine(), paths)
+}
+
+// compileWith is compileFiles in e, whose builtins are what a call compiles
+// to an import.
+func compileWith(e *filo.Engine, paths []string) ([]byte, error) {
 	var entries []filo.BuildEntry
 	for _, path := range paths {
 		src, err := os.ReadFile(path) // #nosec G304 G703 -- a source the command was given

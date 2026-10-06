@@ -36,10 +36,13 @@ the unit (default: main, or the first).`, `  filo run --both fib.filo
 	{"show", "filo show tree|folded|ir FILE", `show writes one stage of what the compiler makes of a source, each line
 with the line:column it came from: the tree as read, the tree once
 constants folded, or the IR, frames and slots named.`, `  filo show ir fib.filo`},
-	{"build", "filo build [--strip] -o OUT FILE...", `build compiles programs into one unit of bytecode (docs/bytecode.md), each
+	{"build", "filo build [--strip] [-vm PROFILE] -o OUT FILE...", `build compiles programs into one unit of bytecode (docs/bytecode.md), each
 an entry named by its file (lib/hello.filo is the entry "hello"): the same
 bytes the C runtime's filo build writes. --strip leaves out the debug section
-(the lines and columns errors say).`, `  filo build -o prog.fbc main.filo fail.filo`},
+(the lines and columns errors say). -vm compiles against the VM the profile
+lists, as check reads it: a call to one of its functions is a call to a
+builtin (an import), as where that VM compiles it, not to a global.`, `  filo build -o prog.fbc main.filo fail.filo
+  filo build -vm app.vm -o app.fbc draw.filo`},
 	{"bundle", "filo bundle -o OUT UNIT...", `bundle puts units into one bundle, each a member named by its file.`, `  filo bundle -o demo.fbb prog.fbc upper.fbc`},
 	{"dump", "filo dump [FILE]", `dump lists Filo bytecode: a unit (.fbc) or a bundle (.fbb), as
 docs/bytecode.md describes it — the header, the names it imports and the
@@ -49,8 +52,8 @@ came from. FILE is read from standard input when absent or "-".`, `  filo dump l
 	{"check", "filo check [-vm PROFILE] [FILE]", `check says of each unit (a bundle's members, each) whether a VM gives what
 it asks for: the functions it imports and the extern globals it reads. The
 VM is this command's (the core, math and strings), or the one PROFILE lists:
-the names it gives, one a line, "#" for a comment (msh's build writes the
-BBS's). A line a unit: "NAME  runs: ..." or "NAME  lacks N: a, b"; the exit
+the names it gives, one a line -- a function, or "global NAME" for a value
+it sets -- and "#" for a comment (msh's build writes the BBS's). A line a unit: "NAME  runs: ..." or "NAME  lacks N: a, b"; the exit
 status is 1 when one lacks something.`, `  filo check -vm bin.vm mine.fbb`},
 	{"decompile", "filo decompile [-o DIR] FILE [MEMBER]", `decompile writes a unit's entry points back as Filo, formatted: each under
 a "; NAME.filo" line, or with -o as DIR/NAME.filo, the paths written in the

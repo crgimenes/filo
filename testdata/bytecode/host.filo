@@ -1,0 +1,2 @@
+; A program for a VM of its own: paint is its function, W its value.
+(paint 0 (str-upper "x") W)
