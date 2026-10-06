@@ -53,8 +53,9 @@ came from. FILE is read from standard input when absent or "-".`, `  filo dump e
 it asks for: the functions it imports and the extern globals it reads. The
 VM is this command's (the core, math and strings), or the one PROFILE lists:
 the names it gives, one a line -- a function, or "global NAME" for a value
-it sets -- and "#" for a comment (rocchetto's build writes its own). A line a unit: "NAME  runs: ..." or "NAME  lacks N: a, b"; the exit
-status is 1 when one lacks something.`, `  filo check -vm bin.vm mine.fbb`},
+it sets -- and "#" for a comment (rocchetto's build writes its own). A
+line a unit: "NAME  runs: ..." or "NAME  lacks N: a, b"; the exit status
+is 1 when one lacks something.`, `  filo check -vm bin.vm mine.fbb`},
 	{"decompile", "filo decompile [-o DIR] FILE [MEMBER]", `decompile writes a unit's entry points back as Filo, formatted: each under
 a "; NAME.filo" line, or with -o as DIR/NAME.filo, the paths written in the
 unit's order, which filo build takes to make the same unit again, byte for
