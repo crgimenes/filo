@@ -308,3 +308,40 @@ func TestFmt(t *testing.T) {
 		t.Fatalf("-w with no file: exit %d", code)
 	}
 }
+
+// filo run has the machine (filoio): ARGS after --, the streams, and the
+// status exit-status leaves; build compiles without it, as C's filo does,
+// so a call to one of its names stays a global, the bytes C writes.
+func TestRunHasTheMachineBuildDoesNot(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "prog.filo")
+	if err := os.WriteFile(src, []byte(`(do (out-write (str-join "," ARGS) " " (in-line)) (exit-status 4) 1)`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errs bytes.Buffer
+	code := run([]string{"run", src, "--", "a", "b"}, strings.NewReader("line\n"), &out, &errs)
+	if code != 4 || out.String() != "a,b line\n1\n" {
+		t.Fatalf("exit %d, out %q, stderr %q", code, out.String(), errs.String())
+	}
+	if machine != nil {
+		t.Fatal("the machine outlived its run")
+	}
+	unit := filepath.Join(dir, "now.fbc")
+	if err := os.WriteFile(src, []byte(`(now)`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code := run([]string{"build", "-o", unit, src}, nil, &out, &errs); code != 0 {
+		t.Fatalf("build: exit %d, stderr %q", code, errs.String())
+	}
+	data, err := os.ReadFile(unit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := engine().LoadUnit(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lack := u.Missing(nil); len(lack) != 1 || lack[0] != "now" {
+		t.Fatalf("build compiled now as %v, want a global the unit lacks", lack)
+	}
+}

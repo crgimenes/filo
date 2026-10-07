@@ -42,7 +42,9 @@ The runtime ships with explicit constraints from day one:
   levels with an error, and `Value.String()` writes the reason instead. Code of
   your own that walks a value calls `Value.Walkable()` first.
 
-There is no file access, no network access, no syscall, no "dangerous" calls of any kind. The only things scripts can touch are the Go functions the host explicitly registers as builtins.
+There is no file access, no network access, no syscall, no "dangerous" calls of any kind. The only things scripts can touch are the Go functions the host explicitly registers as builtins. That holds for every engine you make: `filoio` below, which gives scripts
+files and the network, is the `filo` command's, and an engine has it only
+when you register it.
 
 ## Syntax
 
@@ -182,6 +184,34 @@ Requires explicit registration (import `github.com/crgimenes/filo/filojson`): `f
 
 Requires explicit registration (import `github.com/crgimenes/filo/filoprint`): `filoprint.RegisterBuiltins(eng)`. Adds `print`, `println`, and `printf` (the latter understands `%T` for Filo types). Output goes to stdout by default; redirect it with `filoprint.SetOutput(w)`.
 
+### Extension: filoio
+
+**Never registered by default**: an engine gets it only by
+`h := &filoio.Host{Args: args, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr}`
+then `h.RegisterBuiltins(eng)`, and passes `h.Globals()` (`ARGS`) to the
+run. It is the `filo` command's own: `filo run` and the REPL have it, and a
+program that embeds Filo reaches files and the network only this way, or
+through builtins of its own. The names are those of the
+[rocchetto](https://github.com/crgimenes/rocchetto) shell, so a script runs
+the same in both:
+
+- arguments and streams: `ARGS`, `(in-read [n])`, `(in-line)`,
+  `(out-write s ...)`, `(err-write s ...)`, `(exit-status [n])` (read back
+  with `h.Status()`);
+- files: `(read-file p)`, `(write-file p s)`, `(is-file p)`,
+  `(file-open p ["w" | "a"])` (a handle, or why not; `"w"` replaces the old
+  file only at `file-close`), `(file-read h [n])`, `(file-line h)`,
+  `(file-write h s ...)`, `(file-seek h off)`, `(file-close h)`,
+  `(file-stat p [#t])` → `(kind size mtime "disk")`,
+  `(dir-read d [from [count]])` → `(entries next)`, `(path-resolve p)`;
+- the environment and the clock: `(env-get name)`, `(env-list)`, `(now)`,
+  `(time-zone)`;
+- HTTP: `(http-get url)` and `(http-request method url [body [headers]])`,
+  each `(status body headers)`, status 0 and the reason as body when no
+  answer came.
+
+The C runtime is the light one and has no `filoio`.
+
 ## Pre-parse / execute (template style)
 
 For scripts run many times against different data, Filo supports pre-parsing, similar to Go's `html/template`:
@@ -318,6 +348,8 @@ Three small binaries live under `cmd/`; `make tools` builds all of them into
   falls back to batch mode when stdin is a pipe; math and strings are
   loaded, `-filo-package` names others (rand, print, json), and
   `-step-limit`, `-recursion-limit` and `-timeout` bound the run.
+  `filo run` and the REPL have `filoio` (files, streams, environment,
+  clock, HTTP; `ARGS` after `--`); `filo fmt` is filofmt's layout.
   `filo run` runs a source, a unit or a bundle (`--vm`, `--trace`,
   `--both`); `filo show tree|folded|ir` writes a stage of the compiling —
   the tree as read, once constants fold, the IR — each line with where it

@@ -11,13 +11,37 @@ import (
 
 	"github.com/crgimenes/filo"
 	"github.com/crgimenes/filo/fbc"
+	"github.com/crgimenes/filo/filoio"
 )
 
 // cmdRun runs a program and writes its value, as the C runtime's filo run:
 // a source on the tree the compiler lowers (or, with --vm, as bytecode
 // compiled in memory); a unit's entries, in order, sharing their globals;
 // a bundle's member. --both runs a source both ways, a line each.
-func cmdRun(args []string, stdout, stderr io.Writer) int {
+//
+// After --, the words are the program's: ARGS. The run has the machine
+// (filoio), and the process ends with the status exit-status left.
+func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	var words []string
+	for k, a := range args {
+		if a == "--" {
+			args, words = args[:k], args[k+1:]
+			break
+		}
+	}
+	machine = &filoio.Host{Args: words, Stdin: stdin, Stdout: stdout, Stderr: stderr}
+	defer func() {
+		machine.Close()
+		machine = nil
+	}()
+	code := runArgs(args, stdout, stderr)
+	if s := machine.Status(); code == 0 && s != 0 {
+		return s
+	}
+	return code
+}
+
+func runArgs(args []string, stdout, stderr io.Writer) int {
 	vm, both, trace := false, false, false
 	i := 0
 	for ; i < len(args) && len(args[i]) > 0 && args[i][0] == '-'; i++ {
@@ -70,7 +94,7 @@ func cmdRun(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return complain(stderr, placed(path, data, err))
 	}
-	v, _, err := p.Execute(context.Background(), nil, filo.EvalConfig{})
+	v, _, err := p.Execute(context.Background(), startGlobals(), filo.EvalConfig{})
 	if err != nil {
 		return complain(stderr, placed(path, data, err))
 	}
@@ -89,7 +113,7 @@ func runUnit(data []byte, entries []string, trace bool, stdout, stderr io.Writer
 		entries = []string{firstEntry(u.Entries())}
 	}
 	var v filo.Value
-	var globals map[string]filo.Value
+	globals := startGlobals()
 	for _, entry := range entries {
 		if trace {
 			v, globals, err = traceEntry(u, data, entry, globals, stdout)
@@ -111,7 +135,7 @@ func load(data []byte) (*filo.Unit, error) {
 	if err != nil {
 		return nil, err
 	}
-	lack := u.Missing(nil)
+	lack := u.Missing(startGlobals())
 	if len(lack) > 0 {
 		return nil, fmt.Errorf("missing (%d): %s", len(lack), strings.Join(lack, " "))
 	}
@@ -164,7 +188,7 @@ func runBoth(path string, data []byte, stdout, stderr io.Writer) int {
 		return complain(stderr, placed(path, data, err))
 	}
 	steps := 0
-	v, _, err := p.Execute(context.Background(), nil, filo.EvalConfig{Steps: &steps})
+	v, _, err := p.Execute(context.Background(), startGlobals(), filo.EvalConfig{Steps: &steps})
 	sayEnd(stdout, "ir", v, err, steps, "steps, one a node")
 	unit, err := compileFiles([]string{path})
 	if err != nil {
@@ -175,7 +199,7 @@ func runBoth(path string, data []byte, stdout, stderr io.Writer) int {
 		return complain(stderr, err)
 	}
 	steps = 0
-	v, _, err = u.Run(context.Background(), entryName(path, ".filo"), nil, filo.EvalConfig{Steps: &steps})
+	v, _, err = u.Run(context.Background(), entryName(path, ".filo"), startGlobals(), filo.EvalConfig{Steps: &steps})
 	sayEnd(stdout, "vm", v, err, steps, "steps, one an instruction")
 	return 0
 }

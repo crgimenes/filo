@@ -12,6 +12,7 @@ import (
 
 	"github.com/crgimenes/filo"
 	"github.com/crgimenes/filo/fbc"
+	"github.com/crgimenes/filo/filoio"
 	"github.com/crgimenes/filo/filomath"
 	"github.com/crgimenes/filo/filostrings"
 )
@@ -93,11 +94,28 @@ func newSession(data []byte, member, entry, srcDir string, globals map[string]fi
 
 // engine has what the C runtime's filo command has: the core and the
 // math and strings packs.
+// machine is the filo command's files, streams, clock and network
+// (filoio), there only while run or the REPL is at work: build, check and
+// the rest compile against the language alone, as C's filo does, so the
+// bytes they write stay the same in both.
+var machine *filoio.Host
+
 func engine() *filo.Engine {
 	e := filo.NewEngine()
 	filomath.RegisterBuiltins(e)
 	filostrings.RegisterBuiltins(e)
+	if machine != nil {
+		machine.RegisterBuiltins(e)
+	}
 	return e
+}
+
+// startGlobals are what a run starts with: the machine's (ARGS), if any.
+func startGlobals() map[string]filo.Value {
+	if machine == nil {
+		return nil
+	}
+	return machine.Globals()
 }
 
 // evalGlobals evaluates each "name=expression" into the global of that

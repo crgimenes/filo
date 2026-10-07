@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/crgimenes/filo"
+	"github.com/crgimenes/filo/filoio"
 	"github.com/crgimenes/filo/filojson"
 	"github.com/crgimenes/filo/filomath"
 	"github.com/crgimenes/filo/filoprint"
@@ -78,8 +79,16 @@ func cmdRepl(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	// Create engine and register packages
+	// Create engine and register packages; the machine (filoio) is the
+	// filo command's, the REPL's too: its input is the program or the
+	// terminal, so in-read finds nothing
 	engine := filo.NewEngine()
+	machine = &filoio.Host{Stdin: strings.NewReader(""), Stdout: stdout, Stderr: stderr}
+	defer func() {
+		machine.Close()
+		machine = nil
+	}()
+	machine.RegisterBuiltins(engine)
 	for _, pkg := range requestedPackages {
 		err := registerPackage(engine, pkg)
 		if err != nil {
@@ -129,13 +138,13 @@ func runBatchMode(engine *filo.Engine, stdin io.Reader, stdout, stderr io.Writer
 	}
 
 	ctx := context.Background()
-	result, _, err := engine.RunScript(ctx, script, nil, cfg)
+	result, _, err := engine.RunScript(ctx, script, machine.Globals(), cfg)
 	if err != nil {
 		return complain(stderr, placed("stdin", data, err))
 	}
 
 	_, _ = fmt.Fprintln(stdout, valueText(result))
-	return 0
+	return machine.Status()
 }
 
 func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg filo.EvalConfig, foldConst bool) int {
@@ -168,12 +177,13 @@ func runREPL(engine *filo.Engine, stdinFd int, stdout, stderr io.Writer, cfg fil
 	// Wrap stdin with CRLF output converter for raw mode
 	crlfOut := &crlfWriter{os.Stdout}
 	t := term.NewTerminal(&crlfReadWriter{os.Stdin, crlfOut}, promptMain)
+	machine.Stdout, machine.Stderr = crlfOut, crlfOut // raw mode: "\n" needs its "\r"
 
 	// Configure filoprint to use CRLF output for raw terminal mode
 	filoprint.SetOutput(crlfOut)
 
 	var buffer strings.Builder
-	globals := make(map[string]filo.Value)
+	globals := machine.Globals()
 
 	keys := &replKeys{
 		foldConst: foldConst,
