@@ -37,7 +37,8 @@ import (
 	"github.com/crgimenes/filo"
 )
 
-const version = "0.1.0"
+// Version is the release tag, stamped by the build (-X main.Version).
+var Version = "dev"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
@@ -80,7 +81,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	if showVer {
-		_, _ = fmt.Fprintf(stdout, "filofix version %s\n", version)
+		_, _ = fmt.Fprintf(stdout, "filofix version %s\n", Version)
 		return 0
 	}
 

@@ -1,4 +1,4 @@
-.PHONY: all build tools install vet test fmt tidy clean cross
+.PHONY: all build tools install vet test fmt tidy clean cross dist
 
 # Filo is pure Go; the tools cross-compile from any host.
 export CGO_ENABLED=0
@@ -37,7 +37,29 @@ tidy:
 	go mod tidy
 
 clean:
-	rm -rf bin
+	rm -rf bin dist
+
+# What release.sh publishes (VERSION is its tag, which each tool reports):
+# every tool universal for macOS, gzipped for Linux, and for Windows, the
+# module's own versions only (GOWORK off), amd64 and arm64.
+VERSION  ?= dev
+DIST_DIR ?= dist
+DIST_LD  := -s -w -X main.Version=$(VERSION)
+dist:
+	@mkdir -p $(DIST_DIR)/.work
+	@for t in $(TOOLS); do \
+		for a in amd64 arm64; do \
+			GOWORK=off GOOS=darwin GOARCH=$$a go build -trimpath -ldflags "$(DIST_LD)" \
+				-o $(DIST_DIR)/.work/$$t-$$a ./cmd/$$t || exit 1; \
+			GOWORK=off GOOS=linux GOARCH=$$a go build -trimpath -ldflags "$(DIST_LD)" \
+				-o $(DIST_DIR)/$$t-linux-$$a ./cmd/$$t || exit 1; \
+			gzip -9f $(DIST_DIR)/$$t-linux-$$a; \
+			GOWORK=off GOOS=windows GOARCH=$$a go build -trimpath -ldflags "$(DIST_LD)" \
+				-o $(DIST_DIR)/$$t-windows-$$a.exe ./cmd/$$t || exit 1; \
+		done; \
+		lipo -create -output $(DIST_DIR)/$$t-darwin-universal \
+			$(DIST_DIR)/.work/$$t-amd64 $(DIST_DIR)/.work/$$t-arm64 || exit 1; \
+	done
 
 # Compile-check every supported target without running. Catches build-tag
 # breakage that a single-host `go build` misses.

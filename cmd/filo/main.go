@@ -96,6 +96,10 @@ func help(name string) string {
 			ex = append(ex, c.examples)
 		}
 	}
+	if name == "" {
+		syn = append(syn, "filo --version")
+		text = append(text, "--version writes the version of this filo and which runtime it is, Go or C.")
+	}
 	return "usage: " + strings.Join(syn, "\n       ") + "\n\n" + strings.Join(text, "\n\n") +
 		"\n\nExamples:\n" + strings.Join(ex, "\n") + "\n"
 }
@@ -116,9 +120,16 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
+// Version is the release tag, stamped by the build (-X main.Version).
+var Version = "dev"
+
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) > 0 && (args[0] == "-h" || args[0] == "--help") {
 		_, _ = io.WriteString(stdout, usage)
+		return 0
+	}
+	if len(args) == 1 && (args[0] == "--version" || args[0] == "-version") {
+		_, _ = fmt.Fprintf(stdout, "filo version %s (Go)\n", Version)
 		return 0
 	}
 	if len(args) > 1 && asksHelp(args[1:]) {
