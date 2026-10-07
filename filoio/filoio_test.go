@@ -60,9 +60,15 @@ func TestStreamsArgsAndStatus(t *testing.T) {
 	}
 }
 
+// tempDir is a test's directory spelled with "/", which Windows takes too:
+// a Filo string reads "\U" as an escape.
+func tempDir(t *testing.T) string {
+	return filepath.ToSlash(t.TempDir())
+}
+
 func TestFiles(t *testing.T) {
-	dir := t.TempDir()
-	p := filepath.Join(dir, "notes.txt")
+	dir := tempDir(t)
+	p := dir + "/notes.txt"
 	h, out, _ := newHost("")
 	run(t, h, `(let ((h (file-open "`+p+`" "w")))
 	  (do (file-write h "one\n" "two\n") (out-write (string (is-file "`+p+`")) "\n") (file-close h)))`)
@@ -76,28 +82,28 @@ func TestFiles(t *testing.T) {
 	if got := out.String(); got != "one\ntwone\ntwo\n#t" {
 		t.Fatalf("read back %q", got)
 	}
-	if v := run(t, h, `(file-open "`+filepath.Join(dir, "none")+`")`); v.Kind != filo.KString {
+	if v := run(t, h, `(file-open "`+dir+"/none"+`")`); v.Kind != filo.KString {
 		t.Fatalf("opening what is not there: %v, want why not", v)
 	}
 	run(t, h, `(let ((h (file-open "`+p+`" "a"))) (do (file-write h "three\n") (file-close h)))`)
 	if v := run(t, h, `(read-file "`+p+`")`); v.Str != "one\ntwo\nthree\n" {
 		t.Fatalf("append: %q", v.Str)
 	}
-	if v := run(t, h, `(write-file "`+filepath.Join(dir, "b")+`" "x")`); !v.Bool {
+	if v := run(t, h, `(write-file "`+dir+"/b"+`" "x")`); !v.Bool {
 		t.Fatal("write-file said no")
 	}
 	st := run(t, h, `(file-stat "`+p+`")`)
 	if st.Kind != filo.KTuple || st.Tup[0].Str != "file" || st.Tup[1].Num != 14 || st.Tup[3].Str != "disk" {
 		t.Fatalf("file-stat %v", st)
 	}
-	if v := run(t, h, `(file-stat "`+filepath.Join(dir, "none")+`")`); v.Kind != filo.KList || len(v.List) != 0 {
+	if v := run(t, h, `(file-stat "`+dir+"/none"+`")`); v.Kind != filo.KList || len(v.List) != 0 {
 		t.Fatalf("file-stat of nothing: %v", v)
 	}
 }
 
 // A file being written that is never closed is dropped, the old one kept.
 func TestUnclosedWriteIsDropped(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "keep")
+	p := tempDir(t) + "/keep"
 	if err := os.WriteFile(p, []byte("old"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +121,7 @@ func TestUnclosedWriteIsDropped(t *testing.T) {
 }
 
 func TestDirRead(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDir(t)
 	for _, n := range []string{"b", "a", ".c"} {
 		if err := os.WriteFile(filepath.Join(dir, n), nil, 0o600); err != nil {
 			t.Fatal(err)
