@@ -65,6 +65,9 @@ nested function's); forms that compile alike come back as one (cond for
 if chains, a constant for what was folded into it). For a bundle, MEMBER is
 the unit (default: main, or the first).`, `  filo decompile prog.fbc
   filo build -o again.fbc $(filo decompile -o src prog.fbc)`},
+	{"fmt", "filo fmt [-w] [FILE...]", `fmt lays Filo source out as filofmt does, byte for byte, and as C's filo
+fmt: on standard output, or with -w back into each file. FILE is read from
+standard input when there is none.`, `  filo fmt -w examples/*.filo`},
 	{"size", "filo size [FILE]", `size says where the bytes go: each unit's header and sections, in the
 order the file has them.`, `  filo size screens.fbb`},
 	{"debug", "filo debug [-src DIR] [-g NAME=EXPR]... FILE [MEMBER] [ENTRY]", `debug steps an entry point of a unit, a bundle or a source (compiled as
@@ -164,6 +167,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return cmdSize(args[1:], stdin, stdout, stderr)
 		case "decompile":
 			return cmdDecompile(args[1:], stdin, stdout, stderr)
+		case "fmt":
+			return cmdFmt(args[1:], stdin, stdout, stderr)
 		}
 	}
 	if len(args) < 1 || args[0] != "dump" {

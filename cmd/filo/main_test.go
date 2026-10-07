@@ -284,3 +284,27 @@ func TestDecompileBuildsBack(t *testing.T) {
 		t.Fatalf("a source: exit %d, %q", code, errs.String())
 	}
 }
+
+// filo fmt is filofmt's layout: from stdin to stdout, and -w rewrites a file
+// only to format it.
+func TestFmt(t *testing.T) {
+	var out, errs bytes.Buffer
+	code := run([]string{"fmt"}, strings.NewReader("(def   x\n 1)"), &out, &errs)
+	if code != 0 || out.String() != "(def x 1)\n" {
+		t.Fatalf("exit %d, out %q, stderr %q", code, out.String(), errs.String())
+	}
+	path := filepath.Join(t.TempDir(), "x.filo")
+	if err := os.WriteFile(path, []byte("(def   x\n 1)"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code := run([]string{"fmt", "-w", path}, nil, &out, &errs); code != 0 {
+		t.Fatalf("-w: exit %d, stderr %q", code, errs.String())
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != "(def x 1)\n" {
+		t.Fatalf("-w wrote %q (%v)", got, err)
+	}
+	if code := run([]string{"fmt", "-w"}, nil, &out, &errs); code != 2 {
+		t.Fatalf("-w with no file: exit %d", code)
+	}
+}
