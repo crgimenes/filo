@@ -556,11 +556,32 @@ func formatTokens(tokens []token, cfg FormatConfig) string {
 			i++
 		}
 	}
+	// a string the source leaves open runs to the end: trimming it or a
+	// newline after it would change it, and the next run's layout
+	if len(tokens) > 0 && openString(tokens[len(tokens)-1]) {
+		return l.b.String()
+	}
 	result := strings.TrimRight(l.b.String(), "\n ")
 	if result != "" {
 		result += "\n"
 	}
 	return result
+}
+
+// openString reports a string with no closing quote: tokenize ran it to the end.
+func openString(tok token) bool {
+	v := tok.value
+	if tok.typ != tokAtom || v == "" || v[0] != '"' {
+		return false
+	}
+	for i := 1; i < len(v); i++ {
+		if v[i] == '\\' && i+1 < len(v) {
+			i++
+		} else if v[i] == '"' {
+			return false // tokenize ends a string at its quote
+		}
+	}
+	return true
 }
 
 // FormatValue formats a Filo Value as a readable string.

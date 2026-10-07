@@ -135,6 +135,10 @@ func TestFormatIdempotent(t *testing.T) {
 		"(fn (a b) (+ a b))",
 		"(def foo 42)",
 		"(do (set x 1) (set y 2) (+ x y))",
+		// a string left open runs to the end: no newline may join it
+		"[(str-;fm 1 2t \"\x00\x00\x00\x005 2))\n(< \"21d ) 1error",
+		"(a \"abc  \n\n",
+		"(x \"q\\",
 	}
 
 	for _, input := range inputs {

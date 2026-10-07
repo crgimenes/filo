@@ -112,7 +112,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 			return 1
 		}
-		if !strings.HasSuffix(formatted, "\n") {
+		// FormatWithConfig ends its own lines, or leaves an open string unended
+		if !strings.HasSuffix(formatted, "\n") && (foldConstFlag || formatted == "") {
 			formatted += "\n"
 		}
 		_, err = fmt.Fprint(stdout, formatted)
@@ -183,7 +184,7 @@ func processFile(path string, cfg filo.FormatConfig, write, list, diff, foldCons
 	}
 
 	// Ensure trailing newline
-	if !strings.HasSuffix(formatted, "\n") {
+	if !strings.HasSuffix(formatted, "\n") && (foldConst || formatted == "") {
 		formatted += "\n"
 	}
 
