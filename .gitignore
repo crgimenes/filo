@@ -94,3 +94,7 @@ cmd/filofix/filofix
 /filo
 /bin/
 /filofix
+# planning, kept local
+CLAUDE.md
+project.md
+TODO.md

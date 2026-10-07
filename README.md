@@ -613,7 +613,7 @@ go run ./cmd/filo dump testdata/bytecode/prog.fbc
 members, each): the functions it imports and the extern globals it reads,
 against this command's VM or a profile — the names a VM gives, one a line
 (a function, or `global NAME` for a value it sets), which a host writes from
-its context (rocchetto's build writes its own). The exit status is 1 when
+its context ([rocchetto](https://github.com/crgimenes/rocchetto)'s build writes its own). The exit status is 1 when
 something lacks. `filo build -vm` compiles against the same profile: a call
 to one of the VM's functions is an import, as where that VM compiles it,
 the bytes the C runtime's `filo build -vm` writes. `filo size` says where a unit's bytes
@@ -634,7 +634,7 @@ fewer. A run stepped to its end gives what `Run` gives, on every unit the
 corpus compiles to. The run waits between steps as a coroutine: `Close` ends
 one left in the middle.
 
-`filo debug` steps a unit on the terminal, in the edt's colours: the source on
+`filo debug` steps a unit on the terminal, in the [edt](https://github.com/crgimenes/edt)'s colours: the source on
 the left, highlighted as the edt highlights it, with the line and column the
 run is at; the unit's instructions on the right, all of them as `dump` lists
 them, around the one the run is at (`x` shows the unit's bytes instead,
