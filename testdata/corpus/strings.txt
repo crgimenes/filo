@@ -422,3 +422,53 @@ packs: strings
 (str-fmt "%.3f" 9.9995)
 --- want
 "9.999"
+
+=== str-trim of nothing
+(str-trim "")
+--- want
+""
+
+=== str-trim of blanks only
+(str-trim "   ")
+--- want
+""
+
+=== str-trim takes tabs and line ends
+(str-trim "\t\n x \r\n")
+--- want
+"x"
+
+=== str-trim keeps the letters past ASCII
+(str-trim " á ")
+--- want
+"á"
+
+=== str-lower of nothing
+(str-lower "")
+--- want
+""
+
+=== str-lower leaves digits and spaces
+(str-lower "MiXeD 123")
+--- want
+"mixed 123"
+
+=== str-lower leaves other scripts alone
+(str-lower "ΑΒΓ µ ẞ")
+--- want
+"ΑΒΓ µ ẞ"
+
+=== str-upper leaves the micro sign alone
+(str-upper "µ αβγ")
+--- want
+"µ αβγ"
+
+=== str-concat of nothing
+(str-concat)
+--- want
+""
+
+=== str-concat with empty strings
+(str-concat "a" "" "b")
+--- want
+"ab"

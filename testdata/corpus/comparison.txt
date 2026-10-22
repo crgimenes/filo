@@ -140,3 +140,48 @@
 --- error
 --- at 1:1
 --- message < expects at least 2 arguments
+
+=== zero equals minus zero
+(= 0 -0)
+--- want
+#t
+
+=== NaN is not equal to itself
+(= (number "nan") (number "nan"))
+--- want
+#f
+
+=== NaN differs from itself
+(!= (number "nan") (number "nan"))
+--- want
+#t
+
+=== a list holding NaN is not equal to itself
+(= (list (number "nan")) (list (number "nan")))
+--- want
+#f
+
+=== empty strings are equal
+(= "" "")
+--- want
+#t
+
+=== empty lists are equal
+(= (list) (list))
+--- want
+#t
+
+=== empty tuples are equal
+(= (tuple) (tuple))
+--- want
+#t
+
+=== nested empty lists are equal
+(= (list (list)) (list (list)))
+--- want
+#t
+
+=== two functions alike are not equal
+(= (fn () 1) (fn () 1))
+--- want
+#f

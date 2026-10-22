@@ -113,3 +113,170 @@ needs host-math
 (tan 0)
 --- want
 0
+
+# The edges: NaN, the infinities, the sign of zero, and numbers past int64.
+# A zero's sign shows only in its text, so those cases compare strings.
+
+=== math-max skips NaN
+(math-max 1 (number "nan") 2)
+--- want
+2
+
+=== math-min skips NaN
+(math-min 1 (number "nan") 2)
+--- want
+1
+
+=== math-max with minus infinity
+(math-max (number "-inf") -5)
+--- want
+-5
+
+=== math-min with infinity
+(math-min (number "inf") 5)
+--- want
+5
+
+=== math-max of one number
+(math-max 7)
+--- want
+7
+
+=== math-max needs numbers
+(math-max 1 "a")
+--- error
+--- at 1:1
+--- message expected number, got string
+
+=== abs of minus infinity
+(abs (number "-inf"))
+--- want
+(number "inf")
+
+=== abs of NaN
+(abs (number "nan"))
+--- want
+(number "nan")
+
+=== abs needs a number
+(abs "x")
+--- error
+--- at 1:1
+--- message expected number, got string
+
+=== floor of minus a half
+(floor -0.5)
+--- want
+-1
+
+=== ceil keeps the sign of zero
+(string (ceil -0.5))
+--- want
+"-0"
+
+=== round keeps the sign of zero
+(string (round -0.4))
+--- want
+"-0"
+
+=== ceil of infinity
+(ceil (number "inf"))
+--- want
+(number "inf")
+
+=== round of NaN
+(round (number "nan"))
+--- want
+(number "nan")
+
+=== to-int of NaN is NaN
+(to-int (number "nan"))
+--- want
+(number "nan")
+
+=== to-int of infinity is infinity
+(to-int (number "-inf"))
+--- want
+(number "-inf")
+
+=== to-int past int64 keeps the number
+(to-int 1e300)
+--- want
+1e300
+
+=== to-int keeps the sign of zero
+(string (to-int -0.4))
+--- want
+"-0"
+
+=== pi to the last digit
+(pi)
+--- want
+3.141592653589793
+
+=== e to the last digit
+(e)
+--- want
+2.718281828459045
+
+=== exp of zero
+needs host-math
+(exp 0)
+--- want
+1
+
+=== exp of minus infinity
+needs host-math
+(exp (number "-inf"))
+--- want
+0
+
+=== exp past the doubles
+needs host-math
+(exp 1000)
+--- want
+(number "inf")
+
+=== log of zero
+needs host-math
+(log 0)
+--- error
+--- at 1:1
+--- message log of non-positive number
+
+=== log10 of a power of ten
+needs host-math
+(log10 1000)
+--- want
+3
+
+=== log10 of zero
+needs host-math
+(log10 0)
+--- error
+--- at 1:1
+--- message log10 of non-positive number
+
+=== sin of infinity is NaN
+needs host-math
+(sin (number "inf"))
+--- want
+(number "nan")
+
+=== cos of NaN is NaN
+needs host-math
+(cos (number "nan"))
+--- want
+(number "nan")
+
+=== sqrt of infinity
+needs host-math
+(sqrt (number "inf"))
+--- want
+(number "inf")
+
+=== sqrt keeps minus zero
+needs host-math
+(string (sqrt -0))
+--- want
+"-0"

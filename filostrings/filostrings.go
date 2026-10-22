@@ -283,7 +283,7 @@ func builtinStrUpper(ctx context.Context, args []filo.Value) (filo.Value, error)
 	if err != nil {
 		return filo.Value{}, fmt.Errorf("str-upper: argument must be string: %w", err)
 	}
-	return filo.VString(strings.ToUpper(str)), nil
+	return filo.VString(latin1Case(str, true)), nil
 }
 
 // builtinStrLower converts a string to lowercase.
@@ -297,7 +297,7 @@ func builtinStrLower(ctx context.Context, args []filo.Value) (filo.Value, error)
 	if err != nil {
 		return filo.Value{}, fmt.Errorf("str-lower: argument must be string: %w", err)
 	}
-	return filo.VString(strings.ToLower(str)), nil
+	return filo.VString(latin1Case(str, false)), nil
 }
 
 // builtinStrConcat concatenates multiple strings.
@@ -371,4 +371,42 @@ func builtinStrSub(ctx context.Context, args []filo.Value) (filo.Value, error) {
 		return filo.VString(""), nil
 	}
 	return filo.VString(string(runes[start:end])), nil
+}
+
+// latin1Case maps ASCII and Latin-1 letters only, ÿ and Ÿ included, and
+// leaves every other byte as it came (other scripts, invalid UTF-8): the C
+// runtime does the same with no Unicode tables, and the corpus pins it.
+// strings.ToUpper would map Greek, µ and the rest, and turn invalid bytes
+// into U+FFFD.
+func latin1Case(s string, upper bool) string {
+	b := []byte(s)
+	out := make([]byte, 0, len(b)+1)
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+		switch {
+		case upper && c >= 'a' && c <= 'z':
+			out = append(out, c-32)
+		case !upper && c >= 'A' && c <= 'Z':
+			out = append(out, c+32)
+		case c == 0xC3 && i+1 < len(b):
+			d := b[i+1]
+			switch {
+			case upper && d == 0xBF: // ÿ -> Ÿ
+				out = append(out, 0xC5, 0xB8)
+			case upper && d >= 0xA0 && d <= 0xBE && d != 0xB7:
+				out = append(out, c, d-0x20)
+			case !upper && d >= 0x80 && d <= 0x9E && d != 0x97:
+				out = append(out, c, d+0x20)
+			default:
+				out = append(out, c, d)
+			}
+			i++
+		case !upper && c == 0xC5 && i+1 < len(b) && b[i+1] == 0xB8: // Ÿ -> ÿ
+			out = append(out, 0xC3, 0xBF)
+			i++
+		default:
+			out = append(out, c)
+		}
+	}
+	return string(out)
 }

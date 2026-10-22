@@ -50,7 +50,10 @@ func builtinToInt(_ context.Context, args []filo.Value) (filo.Value, error) {
 	if err != nil {
 		return filo.Value{}, err
 	}
-	return filo.VNum(float64(int64(n))), nil
+	// math.Trunc, not an int64 round trip: that conversion is undefined for
+	// NaN, the infinities and anything past int64, and gives a different
+	// number on each architecture; the C runtime truncates the same way.
+	return filo.VNum(math.Trunc(n)), nil
 }
 
 // builtinAbs returns the absolute value of a number.
