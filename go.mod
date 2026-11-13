@@ -1,6 +1,6 @@
 module github.com/crgimenes/filo
 
-go 1.27.1
+go 1.27.4
 
 require golang.org/x/term v0.48.0
 
