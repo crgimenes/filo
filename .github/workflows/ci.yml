@@ -48,10 +48,10 @@ jobs:
       # round-trip). Not an exhaustive run — just enough to catch a regression
       # that a seed corpus wouldn't. Each target is bounded so the job can't hang.
       - name: Fuzz parser
-        run: go test -run '^$' -fuzz '^FuzzParseDoesNotPanic$' -fuzztime 30s .
+        run: go test -run '^$' -fuzz '^FuzzParseDoesNotPanic$' -fuzztime 30s ./core
       - name: Fuzz run-script
-        run: go test -run '^$' -fuzz '^FuzzRunScriptDoesNotPanic$' -fuzztime 30s .
+        run: go test -run '^$' -fuzz '^FuzzRunScriptDoesNotPanic$' -fuzztime 30s ./core
       - name: Fuzz marshal round-trip
-        run: go test -run '^$' -fuzz '^FuzzMarshalUnmarshalString$' -fuzztime 30s .
+        run: go test -run '^$' -fuzz '^FuzzMarshalUnmarshalString$' -fuzztime 30s ./core
       - name: Fuzz decompile
         run: go test -run '^$' -fuzz '^FuzzDecompileDoesNotPanic$' -fuzztime 30s ./fbc/
